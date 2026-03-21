@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Community - Dream Wave</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container">
+      <a href="dashboard.html" class="nav-brand">🌊 Dream Wave</a>
+      <div class="nav-links">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="ai-assistant.html">AI Assistant</a>
+        <a href="community.html" style="color:#667eea;font-weight:700">Community</a>
+        <button onclick="logout()" class="btn-secondary">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="community-container">
+    <div class="container">
+      <h1>Student Community</h1>
+
+      <div class="create-post-card">
+        <h3>Share Your Achievement</h3>
+        <textarea id="postContent" placeholder="What's on your mind?"></textarea>
+        <select id="postType">
+          <option value="general">General</option>
+          <option value="achievement">Achievement</option>
+          <option value="project">Project</option>
+          <option value="goal">Goal</option>
+        </select>
+        <button onclick="createPost()" id="postBtn" class="btn-primary">Post</button>
+      </div>
+
+      <div id="postsContainer" class="posts-container">
+        <p style="text-align:center;color:#666">Loading posts...</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script>
+    checkAuth();
+    loadPosts();
+
+    async function createPost() {
+      const content = document.getElementById('postContent').value.trim();
+      const type = document.getElementById('postType').value;
+      const btn = document.getElementById('postBtn');
+
+      if (!content) return;
+
+      btn.disabled = true;
+      btn.textContent = 'Posting...';
+
+      try {
+        const res = await fetch(API_URL + '/posts/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + localStorage.getItem('token')
+          },
+          body: JSON.stringify({ content, type })
+        });
+
+        if (res.ok) {
+          document.getElementById('postContent').value = '';
+          loadPosts();
+        } else {
+          alert('Error creating post');
+        }
+      } catch (err) {
+        alert('Cannot connect to server');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Post';
+      }
+    }
+
+    async function loadPosts() {
+      try {
+        const res = await fetch(API_URL + '/posts');
+        const posts = await res.json();
+
+        const container = document.getElementById('postsContainer');
+
+        if (!posts.length) {
+          container.innerHTML = '<p style="text-align:center;color:#666">No posts yet. Be the first to share!</p>';
+          return;
+        }
+
+        container.innerHTML = posts.map(function(post) {
+          return '<div class="post-card">' +
+            '<div class="post-header">' +
+              '<strong>' + post.author.name + '</strong>' +
+              '<span class="post-type">' + post.type + '</span>' +
+            '</div>' +
+            '<p class="post-content">' + post.content + '</p>' +
+            '<div class="post-actions">' +
+              '<button onclick="likePost(\'' + post._id + '\')" class="action-icon">❤️ ' + post.likes.length + '</button>' +
+              '<span>💬 ' + post.comments.length + '</span>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+      } catch (err) {
+        document.getElementById('postsContainer').innerHTML = '<p style="text-align:center;color:red">Error loading posts</p>';
+      }
+    }
+
+    async function likePost(postId) {
+      try {
+        await fetch(API_URL + '/posts/' + postId + '/like', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
+        });
+        loadPosts();
+      } catch (err) {
+        console.error('Error liking post');
+      }
+    }
+  </script>
+</body>
+</html>

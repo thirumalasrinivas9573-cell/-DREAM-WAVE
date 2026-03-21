@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Dream Wave</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .dashboard-layout { display: flex; min-height: calc(100vh - 60px); margin-top: 60px; }
+        .sidebar { width: 220px; background: white; border-right: 1px solid #e5e7eb; padding: 25px 15px; position: fixed; top: 60px; left: 0; height: calc(100vh - 60px); overflow-y: auto; z-index: 100; transition: transform 0.3s; }
+        .sidebar-item { display: flex; align-items: center; gap: 12px; padding: 12px 15px; border-radius: 10px; cursor: pointer; color: #555; font-weight: 500; text-decoration: none; margin-bottom: 5px; transition: all 0.2s; font-size: 0.95rem; }
+        .sidebar-item:hover, .sidebar-item.active { background: #f0f4ff; color: #667eea; }
+        .sidebar-item .icon { font-size: 1.2rem; width: 24px; text-align: center; }
+        .sidebar-section { font-size: 0.72rem; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 1px; padding: 15px 15px 5px; }
+        .main-content { margin-left: 220px; flex: 1; padding: 30px; }
+        .welcome-section { margin-bottom: 30px; }
+        .welcome-section h1 { font-size: 2rem; color: #333; }
+        .welcome-section p { color: #666; margin-top: 5px; }
+        .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; margin-bottom: 30px; }
+        .stat-card { background: white; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 3px 12px rgba(0,0,0,0.07); }
+        .stat-num { font-size: 2rem; font-weight: 700; color: #667eea; }
+        .stat-label { color: #666; font-size: 0.85rem; margin-top: 4px; }
+        .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 25px; }
+        .dash-card { background: white; border-radius: 15px; padding: 25px; box-shadow: 0 5px 20px rgba(0,0,0,0.08); }
+        .dash-card h3 { font-size: 1.1rem; color: #333; margin-bottom: 18px; }
+        .mode-selector { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .mode-btn { padding: 15px 10px; border: 2px solid #e5e7eb; border-radius: 10px; cursor: pointer; text-align: center; background: white; transition: all 0.2s; }
+        .mode-btn:hover, .mode-btn.active { border-color: #667eea; background: #f0f4ff; }
+        .mode-icon { font-size: 1.5rem; display: block; margin-bottom: 5px; }
+        .mode-btn span:last-child { font-size: 0.8rem; color: #555; font-weight: 500; }
+        .quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .action-btn { display: flex; align-items: center; gap: 10px; padding: 14px; background: #f8f9ff; border-radius: 10px; text-decoration: none; color: #333; font-size: 0.9rem; font-weight: 500; transition: all 0.2s; border: 1px solid transparent; }
+        .action-btn:hover { background: #f0f4ff; border-color: #667eea; color: #667eea; }
+        .action-btn span:first-child { font-size: 1.3rem; }
+        .ambition-banner { background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-radius: 15px; padding: 25px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; }
+        .ambition-banner h3 { font-size: 1.2rem; margin-bottom: 5px; }
+        .ambition-banner p { opacity: 0.85; font-size: 0.9rem; }
+        .amb-action-btn { background: white; color: #667eea; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.9rem; white-space: nowrap; }
+        body.dark-mode .sidebar { background: #1e293b; border-color: #374151; }
+        body.dark-mode .sidebar-item { color: #d1d5db; }
+        body.dark-mode .sidebar-item:hover, body.dark-mode .sidebar-item.active { background: #0f172a; color: #818cf8; }
+        body.dark-mode .stat-card, body.dark-mode .dash-card { background: #1e293b; }
+        body.dark-mode .welcome-section h1, body.dark-mode .dash-card h3 { color: #f3f4f6; }
+        body.dark-mode .welcome-section p { color: #9ca3af; }
+        body.dark-mode .mode-btn { background: #0f172a; border-color: #374151; }
+        body.dark-mode .mode-btn span:last-child { color: #d1d5db; }
+        body.dark-mode .action-btn { background: #0f172a; color: #d1d5db; }
+        body.dark-mode .action-btn:hover { background: #1a1f3a; color: #818cf8; border-color: #667eea; }
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); }
+            .main-content { margin-left: 0; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="dashboard.html" class="nav-brand">🌊 Dream Wave</a>
+            <div class="nav-links">
+                <a href="profile.html" id="profileLink">Profile</a>
+                <button onclick="logout()" class="btn-secondary">Logout</button>
+                <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="dashboard-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-section">Main</div>
+            <a href="dashboard.html" class="sidebar-item active"><span class="icon">🏠</span> Dashboard</a>
+            <a href="ai-assistant.html" class="sidebar-item"><span class="icon">🤖</span> AI Chat</a>
+            <a href="careers.html" class="sidebar-item"><span class="icon">🚀</span> Careers</a>
+            <a href="study.html" class="sidebar-item"><span class="icon">📚</span> Study</a>
+            <a href="entertainment.html" class="sidebar-item"><span class="icon">🎬</span> Entertainment</a>
+
+            <div class="sidebar-section">Progress</div>
+            <a href="leaderboard.html" class="sidebar-item"><span class="icon">🏆</span> Leaderboard</a>
+            <a href="community.html" class="sidebar-item"><span class="icon">👥</span> Community</a>
+            <a href="code-generator.html" class="sidebar-item"><span class="icon">⚡</span> Code Gen</a>
+
+            <div class="sidebar-section">Account</div>
+            <a href="profile.html" class="sidebar-item" id="sidebarProfile"><span class="icon">👤</span> Profile</a>
+            <a href="#" class="sidebar-item" onclick="logout()"><span class="icon">🚪</span> Logout</a>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="welcome-section">
+                <h1>Welcome back, <span id="userName"></span>! 👋</h1>
+                <p>Continue your learning journey</p>
+            </div>
+
+            <!-- Stats Row -->
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-num" id="statPoints">0</div>
+                    <div class="stat-label">⭐ Points</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-num" id="statStreak">0</div>
+                    <div class="stat-label">🔥 Day Streak</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-num" id="statBadges">0</div>
+                    <div class="stat-label">🏅 Badges</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-num" id="statRank">#-</div>
+                    <div class="stat-label">🏆 Rank</div>
+                </div>
+            </div>
+
+            <!-- Ambition Banner -->
+            <div class="ambition-banner" id="ambitionBanner">
+                <div>
+                    <h3>🎯 Set Your Ambition</h3>
+                    <p>Choose a career path and get your personalized roadmap</p>
+                </div>
+                <button class="amb-action-btn" onclick="window.location.href='careers.html'">Explore Careers →</button>
+            </div>
+
+            <div class="dash-grid">
+                <!-- Learning Mode -->
+                <div class="dash-card">
+                    <h3>Choose Learning Mode</h3>
+                    <div class="mode-selector">
+                        <button class="mode-btn" data-mode="reading">
+                            <span class="mode-icon">📖</span>
+                            <span>Reading</span>
+                        </button>
+                        <button class="mode-btn" data-mode="voice">
+                            <span class="mode-icon">🎤</span>
+                            <span>Voice</span>
+                        </button>
+                        <button class="mode-btn" data-mode="visual">
+                            <span class="mode-icon">🎨</span>
+                            <span>Visual</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="dash-card">
+                    <h3>Quick Actions</h3>
+                    <div class="quick-actions">
+                        <a href="ai-assistant.html" class="action-btn"><span>🤖</span><span>AI Assistant</span></a>
+                        <a href="careers.html" class="action-btn"><span>🚀</span><span>Explore Careers</span></a>
+                        <a href="study.html" class="action-btn"><span>📚</span><span>Study Mode</span></a>
+                        <a href="leaderboard.html" class="action-btn"><span>🏆</span><span>Leaderboard</span></a>
+                        <a href="code-generator.html" class="action-btn"><span>⚡</span><span>Code Generator</span></a>
+                        <a href="entertainment.html" class="action-btn"><span>🎬</span><span>Entertainment</span></a>
+                        <a href="community.html" class="action-btn"><span>👥</span><span>Community</span></a>
+                        <a href="profile.html" class="action-btn" id="profileActionLink"><span>👤</span><span>My Profile</span></a>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        checkAuth();
+
+        const API = window.location.hostname === 'localhost'
+            ? 'http://localhost:5000/api'
+            : 'https://aa-dream-wave-production.up.railway.app/api';
+
+        async function loadDashboard() {
+            try {
+                const [userRes, statsRes] = await Promise.all([
+                    fetch(`${API}/auth/me`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }),
+                    fetch(`${API}/progress/stats`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } })
+                ]);
+                const user = await userRes.json();
+                const stats = await statsRes.json();
+
+                document.getElementById('userName').textContent = user.name;
+                document.getElementById('profileLink').href = `profile.html?username=${user.username}`;
+                document.getElementById('sidebarProfile').href = `profile.html?username=${user.username}`;
+                document.getElementById('profileActionLink').href = `profile.html?username=${user.username}`;
+
+                document.getElementById('statPoints').textContent = stats.points || 0;
+                document.getElementById('statStreak').textContent = stats.streak || 0;
+                document.getElementById('statBadges').textContent = (stats.badges || []).length;
+                document.getElementById('statRank').textContent = `#${stats.rank || '-'}`;
+
+                if (user.ambition) {
+                    const careerRes = await fetch(`${API}/ambition/${user.ambition}`);
+                    const career = await careerRes.json();
+                    document.getElementById('ambitionBanner').innerHTML = `
+                        <div>
+                            <h3>${career.icon} Your Ambition: ${career.title}</h3>
+                            <p>Keep going! Complete tasks to earn certificates and climb the leaderboard.</p>
+                        </div>
+                        <button class="amb-action-btn" onclick="window.location.href='ambition.html?id=${career.id}'">Continue →</button>
+                    `;
+                }
+
+                // Set active mode button
+                document.querySelectorAll('.mode-btn').forEach(btn => {
+                    if (btn.dataset.mode === user.learningMode) btn.classList.add('active');
+                });
+            } catch (err) {
+                const stored = JSON.parse(localStorage.getItem('user') || '{}');
+                document.getElementById('userName').textContent = stored.name || 'User';
+            }
+        }
+
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                await fetch(`${API}/profile/update`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                    body: JSON.stringify({ learningMode: btn.dataset.mode })
+                });
+            });
+        });
+
+        loadDashboard();
+    </script>
+</body>
+</html>

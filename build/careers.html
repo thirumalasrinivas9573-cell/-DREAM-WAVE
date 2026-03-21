@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Career Explorer - Dream Wave</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .careers-hero {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 80px 20px 60px;
+            text-align: center;
+        }
+        .careers-hero h1 { font-size: 2.8rem; margin-bottom: 15px; }
+        .careers-hero p { font-size: 1.2rem; opacity: 0.9; }
+
+        .search-bar {
+            max-width: 500px;
+            margin: 30px auto 0;
+            display: flex;
+            gap: 10px;
+        }
+        .search-bar input {
+            flex: 1;
+            padding: 14px 20px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        .filter-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            padding: 30px 20px;
+            flex-wrap: wrap;
+        }
+        .filter-tab {
+            padding: 8px 20px;
+            border: 2px solid #667eea;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+            background: white;
+            color: #667eea;
+        }
+        .filter-tab.active, .filter-tab:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .careers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 25px;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .career-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+        .career-card:hover {
+            transform: translateY(-5px);
+            border-color: #667eea;
+            box-shadow: 0 10px 30px rgba(102,126,234,0.2);
+        }
+        .career-icon { font-size: 3rem; margin-bottom: 15px; }
+        .career-category {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #667eea;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+        .career-title { font-size: 1.3rem; font-weight: 700; color: #333; margin-bottom: 10px; }
+        .career-desc { color: #666; font-size: 0.9rem; line-height: 1.5; margin-bottom: 15px; }
+        .career-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+        }
+        .salary { color: #10b981; font-weight: 600; }
+        .demand { color: #f59e0b; font-weight: 600; }
+        .explore-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: opacity 0.3s;
+        }
+        .explore-btn:hover { opacity: 0.9; }
+
+        body.dark-mode .career-card { background: #1e293b; }
+        body.dark-mode .career-title { color: #f3f4f6; }
+        body.dark-mode .career-desc { color: #d1d5db; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="dashboard.html" class="nav-brand">🌊 Dream Wave</a>
+            <div class="nav-links">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="careers.html" style="color:#667eea;font-weight:700">Careers</a>
+                <a href="ai-assistant.html">AI Assistant</a>
+                <a href="community.html">Community</a>
+                <a href="profile.html">Profile</a>
+                <button onclick="logout()" class="btn-secondary">Logout</button>
+                <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="careers-hero">
+        <h1>🚀 Explore Your Dream Career</h1>
+        <p>Choose your ambition and get a personalized roadmap, tasks, and guidance</p>
+        <div class="search-bar">
+            <input type="text" id="searchInput" placeholder="Search careers..." oninput="filterCareers()">
+        </div>
+    </div>
+
+    <div class="filter-tabs">
+        <div class="filter-tab active" onclick="filterByCategory('ALL', this)">All</div>
+        <div class="filter-tab" onclick="filterByCategory('TECH', this)">Tech</div>
+        <div class="filter-tab" onclick="filterByCategory('BUSINESS', this)">Business</div>
+        <div class="filter-tab" onclick="filterByCategory('CREATIVE', this)">Creative</div>
+        <div class="filter-tab" onclick="filterByCategory('MEDICAL', this)">Medical</div>
+        <div class="filter-tab" onclick="filterByCategory('GOVERNMENT', this)">Government</div>
+        <div class="filter-tab" onclick="filterByCategory('FREELANCE', this)">Freelance</div>
+        <div class="filter-tab" onclick="filterByCategory('FINANCE', this)">Finance</div>
+    </div>
+
+    <div class="careers-grid" id="careersGrid">
+        <div style="text-align:center;padding:40px;grid-column:1/-1">Loading careers...</div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        checkAuth();
+        let allCareers = [];
+        let currentCategory = 'ALL';
+
+        const API = window.location.hostname === 'localhost'
+            ? 'http://localhost:5000/api'
+            : 'https://aa-dream-wave-production.up.railway.app/api';
+
+        async function loadCareers() {
+            try {
+                const res = await fetch(`${API}/ambition`);
+                allCareers = await res.json();
+                renderCareers(allCareers);
+            } catch (err) {
+                document.getElementById('careersGrid').innerHTML = '<p style="text-align:center;color:red">Error loading careers</p>';
+            }
+        }
+
+        function renderCareers(careers) {
+            const grid = document.getElementById('careersGrid');
+            if (!careers.length) {
+                grid.innerHTML = '<p style="text-align:center;color:#666;grid-column:1/-1">No careers found</p>';
+                return;
+            }
+            grid.innerHTML = careers.map(c => `
+                <div class="career-card" onclick="goToCareer('${c.id}')">
+                    <div class="career-icon">${c.icon}</div>
+                    <div class="career-category">${c.category}</div>
+                    <div class="career-title">${c.title}</div>
+                    <div class="career-desc">${c.description}</div>
+                    <div class="career-meta">
+                        <span class="salary">💰 ${c.avgSalary}</span>
+                        <span class="demand">📈 ${c.jobDemand}</span>
+                    </div>
+                    <button class="explore-btn">Explore Roadmap →</button>
+                </div>
+            `).join('');
+        }
+
+        function filterByCategory(category, el) {
+            currentCategory = category;
+            document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+            el.classList.add('active');
+            applyFilters();
+        }
+
+        function filterCareers() { applyFilters(); }
+
+        function applyFilters() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            let filtered = allCareers;
+            if (currentCategory !== 'ALL') filtered = filtered.filter(c => c.category === currentCategory);
+            if (search) filtered = filtered.filter(c => c.title.toLowerCase().includes(search) || c.description.toLowerCase().includes(search));
+            renderCareers(filtered);
+        }
+
+        function goToCareer(careerId) {
+            window.location.href = `ambition.html?id=${careerId}`;
+        }
+
+        loadCareers();
+    </script>
+</body>
+</html>

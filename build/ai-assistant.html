@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Assistant - Dream Wave</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .chat-tabs { display: flex; gap: 10px; padding: 15px 20px 0; background: white; border-bottom: 1px solid #e5e7eb; }
+        .chat-tab { padding: 10px 24px; border-radius: 8px 8px 0 0; border: none; font-size: 0.95rem; font-weight: 600; cursor: pointer; background: #f0f4ff; color: #667eea; transition: all 0.2s; }
+        .chat-tab.active { background: #667eea; color: white; }
+
+        /* REPORT PANEL */
+        .report-panel { display: none; max-width: 900px; margin: 30px auto; padding: 0 20px; }
+        .report-panel.visible { display: block; }
+        .report-input-row { display: flex; gap: 12px; margin-bottom: 20px; }
+        .report-input-row input { flex: 1; padding: 14px 20px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 1rem; outline: none; transition: border 0.2s; }
+        .report-input-row input:focus { border-color: #667eea; }
+        .report-input-row button { padding: 14px 28px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 10px; font-size: 1rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+        .report-input-row button:disabled { opacity: 0.6; cursor: not-allowed; }
+        .report-output { background: white; border-radius: 15px; padding: 30px; box-shadow: 0 5px 20px rgba(0,0,0,0.08); white-space: pre-wrap; line-height: 1.8; font-size: 0.95rem; color: #333; display: none; }
+        .report-output.visible { display: block; }
+        .report-actions { display: flex; gap: 10px; margin-top: 15px; justify-content: flex-end; }
+        .report-actions button { padding: 10px 20px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; font-size: 0.9rem; }
+        .btn-print { background: #10b981; color: white; }
+        .btn-copy { background: #667eea; color: white; }
+        .report-loading { text-align: center; padding: 40px; display: none; }
+        .report-loading.visible { display: block; }
+        .spinner { width: 48px; height: 48px; border: 5px solid #f0f4ff; border-top-color: #667eea; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 15px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        body.dark-mode .chat-tabs { background: #1e293b; border-color: #374151; }
+        body.dark-mode .chat-tab { background: #0f172a; color: #818cf8; }
+        body.dark-mode .chat-tab.active { background: #667eea; color: white; }
+        body.dark-mode .report-output { background: #1e293b; color: #f3f4f6; }
+        body.dark-mode .report-input-row input { background: #0f172a; border-color: #374151; color: #f3f4f6; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="dashboard.html" class="nav-brand">🌊 Dream Wave</a>
+            <div class="nav-links">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="ai-assistant.html">AI Assistant</a>
+                <a href="community.html">Community</a>
+                <button onclick="logout()" class="btn-secondary">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Tabs -->
+    <div class="chat-tabs">
+        <button class="chat-tab active" onclick="switchTab('chat', this)">🤖 AI Chat</button>
+        <button class="chat-tab" onclick="switchTab('report', this)">📊 Report</button>
+    </div>
+
+    <!-- CHAT PANEL -->
+    <div id="chatPanel">
+        <div class="chat-container">
+            <div class="chat-sidebar">
+                <h3>AI Settings</h3>
+                <div class="form-group">
+                    <label>Assistant Name</label>
+                    <input type="text" id="assistantName" placeholder="Dream AI">
+                    <button onclick="updateAssistantName()" class="btn-primary">Update</button>
+                </div>
+                <div class="chat-info">
+                    <p>💡 Ask me anything about:</p>
+                    <ul>
+                        <li>Career guidance</li>
+                        <li>Study topics</li>
+                        <li>College selection</li>
+                        <li>Exam preparation</li>
+                        <li>Skill development</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="chat-main">
+                <div class="chat-messages" id="chatMessages">
+                    <div class="message ai-message">
+                        <div class="message-content">
+                            <p>Hello! I'm your AI career assistant. I'm here to help you discover your career path and achieve your ambitions. Tell me about your interests, hobbies, or ask me anything!</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chat-input-container">
+                    <input type="text" id="chatInput" placeholder="Type your message..." />
+                    <button onclick="sendMessage()" class="btn-primary">Send</button>
+                    <button onclick="startVoiceInput()" class="btn-secondary" id="voiceBtn">🎤</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- REPORT PANEL -->
+    <div id="reportPanel" class="report-panel">
+        <h2 style="margin-bottom:8px">📊 Career Intelligence Report</h2>
+        <p style="color:#666;margin-bottom:20px">Enter any occupation to generate a detailed 4-year R&D report with success analysis, roadmap, and earning progression.</p>
+
+        <div class="report-input-row">
+            <input type="text" id="reportOccupation" placeholder="e.g. Software Engineer, Data Scientist, UI/UX Designer..." />
+            <button onclick="generateReport()" id="reportBtn">Generate Report</button>
+        </div>
+
+        <div class="report-loading" id="reportLoading">
+            <div class="spinner"></div>
+            <p style="color:#667eea;font-weight:600">Generating your premium report... This may take 30–60 seconds.</p>
+        </div>
+
+        <div class="report-output" id="reportOutput"></div>
+
+        <div class="report-actions" id="reportActions" style="display:none">
+            <button class="btn-copy" onclick="copyReport()">📋 Copy</button>
+            <button class="btn-print" onclick="printReport()">🖨️ Print / Save PDF</button>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+    <script>
+        checkAuth();
+
+        const token = () => localStorage.getItem('token');
+
+        // ─── TAB SWITCHING ────────────────────────────────
+        function switchTab(tab, el) {
+            document.querySelectorAll('.chat-tab').forEach(t => t.classList.remove('active'));
+            el.classList.add('active');
+            document.getElementById('chatPanel').style.display = tab === 'chat' ? '' : 'none';
+            document.getElementById('reportPanel').classList.toggle('visible', tab === 'report');
+        }
+
+        // ─── CHAT ─────────────────────────────────────────
+        async function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            if (!message) return;
+
+            addMessage(message, 'user');
+            input.value = '';
+
+            try {
+                const response = await fetch(`${API_URL}/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token()}` },
+                    body: JSON.stringify({ message, context: 'career-guidance' })
+                });
+                const data = await response.json();
+                addMessage(data.response || data.error || 'No response received', 'ai');
+            } catch (error) {
+                addMessage('Sorry, I encountered an error. Please try again.', 'ai');
+            }
+        }
+
+        function addMessage(text, type) {
+            const messagesDiv = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}-message`;
+            messageDiv.innerHTML = `<div class="message-content"><p>${text.replace(/\n/g, '<br>')}</p></div>`;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        document.getElementById('chatInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        async function updateAssistantName() {
+            const name = document.getElementById('assistantName').value;
+            await fetch(`${API_URL}/profile/update`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token()}` },
+                body: JSON.stringify({ aiAssistantName: name })
+            });
+            alert('Assistant name updated!');
+        }
+
+        function startVoiceInput() {
+            if ('webkitSpeechRecognition' in window) {
+                const recognition = new webkitSpeechRecognition();
+                recognition.lang = 'en-US';
+                recognition.onresult = (event) => {
+                    document.getElementById('chatInput').value = event.results[0][0].transcript;
+                };
+                recognition.start();
+            } else {
+                alert('Voice input not supported in this browser');
+            }
+        }
+
+        // ─── REPORT ───────────────────────────────────────
+        async function generateReport() {
+            const occupation = document.getElementById('reportOccupation').value.trim();
+            if (!occupation) { alert('Please enter an occupation'); return; }
+
+            const btn = document.getElementById('reportBtn');
+            const loading = document.getElementById('reportLoading');
+            const output = document.getElementById('reportOutput');
+            const actions = document.getElementById('reportActions');
+
+            btn.disabled = true;
+            btn.textContent = 'Generating...';
+            loading.classList.add('visible');
+            output.classList.remove('visible');
+            actions.style.display = 'none';
+
+            try {
+                const response = await fetch(`${API_URL}/chat/report`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token()}` },
+                    body: JSON.stringify({ occupation })
+                });
+                const data = await response.json();
+
+                if (data.report) {
+                    output.textContent = data.report;
+                    output.classList.add('visible');
+                    actions.style.display = 'flex';
+                } else {
+                    output.textContent = `Error: ${data.error || data.message || 'Failed to generate report'}`;
+                    output.classList.add('visible');
+                }
+            } catch (err) {
+                output.textContent = 'Error generating report. Please try again.';
+                output.classList.add('visible');
+            } finally {
+                loading.classList.remove('visible');
+                btn.disabled = false;
+                btn.textContent = 'Generate Report';
+            }
+        }
+
+        document.getElementById('reportOccupation').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') generateReport();
+        });
+
+        function copyReport() {
+            const text = document.getElementById('reportOutput').textContent;
+            navigator.clipboard.writeText(text).then(() => alert('Report copied to clipboard!'));
+        }
+
+        function printReport() {
+            const content = document.getElementById('reportOutput').textContent;
+            const win = window.open('', '_blank');
+            win.document.write(`<pre style="font-family:Arial;font-size:13px;line-height:1.8;padding:30px;white-space:pre-wrap">${content}</pre>`);
+            win.document.close();
+            win.print();
+        }
+    </script>
+</body>
+</html>
