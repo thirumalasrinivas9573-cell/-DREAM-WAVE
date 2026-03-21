@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Career Roadmap - Dream Wave</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="dashboard.html" class="nav-brand">🌊 Dream Wave</a>
+            <div class="nav-links">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="ai-assistant.html">AI Assistant</a>
+                <a href="community.html">Community</a>
+                <button onclick="logout()" class="btn-secondary">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="roadmap-container">
+        <div class="container">
+            <h1>Your Career Roadmap</h1>
+            <p>Generate a personalized career roadmap by talking to your AI assistant about your ambitions.</p>
+            
+            <div class="roadmap-card">
+                <h3>How to Generate Your Roadmap</h3>
+                <ol>
+                    <li>Go to the AI Assistant</li>
+                    <li>Tell the AI about your career interests</li>
+                    <li>Confirm your career ambition</li>
+                    <li>AI will generate a detailed roadmap including:
+                        <ul>
+                            <li>Career overview and meaning</li>
+                            <li>Required subjects and skills</li>
+                            <li>Recommended colleges and institutions</li>
+                            <li>Entrance exams and minimum scores</li>
+                            <li>Technical skills needed</li>
+                            <li>Salary ranges and earning potential</li>
+                            <li>Success stories and strategies</li>
+                            <li>Challenges and how to overcome them</li>
+                        </ul>
+                    </li>
+                    <li>Download your roadmap as PDF</li>
+                </ol>
+                <a href="ai-assistant.html" class="btn-primary">Start with AI Assistant</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>checkAuth();</script>
+</body>
+</html>

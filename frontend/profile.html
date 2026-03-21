@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile - Dream Wave</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container">
+      <a href="dashboard.html" class="nav-brand">🌊 Dream Wave</a>
+      <div class="nav-links">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="ai-assistant.html">AI Assistant</a>
+        <a href="community.html">Community</a>
+        <button onclick="logout()" class="btn-secondary">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="profile-container">
+    <div class="container">
+      <div class="profile-header">
+        <div class="profile-avatar">👤</div>
+        <div class="profile-info">
+          <h1 id="profileName"></h1>
+          <p id="profileEmail"></p>
+          <span class="subscription-badge" id="subscriptionBadge"></span>
+        </div>
+      </div>
+
+      <div class="profile-grid">
+        <div class="profile-card">
+          <h3>About</h3>
+          <div class="profile-details">
+            <p><strong>Education:</strong> <span id="education">Not set</span></p>
+            <p><strong>Career Goals:</strong> <span id="careerGoals">Not set</span></p>
+            <p><strong>Learning Mode:</strong> <span id="learningMode"></span></p>
+          </div>
+        </div>
+
+        <div class="profile-card">
+          <h3>Skills</h3>
+          <div id="skillsList" class="skills-list"></div>
+        </div>
+
+        <div class="profile-card">
+          <h3>Certificates</h3>
+          <div id="certificatesList"></div>
+        </div>
+
+        <div class="profile-card">
+          <h3>Projects</h3>
+          <div id="projectsList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script>
+    checkAuth();
+    loadProfile();
+
+    async function loadProfile() {
+      const params = new URLSearchParams(window.location.search);
+      const username = params.get('username');
+
+      if (!username) {
+        document.querySelector('.profile-container').innerHTML = '<p style="text-align:center;padding:40px;color:red">No username provided</p>';
+        return;
+      }
+
+      try {
+        const res = await fetch(API_URL + '/profile/' + username);
+        const user = await res.json();
+
+        if (!res.ok) {
+          document.querySelector('.profile-container').innerHTML = '<p style="text-align:center;padding:40px;color:red">User not found</p>';
+          return;
+        }
+
+        document.getElementById('profileName').textContent = user.name;
+        document.getElementById('profileEmail').textContent = user.email;
+        document.getElementById('subscriptionBadge').textContent = user.subscription.toUpperCase();
+        document.getElementById('education').textContent = user.education || 'Not set';
+        document.getElementById('careerGoals').textContent = user.careerGoals || 'Not set';
+        document.getElementById('learningMode').textContent = user.learningMode;
+
+        document.getElementById('skillsList').innerHTML = user.skills && user.skills.length
+          ? user.skills.map(function(s) { return '<span class="skill-tag">' + s + '</span>'; }).join('')
+          : '<p>No skills added yet</p>';
+
+        document.getElementById('certificatesList').innerHTML = user.certificates && user.certificates.length
+          ? user.certificates.map(function(c) { return '<div class="cert-item">🏆 ' + c.title + '</div>'; }).join('')
+          : '<p>No certificates yet</p>';
+
+        document.getElementById('projectsList').innerHTML = user.projects && user.projects.length
+          ? user.projects.map(function(p) { return '<div class="project-item"><strong>' + p.title + '</strong><p>' + p.description + '</p></div>'; }).join('')
+          : '<p>No projects yet</p>';
+
+      } catch (err) {
+        document.querySelector('.profile-container').innerHTML = '<p style="text-align:center;padding:40px;color:red">Error loading profile</p>';
+      }
+    }
+  </script>
+</body>
+</html>

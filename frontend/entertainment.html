@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entertainment - Dream Wave</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .ent-container { max-width: 600px; margin: 80px auto 40px; padding: 20px; }
+        .ent-header { text-align: center; margin-bottom: 30px; }
+        .ent-header h1 { font-size: 2rem; color: #667eea; }
+        .ent-header p { color: #666; margin-top: 8px; }
+        .upload-card { background: white; border-radius: 15px; padding: 25px; box-shadow: 0 5px 20px rgba(0,0,0,0.08); margin-bottom: 30px; }
+        .upload-card h3 { margin-bottom: 15px; color: #333; }
+        .upload-form { display: flex; flex-direction: column; gap: 12px; }
+        .upload-form input, .upload-form textarea, .upload-form select { padding: 12px 15px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.95rem; outline: none; transition: border 0.2s; }
+        .upload-form input:focus, .upload-form textarea:focus { border-color: #667eea; }
+        .upload-form textarea { resize: vertical; min-height: 80px; }
+        .upload-btn { background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; padding: 12px; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+        .upload-btn:hover { opacity: 0.9; }
+        .reels-feed { display: flex; flex-direction: column; gap: 20px; }
+        .reel-card { background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 5px 20px rgba(0,0,0,0.08); }
+        .reel-video { width: 100%; max-height: 400px; background: #000; display: block; }
+        .reel-body { padding: 15px; }
+        .reel-user { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .reel-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.9rem; }
+        .reel-username { font-weight: 600; color: #333; font-size: 0.9rem; }
+        .reel-time { color: #888; font-size: 0.8rem; }
+        .reel-title { font-weight: 600; color: #333; margin-bottom: 5px; }
+        .reel-desc { color: #666; font-size: 0.88rem; margin-bottom: 12px; }
+        .reel-tag { display: inline-block; background: #f0f4ff; color: #667eea; padding: 3px 10px; border-radius: 12px; font-size: 0.78rem; margin-right: 5px; }
+        .reel-actions { display: flex; gap: 15px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f0f0; }
+        .reel-btn { background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 5px; color: #666; font-size: 0.88rem; padding: 5px 10px; border-radius: 8px; transition: all 0.2s; }
+        .reel-btn:hover { background: #f0f4ff; color: #667eea; }
+        .reel-btn.liked { color: #e74c3c; }
+        .comments-section { margin-top: 12px; display: none; }
+        .comment-input { display: flex; gap: 8px; margin-bottom: 10px; }
+        .comment-input input { flex: 1; padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 20px; font-size: 0.85rem; outline: none; }
+        .comment-input button { background: #667eea; color: white; border: none; padding: 8px 15px; border-radius: 20px; cursor: pointer; font-size: 0.85rem; }
+        .comment-item { display: flex; gap: 8px; margin-bottom: 8px; }
+        .comment-text { background: #f8f9ff; padding: 8px 12px; border-radius: 10px; font-size: 0.85rem; color: #333; flex: 1; }
+        .comment-author { font-weight: 600; font-size: 0.8rem; color: #667eea; margin-bottom: 2px; }
+        .empty-feed { text-align: center; padding: 60px 20px; color: #888; }
+        .empty-feed .empty-icon { font-size: 4rem; margin-bottom: 15px; }
+        body.dark-mode .upload-card, body.dark-mode .reel-card { background: #1e293b; }
+        body.dark-mode .upload-card h3, body.dark-mode .reel-title, body.dark-mode .reel-username { color: #f3f4f6; }
+        body.dark-mode .upload-form input, body.dark-mode .upload-form textarea { background: #0f172a; border-color: #374151; color: #f3f4f6; }
+        body.dark-mode .reel-desc { color: #9ca3af; }
+        body.dark-mode .reel-actions { border-color: #374151; }
+        body.dark-mode .comment-text { background: #0f172a; color: #f3f4f6; }
+        body.dark-mode .comment-input input { background: #0f172a; border-color: #374151; color: #f3f4f6; }
+        body.dark-mode .ent-header p { color: #9ca3af; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="dashboard.html" class="nav-brand">🌊 Dream Wave</a>
+            <div class="nav-links">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="careers.html">Careers</a>
+                <a href="study.html">Study</a>
+                <a href="entertainment.html" style="color:#667eea;font-weight:700">Entertainment</a>
+                <a href="ai-assistant.html">AI</a>
+                <a href="profile.html" id="profileLink">Profile</a>
+                <button onclick="logout()" class="btn-secondary">Logout</button>
+                <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="ent-container">
+        <div class="ent-header">
+            <h1>🎬 Entertainment</h1>
+            <p>Share motivation, learning content, and career reels with the community</p>
+        </div>
+
+        <!-- Upload Section -->
+        <div class="upload-card">
+            <h3>📤 Share a Reel</h3>
+            <div class="upload-form">
+                <input type="text" id="reelTitle" placeholder="Reel title..." maxlength="100">
+                <textarea id="reelDesc" placeholder="Describe your content..."></textarea>
+                <select id="reelCategory">
+                    <option value="motivation">🔥 Motivation</option>
+                    <option value="learning">📚 Learning</option>
+                    <option value="career">🚀 Career Tips</option>
+                    <option value="coding">💻 Coding</option>
+                    <option value="lifestyle">🌟 Lifestyle</option>
+                </select>
+                <input type="url" id="reelUrl" placeholder="Video URL (YouTube, MP4 link...)">
+                <button class="upload-btn" onclick="postReel()">🚀 Post Reel</button>
+            </div>
+        </div>
+
+        <!-- Feed -->
+        <div class="reels-feed" id="reelsFeed">
+            <div style="text-align:center;padding:40px;color:#666">Loading reels...</div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+    <script>
+        checkAuth();
+
+        var reels = JSON.parse(localStorage.getItem('dw_reels') || '[]');
+        var currentUser = null;
+
+        async function init() {
+            try {
+                var res = await fetch(API_URL + '/auth/me', {
+                    headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
+                });
+                currentUser = await res.json();
+                document.getElementById('profileLink').href = 'profile.html?username=' + currentUser.username;
+            } catch (e) {}
+
+            if (!reels.length) {
+                reels = [
+                    { id: 1, title: "How I became a Software Engineer in 6 months", desc: "My journey from zero to landing my first job. Consistency is key!", category: "career", url: "", author: "DreamWave Team", time: "2 hours ago", likes: 42, comments: [] },
+                    { id: 2, title: "5 Habits of Successful Students", desc: "These habits changed my life. Start with just one today.", category: "motivation", url: "", author: "Mentor AI", time: "5 hours ago", likes: 87, comments: [] },
+                    { id: 3, title: "Learn Python in 30 Days - Day 1", desc: "Starting my Python journey. Follow along for daily updates!", category: "learning", url: "", author: "CodeLearner", time: "1 day ago", likes: 31, comments: [] }
+                ];
+                localStorage.setItem('dw_reels', JSON.stringify(reels));
+            }
+            renderFeed();
+        }
+
+        function renderFeed() {
+            const feed = document.getElementById('reelsFeed');
+            if (!reels.length) {
+                feed.innerHTML = `<div class="empty-feed"><div class="empty-icon">🎬</div><p>No reels yet. Be the first to share!</p></div>`;
+                return;
+            }
+
+            const catEmoji = { motivation: '🔥', learning: '📚', career: '🚀', coding: '💻', lifestyle: '🌟' };
+
+            feed.innerHTML = reels.slice().reverse().map(r => `
+                <div class="reel-card" id="reel-${r.id}">
+                    ${r.url ? `<video class="reel-video" controls src="${r.url}"></video>` : `<div style="background:linear-gradient(135deg,#667eea,#764ba2);height:200px;display:flex;align-items:center;justify-content:center;font-size:4rem">${catEmoji[r.category] || '🎬'}</div>`}
+                    <div class="reel-body">
+                        <div class="reel-user">
+                            <div class="reel-avatar">${(r.author || 'U')[0].toUpperCase()}</div>
+                            <div>
+                                <div class="reel-username">${r.author || 'Anonymous'}</div>
+                                <div class="reel-time">${r.time}</div>
+                            </div>
+                        </div>
+                        <div class="reel-title">${r.title}</div>
+                        <div class="reel-desc">${r.desc}</div>
+                        <span class="reel-tag">${catEmoji[r.category] || ''} ${r.category}</span>
+                        <div class="reel-actions">
+                            <button class="reel-btn ${r.liked ? 'liked' : ''}" onclick="toggleLike(${r.id})">
+                                ${r.liked ? '❤️' : '🤍'} ${r.likes || 0}
+                            </button>
+                            <button class="reel-btn" onclick="toggleComments(${r.id})">
+                                💬 ${(r.comments || []).length}
+                            </button>
+                            <button class="reel-btn" onclick="shareReel(${r.id})">🔗 Share</button>
+                        </div>
+                        <div class="comments-section" id="comments-${r.id}">
+                            <div class="comment-input">
+                                <input type="text" id="commentInput-${r.id}" placeholder="Add a comment...">
+                                <button onclick="addComment(${r.id})">Post</button>
+                            </div>
+                            <div id="commentsList-${r.id}">
+                                ${(r.comments || []).map(c => `
+                                    <div class="comment-item">
+                                        <div class="reel-avatar" style="width:28px;height:28px;font-size:0.75rem">${c.author[0]}</div>
+                                        <div class="comment-text">
+                                            <div class="comment-author">${c.author}</div>
+                                            ${c.text}
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function postReel() {
+            const title = document.getElementById('reelTitle').value.trim();
+            const desc = document.getElementById('reelDesc').value.trim();
+            const category = document.getElementById('reelCategory').value;
+            const url = document.getElementById('reelUrl').value.trim();
+
+            if (!title) { alert('Please add a title'); return; }
+
+            const reel = {
+                id: Date.now(),
+                title, desc, category, url,
+                author: currentUser?.name || 'You',
+                time: 'Just now',
+                likes: 0, liked: false, comments: []
+            };
+
+            reels.push(reel);
+            localStorage.setItem('dw_reels', JSON.stringify(reels));
+
+            document.getElementById('reelTitle').value = '';
+            document.getElementById('reelDesc').value = '';
+            document.getElementById('reelUrl').value = '';
+
+            renderFeed();
+        }
+
+        function toggleLike(id) {
+            const reel = reels.find(r => r.id === id);
+            if (!reel) return;
+            reel.liked = !reel.liked;
+            reel.likes = (reel.likes || 0) + (reel.liked ? 1 : -1);
+            localStorage.setItem('dw_reels', JSON.stringify(reels));
+            renderFeed();
+        }
+
+        function toggleComments(id) {
+            const el = document.getElementById(`comments-${id}`);
+            el.style.display = el.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function addComment(id) {
+            const input = document.getElementById(`commentInput-${id}`);
+            const text = input.value.trim();
+            if (!text) return;
+            const reel = reels.find(r => r.id === id);
+            if (!reel) return;
+            reel.comments = reel.comments || [];
+            reel.comments.push({ author: currentUser?.name || 'You', text });
+            localStorage.setItem('dw_reels', JSON.stringify(reels));
+            renderFeed();
+            setTimeout(() => {
+                document.getElementById(`comments-${id}`).style.display = 'block';
+            }, 50);
+        }
+
+        function shareReel(id) {
+            const reel = reels.find(r => r.id === id);
+            if (navigator.share) {
+                navigator.share({ title: reel.title, text: reel.desc, url: window.location.href });
+            } else {
+                navigator.clipboard.writeText(window.location.href);
+                alert('Link copied to clipboard!');
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

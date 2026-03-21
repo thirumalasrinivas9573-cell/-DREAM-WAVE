@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Code Generator - Dream Wave</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .code-generator-container {
+            max-width: 1200px;
+            margin: 100px auto 50px;
+            padding: 20px;
+        }
+
+        .generator-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .generator-header h1 {
+            font-size: 2.5rem;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+
+        .generator-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        .prompt-input-area {
+            margin-bottom: 20px;
+        }
+
+        .prompt-input-area label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .prompt-input {
+            width: 100%;
+            min-height: 120px;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-family: inherit;
+            resize: vertical;
+        }
+
+        .prompt-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .language-selector {
+            margin-bottom: 20px;
+        }
+
+        .language-selector select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+        }
+
+        .generate-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .generate-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .generate-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .code-output-area {
+            background: #1e1e1e;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            position: relative;
+        }
+
+        .code-output {
+            color: #d4d4d4;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            line-height: 1.6;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            padding: 8px 15px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .copy-btn:hover {
+            background: var(--secondary-color);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .loading::after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+
+        .examples {
+            margin-top: 30px;
+        }
+
+        .examples h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .example-prompts {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .example-prompt {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+
+        .example-prompt:hover {
+            background: #e9ecef;
+            border-color: var(--primary-color);
+        }
+
+        .example-prompt strong {
+            display: block;
+            color: var(--primary-color);
+            margin-bottom: 5px;
+        }
+
+        body.dark-mode nav { background: #1e293b; }
+        body.dark-mode nav a, body.dark-mode .logo { color: #d1d5db; }
+        body.dark-mode .generator-header p { color: #9ca3af; }
+        body.dark-mode .generator-section { background: #1e293b; }
+        body.dark-mode .prompt-input-area label,
+        body.dark-mode .language-selector label,
+        body.dark-mode .examples h3 { color: #f3f4f6; }
+        body.dark-mode .prompt-input,
+        body.dark-mode .language-selector select {
+            background: #0f172a;
+            color: #f3f4f6;
+            border-color: #374151;
+        }
+        body.dark-mode .example-prompt {
+            background: #0f172a;
+            border-color: #374151;
+        }
+        body.dark-mode .example-prompt:hover { background: #1a1f3a; border-color: #6366f1; }
+        body.dark-mode .example-prompt strong { color: #818cf8; }
+        body.dark-mode .example-prompt p { color: #9ca3af; }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="nav-container">
+            <div class="logo">Dream Wave</div>
+            <ul class="nav-links">
+                <li><a href="dashboard.html">Dashboard</a></li>
+                <li><a href="ai-assistant.html">AI Assistant</a></li>
+                <li><a href="code-generator.html">Code Generator</a></li>
+                <li><a href="community.html">Community</a></li>
+                <li><a href="profile.html">Profile</a></li>
+                <li><a href="#" onclick="logout()">Logout</a></li>
+                <li><button class="theme-toggle" onclick="toggleTheme()" id="themeToggle">🌙</button></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="code-generator-container">
+        <div class="generator-header">
+            <h1>🚀 AI Code Generator</h1>
+            <p>Describe what you want to build, and AI will generate the code for you!</p>
+        </div>
+
+        <div class="generator-section">
+            <div class="prompt-input-area">
+                <label for="codePrompt">What do you want to build?</label>
+                <textarea 
+                    id="codePrompt" 
+                    class="prompt-input" 
+                    placeholder="Example: Create a function to calculate fibonacci numbers in Python&#10;Example: Build a REST API endpoint for user authentication&#10;Example: Write a React component for a todo list"
+                ></textarea>
+            </div>
+
+            <div class="language-selector">
+                <label for="language">Programming Language:</label>
+                <select id="language">
+                    <option value="auto">Auto-detect</option>
+                    <option value="python">Python</option>
+                    <option value="javascript">JavaScript</option>
+                    <option value="java">Java</option>
+                    <option value="cpp">C++</option>
+                    <option value="csharp">C#</option>
+                    <option value="php">PHP</option>
+                    <option value="ruby">Ruby</option>
+                    <option value="go">Go</option>
+                    <option value="rust">Rust</option>
+                    <option value="html">HTML/CSS</option>
+                    <option value="sql">SQL</option>
+                </select>
+            </div>
+
+            <button class="generate-btn" onclick="generateCode()" id="generateBtn">
+                ✨ Generate Code
+            </button>
+
+            <div id="outputSection" style="display: none;">
+                <div class="code-output-area">
+                    <button class="copy-btn" onclick="copyCode()">📋 Copy</button>
+                    <pre class="code-output" id="codeOutput"></pre>
+                </div>
+            </div>
+
+            <div id="loadingSection" style="display: none;">
+                <div class="loading">Generating your code</div>
+            </div>
+        </div>
+
+        <div class="generator-section examples">
+            <h3>💡 Example Prompts</h3>
+            <div class="example-prompts">
+                <div class="example-prompt" onclick="useExample(this)">
+                    <strong>Python Function</strong>
+                    <p>Create a function to sort a list of dictionaries by a specific key</p>
+                </div>
+                <div class="example-prompt" onclick="useExample(this)">
+                    <strong>API Endpoint</strong>
+                    <p>Build a Node.js Express endpoint for user registration with validation</p>
+                </div>
+                <div class="example-prompt" onclick="useExample(this)">
+                    <strong>React Component</strong>
+                    <p>Create a React component for a responsive navigation bar with dropdown menu</p>
+                </div>
+                <div class="example-prompt" onclick="useExample(this)">
+                    <strong>Database Query</strong>
+                    <p>Write a SQL query to find top 10 customers by total purchase amount</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+    <script>
+        checkAuth();
+
+        async function generateCode() {
+            var prompt = document.getElementById('codePrompt').value.trim();
+            var language = document.getElementById('language').value;
+
+            if (!prompt) {
+                alert('Please enter a description of what you want to build!');
+                return;
+            }
+
+            var generateBtn = document.getElementById('generateBtn');
+            var outputSection = document.getElementById('outputSection');
+            var loadingSection = document.getElementById('loadingSection');
+
+            generateBtn.disabled = true;
+            outputSection.style.display = 'none';
+            loadingSection.style.display = 'block';
+
+            var fullPrompt = language === 'auto'
+                ? 'Generate code for: ' + prompt + '\n\nProvide clean, well-commented code with explanations.'
+                : 'Generate ' + language + ' code for: ' + prompt + '\n\nProvide clean, well-commented code with explanations.';
+
+            try {
+                var res = await fetch(API_URL + '/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + localStorage.getItem('token')
+                    },
+                    body: JSON.stringify({ message: fullPrompt, context: 'code-generation' })
+                });
+
+                var data = await res.json();
+
+                if (data.response) {
+                    document.getElementById('codeOutput').textContent = data.response;
+                    outputSection.style.display = 'block';
+                } else {
+                    alert('Error generating code. Please try again.');
+                }
+            } catch (err) {
+                alert('Failed to generate code. Please try again.');
+            } finally {
+                generateBtn.disabled = false;
+                loadingSection.style.display = 'none';
+            }
+        }
+
+        function copyCode() {
+            var codeOutput = document.getElementById('codeOutput').textContent;
+            navigator.clipboard.writeText(codeOutput).then(function() {
+                var copyBtn = document.querySelector('.copy-btn');
+                var orig = copyBtn.textContent;
+                copyBtn.textContent = '✅ Copied!';
+                setTimeout(function() { copyBtn.textContent = orig; }, 2000);
+            });
+        }
+
+        function useExample(element) {
+            document.getElementById('codePrompt').value = element.querySelector('p').textContent;
+            document.getElementById('codePrompt').focus();
+        }
+
+        document.getElementById('codePrompt').addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') generateCode();
+        });
+    </script>
+</body>
+</html>
