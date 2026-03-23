@@ -26,8 +26,23 @@
         <button onclick="logout()" class="btn-secondary">Logout</button>
         <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle">🌙</button>
       </div>
+      <button class="hamburger" id="hamburger" onclick="toggleMobileNav()" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
     </div>
   </nav>
+  <div class="mobile-nav" id="mobileNav">
+    <a href="dashboard.html">🏠 Dashboard</a>
+    <a href="ai-assistant.html">🤖 AI Chat</a>
+    <a href="mentor.html">🎓 AI Mentor</a>
+    <a href="comrades.html">🤝 Comrades</a>
+    <a href="community.html">👥 Community</a>
+    <a href="focus.html">🎯 Focus Mode</a>
+    <a href="daily-life.html">🌿 Daily Life AI</a>
+    <a href="study.html">📚 Study</a>
+    <a href="profile.html">👤 Profile</a>
+    <button onclick="logout()">🚪 Logout</button>
+  </div>
 
   <div class="dashboard-layout">
     <aside class="sidebar">
@@ -40,8 +55,13 @@
       <a href="study.html" class="sidebar-item"><span class="icon">📚</span> Study</a>
       <a href="ambition.html" class="sidebar-item"><span class="icon">🎯</span> Set Goal</a>
 
+      <a href="focus.html" class="sidebar-item"><span class="icon">🎯</span> Focus Mode</a>
+      <a href="daily-life.html" class="sidebar-item"><span class="icon">🌿</span> Daily Life AI</a>
+
       <div class="sidebar-section">Social</div>
+      <a href="comrades.html" class="sidebar-item"><span class="icon">🤝</span> Comrades</a>
       <a href="community.html" class="sidebar-item"><span class="icon">👥</span> Community</a>
+      <a href="messages.html" class="sidebar-item"><span class="icon">💬</span> Messages</a>
       <a href="entertainment.html" class="sidebar-item"><span class="icon">🎬</span> Reels</a>
       <a href="leaderboard.html" class="sidebar-item"><span class="icon">🏆</span> Leaderboard</a>
 
@@ -121,6 +141,10 @@
           <div class="stat-num" id="statTasks">0</div>
           <div class="stat-label">✅ Tasks Done</div>
         </div>
+        <div class="stat-card">
+          <div class="stat-num" id="statDiscipline">0%</div>
+          <div class="stat-label">⚔️ Discipline</div>
+        </div>
       </div>
 
       <!-- Main Grid -->
@@ -143,7 +167,9 @@
           <div class="quick-actions">
             <a href="ai-assistant.html" class="action-btn"><span>🤖</span> AI Mentor</a>
             <a href="study.html" class="action-btn"><span>📚</span> Study Mode</a>
-            <a href="community.html" class="action-btn"><span>👥</span> Community</a>
+            <a href="comrades.html" class="action-btn"><span>🤝</span> Comrades</a>
+            <a href="focus.html" class="action-btn"><span>🎯</span> Focus Mode</a>
+            <a href="daily-life.html" class="action-btn"><span>🌿</span> Daily Life AI</a>
             <a href="career-roadmap.html" class="action-btn"><span>🗺️</span> Roadmap</a>
             <a href="leaderboard.html" class="action-btn"><span>🏆</span> Leaderboard</a>
             <a href="entertainment.html" class="action-btn"><span>🎬</span> Reels</a>
@@ -238,6 +264,7 @@
           document.getElementById('statStreak').textContent = data.streak || 0;
           document.getElementById('statRank').textContent = '#' + (data.rank || '—');
           document.getElementById('statLevel').textContent = data.level || 1;
+          document.getElementById('statDiscipline').textContent = (data.disciplineScore || 0) + '%';
           document.getElementById('creditDisplay').textContent = data.points || 0;
 
           const level = data.level || 1;
@@ -403,6 +430,13 @@
     }
 
     loadDashboard();
+
+    function toggleMobileNav() {
+      const nav = document.getElementById('mobileNav');
+      const btn = document.getElementById('hamburger');
+      nav.classList.toggle('open');
+      btn.classList.toggle('open');
+    }
   </script>
 </body>
 </html>

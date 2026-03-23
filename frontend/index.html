@@ -42,8 +42,18 @@
         <a href="login.html" class="btn-secondary">Login</a>
         <a href="register.html" class="btn-primary">Get Started</a>
       </div>
+      <button class="hamburger" id="hamburger" onclick="toggleMobileNav()" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
     </div>
   </nav>
+  <div class="mobile-nav" id="mobileNav">
+    <a href="#features">Features</a>
+    <a href="#how">How it Works</a>
+    <a href="#pricing">Pricing</a>
+    <a href="login.html">Login</a>
+    <a href="register.html">Get Started Free</a>
+  </div>
 
   <!-- HERO -->
   <section class="hero">
@@ -288,5 +298,13 @@
       </div>
     </div>
   </footer>
+  <script>
+    function toggleMobileNav() {
+      const nav = document.getElementById('mobileNav');
+      const btn = document.getElementById('hamburger');
+      nav.classList.toggle('open');
+      btn.classList.toggle('open');
+    }
+  </script>
 </body>
 </html>

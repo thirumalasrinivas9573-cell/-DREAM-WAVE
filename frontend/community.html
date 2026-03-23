@@ -57,12 +57,23 @@
       <div class="nav-links">
         <a href="dashboard.html">Dashboard</a>
         <a href="ai-assistant.html">AI Mentor</a>
+        <a href="comrades.html">🤝 Comrades</a>
         <a href="community.html" class="active">Community</a>
         <a href="messages.html">💬 Chat</a>
         <button onclick="logout()" class="btn-secondary">Logout</button>
       </div>
+      <button class="hamburger" id="hamburger" onclick="toggleMobileNav()" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
     </div>
   </nav>
+  <div class="mobile-nav" id="mobileNav">
+    <a href="dashboard.html">🏠 Dashboard</a>
+    <a href="comrades.html">🤝 Comrades</a>
+    <a href="community.html">👥 Community</a>
+    <a href="messages.html">💬 Messages</a>
+    <button onclick="logout()">🚪 Logout</button>
+  </div>
 
   <div class="page-wrap">
     <!-- LEFT: Feed -->
@@ -271,6 +282,13 @@
         </div>
         <button class="connect-btn" onclick="sendRequest('${u._id}',this)">+ Comrade</button>
       </div>`;
+    }
+
+    function toggleMobileNav() {
+      const nav = document.getElementById('mobileNav');
+      const btn = document.getElementById('hamburger');
+      nav.classList.toggle('open');
+      btn.classList.toggle('open');
     }
   </script>
 </body>

@@ -68,7 +68,11 @@ router.get('/stats', auth, async (req, res) => {
       await User.findByIdAndUpdate(req.userId, { level });
     }
 
-    res.json({ ...user.toObject(), rank, level, badges: badgeArr });
+    const streakScore = Math.min(streak * 3, 40);
+    const pointScore = Math.min(Math.floor(pts / 50), 60);
+    const disciplineScore = Math.min(streakScore + pointScore, 100);
+
+    res.json({ ...user.toObject(), rank, level, badges: badgeArr, disciplineScore });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }

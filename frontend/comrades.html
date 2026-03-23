@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Comrades - Dream Wave</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .navbar{position:fixed;top:0;width:100%;z-index:1000;}
+    .page-wrap{margin-top:64px;display:flex;min-height:calc(100vh - 64px);}
+    .sidebar{width:240px;background:rgba(10,10,15,0.9);border-right:1px solid var(--glass-border);padding:24px 16px;position:fixed;top:64px;left:0;height:calc(100vh - 64px);overflow-y:auto;z-index:100;backdrop-filter:blur(20px);}
+    .sidebar-section{font-size:0.68rem;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:1.5px;padding:16px 12px 6px;}
+    .sidebar-item{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:var(--radius-sm);cursor:pointer;color:var(--text-muted);font-weight:500;text-decoration:none;margin-bottom:3px;transition:all 0.2s;font-size:0.9rem;}
+    .sidebar-item:hover,.sidebar-item.active{background:rgba(124,58,237,0.15);color:var(--accent);}
+    .sidebar-item.active{border-left:2px solid var(--primary);}
+    .main{margin-left:240px;flex:1;padding:32px;}
+    .page-title{font-size:1.8rem;font-weight:800;margin-bottom:4px;}
+    .page-sub{color:var(--text-muted);font-size:0.9rem;margin-bottom:28px;}
+    .tabs{display:flex;gap:4px;background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);border-radius:14px;padding:4px;margin-bottom:28px;width:fit-content;}
+    .tab{padding:9px 20px;border:none;border-radius:10px;background:transparent;color:var(--text-muted);font-size:0.88rem;font-weight:600;cursor:pointer;transition:all 0.2s;}
+    .tab.active{background:rgba(124,58,237,0.25);color:#c4b5fd;}
+    .tab-panel{display:none;}
+    .tab-panel.active{display:block;}
+    .search-bar{display:flex;gap:10px;margin-bottom:20px;}
+    .search-bar input{flex:1;padding:12px 16px;background:rgba(255,255,255,0.06);border:1px solid var(--glass-border);border-radius:12px;color:#fff;font-size:0.9rem;outline:none;}
+    .search-bar input:focus{border-color:var(--accent);}
+    .search-bar input::placeholder{color:var(--text-dim);}
+    .user-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;}
+    .user-card{background:var(--card-bg);border:1px solid var(--glass-border);border-radius:16px;padding:20px;transition:all 0.2s;}
+    .user-card:hover{border-color:rgba(124,58,237,0.3);transform:translateY(-2px);}
+    .uc-top{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
+    .uc-avatar{width:48px;height:48px;border-radius:50%;background:var(--grad-primary);display:flex;align-items:center;justify-content:center;color:white;font-weight:800;font-size:1.1rem;flex-shrink:0;position:relative;}
+    .online-ring{position:absolute;bottom:1px;right:1px;width:12px;height:12px;border-radius:50%;background:#10b981;border:2px solid var(--dark);}
+    .uc-name{font-weight:700;font-size:0.95rem;}
+    .uc-aaid{color:var(--accent);font-size:0.78rem;}
+    .uc-goal{color:var(--text-muted);font-size:0.8rem;margin-top:2px;}
+    .uc-stats{display:flex;gap:12px;margin-bottom:14px;padding:10px;background:rgba(255,255,255,0.03);border-radius:10px;}
+    .uc-stat{text-align:center;flex:1;}
+    .uc-stat-num{font-size:1.1rem;font-weight:800;color:var(--accent);}
+    .uc-stat-label{font-size:0.68rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;}
+    .uc-actions{display:flex;gap:8px;}
+    .btn-connect{flex:1;padding:8px;background:linear-gradient(135deg,#7c3aed,#a78bfa);color:white;border:none;border-radius:9px;font-size:0.82rem;font-weight:700;cursor:pointer;transition:opacity 0.2s;}
+    .btn-connect:hover{opacity:0.85;}
+    .btn-connect.sent{background:rgba(255,255,255,0.08);color:var(--text-muted);cursor:default;}
+    .btn-connect.accepted{background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);cursor:default;}
+    .btn-chat{padding:8px 14px;background:rgba(167,139,250,0.12);color:var(--accent);border:1px solid rgba(167,139,250,0.25);border-radius:9px;font-size:0.82rem;font-weight:700;cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:4px;}
+    .btn-chat:hover{background:rgba(167,139,250,0.2);}
+    .req-card{background:var(--card-bg);border:1px solid var(--glass-border);border-radius:14px;padding:16px;display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+    .req-actions{margin-left:auto;display:flex;gap:8px;}
+    .btn-accept{background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);padding:7px 14px;border-radius:8px;font-size:0.82rem;font-weight:700;cursor:pointer;}
+    .btn-reject{background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.2);padding:7px 14px;border-radius:8px;font-size:0.82rem;font-weight:700;cursor:pointer;}
+    .comrade-detail{background:var(--card-bg);border:1px solid var(--glass-border);border-radius:16px;padding:24px;margin-bottom:16px;}
+    .comrade-detail-top{display:flex;align-items:center;gap:16px;margin-bottom:16px;}
+    .cd-avatar{width:60px;height:60px;border-radius:50%;background:var(--grad-primary);display:flex;align-items:center;justify-content:center;color:white;font-weight:800;font-size:1.4rem;flex-shrink:0;}
+    .cd-name{font-size:1.1rem;font-weight:800;}
+    .cd-aaid{color:var(--accent);font-size:0.85rem;}
+    .cd-goal{color:var(--text-muted);font-size:0.82rem;margin-top:2px;}
+    .progress-compare{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;}
+    .pc-side{background:rgba(255,255,255,0.03);border-radius:12px;padding:14px;}
+    .pc-label{font-size:0.72rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;}
+    .pc-val{font-size:1.6rem;font-weight:800;background:var(--grad-primary);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+    .empty-state{text-align:center;padding:60px 20px;color:var(--text-dim);}
+    .empty-state .ei{font-size:3rem;margin-bottom:12px;}
+    .badge-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+    .badge-pill{background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.25);color:var(--accent);padding:3px 10px;border-radius:20px;font-size:0.75rem;}
+    .mutual-section{margin-top:14px;padding-top:14px;border-top:1px solid var(--border);}
+    .mutual-label{font-size:0.78rem;color:var(--text-dim);margin-bottom:8px;}
+    .mutual-avatars{display:flex;gap:-6px;}
+    .mutual-av{width:28px;height:28px;border-radius:50%;background:var(--grad-primary);display:flex;align-items:center;justify-content:center;color:white;font-size:0.7rem;font-weight:700;border:2px solid var(--dark);margin-right:-6px;}
+    @media(max-width:768px){.sidebar{display:none;}.main{margin-left:0;padding:16px;}.user-grid{grid-template-columns:1fr;}.progress-compare{grid-template-columns:1fr;}}
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container">
+      <a href="dashboard.html" class="nav-brand">🌊 Dream Wave</a>
+      <div class="nav-links">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="community.html">Community</a>
+        <a href="messages.html">💬 Chat</a>
+        <button onclick="logout()" class="btn-secondary">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="page-wrap">
+    <aside class="sidebar">
+      <div class="sidebar-section">Main</div>
+      <a href="dashboard.html" class="sidebar-item"><span>🏠</span> Dashboard</a>
+      <a href="ai-assistant.html" class="sidebar-item"><span>🤖</span> AI Chat</a>
+      <a href="mentor.html" class="sidebar-item"><span>🎓</span> AI Mentor</a>
+      <a href="careers.html" class="sidebar-item"><span>🚀</span> Careers</a>
+      <a href="study.html" class="sidebar-item"><span>📚</span> Study</a>
+      <a href="focus.html" class="sidebar-item"><span>🎯</span> Focus Mode</a>
+      <a href="daily-life.html" class="sidebar-item"><span>🌿</span> Daily Life AI</a>
+      <div class="sidebar-section">Social</div>
+      <a href="comrades.html" class="sidebar-item active"><span>🤝</span> Comrades</a>
+      <a href="community.html" class="sidebar-item"><span>👥</span> Community</a>
+      <a href="messages.html" class="sidebar-item"><span>💬</span> Messages</a>
+      <a href="leaderboard.html" class="sidebar-item"><span>🏆</span> Leaderboard</a>
+      <div class="sidebar-section">Tools</div>
+      <a href="code-generator.html" class="sidebar-item"><span>⚡</span> Code Gen</a>
+      <a href="profile.html" class="sidebar-item"><span>👤</span> Profile</a>
+    </aside>
+
+    <main class="main">
+      <div class="page-title">🤝 Comrades</div>
+      <p class="page-sub">Connect with people on the same path — share progress, chat, grow together</p>
+
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('my')">My Comrades</button>
+        <button class="tab" onclick="switchTab('find')">Find Comrades</button>
+        <button class="tab" onclick="switchTab('requests')">Requests <span id="reqBadge" style="display:none;background:#ef4444;color:white;border-radius:50%;padding:1px 6px;font-size:0.7rem;margin-left:4px"></span></button>
+      </div>
+
+      <!-- MY COMRADES -->
+      <div class="tab-panel active" id="panel-my">
+        <div id="myComradesList"><div class="empty-state"><div class="ei">🤝</div><p>No comrades yet — find people to connect with!</p></div></div>
+      </div>
+
+      <!-- FIND -->
+      <div class="tab-panel" id="panel-find">
+        <div class="search-bar">
+          <input type="text" id="searchInput" placeholder="Search by @AA ID or name..." oninput="searchUsers(this.value)">
+        </div>
+        <div id="searchResults"></div>
+        <div style="margin-bottom:14px;font-size:0.82rem;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">✨ Suggested Comrades</div>
+        <div id="suggestions" class="user-grid"><div class="empty-state"><div class="ei">🔍</div><p>Loading suggestions...</p></div></div>
+      </div>
+
+      <!-- REQUESTS -->
+      <div class="tab-panel" id="panel-requests">
+        <div id="requestsList"><div class="empty-state"><div class="ei">📨</div><p>No pending requests</p></div></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script>
+    checkAuth();
+    const token = () => localStorage.getItem('token');
+    let searchTimer = null;
+
+    loadMyComrades();
+    loadSuggestions();
+    loadRequests();
+
+    function switchTab(name) {
+      document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['my','find','requests'][i] === name));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById('panel-' + name).classList.add('active');
+    }
+
+    async function loadMyComrades() {
+      const el = document.getElementById('myComradesList');
+      try {
+        const r = await fetch(API_URL + '/comrades/mine', { headers: { Authorization: 'Bearer ' + token() } });
+        const users = await r.json();
+        if (!users.length) { el.innerHTML = '<div class="empty-state"><div class="ei">🤝</div><p>No comrades yet</p></div>'; return; }
+
+        // Load stats for each comrade
+        const cards = await Promise.all(users.map(async u => {
+          let stats = { points: 0, streak: 0, level: 1 };
+          try {
+            const sr = await fetch(API_URL + '/progress/stats?userId=' + u._id, { headers: { Authorization: 'Bearer ' + token() } });
+            if (sr.ok) stats = await sr.json();
+          } catch(e) {}
+          return comradeDetailCard(u, stats);
+        }));
+        el.innerHTML = cards.join('');
+      } catch(e) { el.innerHTML = '<div class="empty-state"><div class="ei">⚠️</div><p>Error loading comrades</p></div>'; }
+    }
+
+    function comradeDetailCard(u, stats) {
+      const init = (u.name || 'U')[0].toUpperCase();
+      return `<div class="comrade-detail">
+        <div class="comrade-detail-top">
+          <div class="cd-avatar">${init}</div>
+          <div>
+            <div class="cd-name">${u.name || 'Unknown'}</div>
+            <div class="cd-aaid">@${u.aaId || ''}</div>
+            <div class="cd-goal">${(u.ambition || u.goal || 'No goal set').replace(/-/g,' ')}</div>
+          </div>
+          <a href="messages.html?with=${u._id}" class="btn-chat" style="margin-left:auto">💬 Chat</a>
+        </div>
+        <div class="progress-compare">
+          <div class="pc-side">
+            <div class="pc-label">Credits</div>
+            <div class="pc-val">${stats.points || 0}</div>
+          </div>
+          <div class="pc-side">
+            <div class="pc-label">Streak</div>
+            <div class="pc-val">${stats.streak || 0} 🔥</div>
+          </div>
+          <div class="pc-side">
+            <div class="pc-label">Level</div>
+            <div class="pc-val">Lv.${stats.level || 1}</div>
+          </div>
+          <div class="pc-side">
+            <div class="pc-label">Discipline</div>
+            <div class="pc-val">${stats.disciplineScore || 0}%</div>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    async function loadSuggestions() {
+      const el = document.getElementById('suggestions');
+      try {
+        const r = await fetch(API_URL + '/comrades/suggestions', { headers: { Authorization: 'Bearer ' + token() } });
+        const users = await r.json();
+        if (!users.length) { el.innerHTML = '<div class="empty-state"><div class="ei">🔍</div><p>No suggestions yet</p></div>'; return; }
+        el.innerHTML = users.map(u => userCard(u)).join('');
+      } catch(e) {}
+    }
+
+    async function loadRequests() {
+      try {
+        const r = await fetch(API_URL + '/comrades/requests', { headers: { Authorization: 'Bearer ' + token() } });
+        const reqs = await r.json();
+        const el = document.getElementById('requestsList');
+        if (!reqs.length) { el.innerHTML = '<div class="empty-state"><div class="ei">📨</div><p>No pending requests</p></div>'; return; }
+        const badge = document.getElementById('reqBadge');
+        badge.style.display = 'inline'; badge.textContent = reqs.length;
+        el.innerHTML = reqs.map(req => `
+          <div class="req-card" id="req-${req._id}">
+            <div class="uc-avatar">${(req.requester?.name||'U')[0].toUpperCase()}</div>
+            <div>
+              <div style="font-weight:700">${req.requester?.name}</div>
+              <div style="color:var(--accent);font-size:0.78rem">@${req.requester?.aaId||''}</div>
+            </div>
+            <div class="req-actions">
+              <button class="btn-accept" onclick="respondRequest('${req._id}','accept')">✓ Accept</button>
+              <button class="btn-reject" onclick="respondRequest('${req._id}','reject')">✗ Reject</button>
+            </div>
+          </div>`).join('');
+      } catch(e) {}
+    }
+
+    function searchUsers(q) {
+      clearTimeout(searchTimer);
+      const el = document.getElementById('searchResults');
+      if (!q.trim()) { el.innerHTML = ''; return; }
+      el.innerHTML = '<div style="color:var(--text-dim);font-size:0.85rem;padding:10px 0">Searching...</div>';
+      searchTimer = setTimeout(async () => {
+        try {
+          const r = await fetch(API_URL + '/comrades/search?q=' + encodeURIComponent(q), { headers: { Authorization: 'Bearer ' + token() } });
+          const users = await r.json();
+          if (!users.length) { el.innerHTML = '<div style="color:var(--text-dim);font-size:0.85rem;padding:10px 0">No users found</div>'; return; }
+          el.innerHTML = '<div class="user-grid" style="margin-bottom:20px">' + users.map(u => userCard(u)).join('') + '</div>';
+        } catch(e) { el.innerHTML = '<div style="color:var(--text-dim)">Error searching</div>'; }
+      }, 400);
+    }
+
+    function userCard(u) {
+      const init = (u.name || 'U')[0].toUpperCase();
+      return `<div class="user-card">
+        <div class="uc-top">
+          <div class="uc-avatar">${init}</div>
+          <div>
+            <div class="uc-name">${u.name || 'Unknown'}</div>
+            <div class="uc-aaid">@${u.aaId || ''}</div>
+            <div class="uc-goal">${(u.ambition || '').replace(/-/g,' ')}</div>
+          </div>
+        </div>
+        <div class="uc-actions">
+          <button class="btn-connect" onclick="sendRequest('${u._id}',this)">+ Connect</button>
+        </div>
+      </div>`;
+    }
+
+    async function sendRequest(userId, btn) {
+      try {
+        const r = await fetch(API_URL + '/comrades/request/' + userId, { method: 'POST', headers: { Authorization: 'Bearer ' + token() } });
+        const d = await r.json();
+        btn.textContent = 'Sent ✓'; btn.className = 'btn-connect sent'; btn.disabled = true;
+      } catch(e) {}
+    }
+
+    async function respondRequest(id, action) {
+      try {
+        await fetch(API_URL + '/comrades/respond/' + id, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() },
+          body: JSON.stringify({ action })
+        });
+        document.getElementById('req-' + id)?.remove();
+        if (action === 'accept') loadMyComrades();
+      } catch(e) {}
+    }
+  </script>
+</body>
+</html>
