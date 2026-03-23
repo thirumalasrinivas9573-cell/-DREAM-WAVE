@@ -152,15 +152,14 @@
         <div style="text-align:center;padding:40px;grid-column:1/-1">Loading careers...</div>
     </div>
 
+    <script src="config.js"></script>
     <script src="app.js"></script>
     <script>
         checkAuth();
         let allCareers = [];
         let currentCategory = 'ALL';
 
-        const API = window.location.hostname === 'localhost'
-            ? 'http://localhost:5000/api'
-            : 'https://aa-dream-wave-production.up.railway.app/api';
+        const API = API_URL;
 
         async function loadCareers() {
             try {
@@ -211,7 +210,8 @@
         }
 
         function goToCareer(careerId) {
-            window.location.href = `ambition.html?id=${careerId}`;
+            // Pre-fill the goal in onboarding via query param
+            window.location.href = `ambition.html?goal=${encodeURIComponent(careerId)}`;
         }
 
         loadCareers();

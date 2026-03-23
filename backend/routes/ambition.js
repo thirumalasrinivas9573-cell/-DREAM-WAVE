@@ -1,6 +1,6 @@
 const express = require('express');
-const auth = require('../middleware/auth');
 const User = require('../models/User');
+const auth = require('../middleware/auth');
 const careers = require('../data/careers');
 
 const router = express.Router();
@@ -8,32 +8,37 @@ const router = express.Router();
 // Get all careers
 router.get('/', (req, res) => {
   const careerList = Object.values(careers).map(c => ({
-    id: c.id,
-    title: c.title,
-    category: c.category,
-    icon: c.icon,
-    description: c.description,
-    avgSalary: c.avgSalary,
-    jobDemand: c.jobDemand
+    id: c.id, title: c.title, category: c.category, icon: c.icon,
+    description: c.description, avgSalary: c.avgSalary, jobDemand: c.jobDemand
   }));
   res.json(careerList);
 });
 
-// Save user ambition (must be before /:careerId)
+// Save user ambition (by careerId)
 router.post('/select', auth, async (req, res) => {
   try {
     const { careerId } = req.body;
     const career = careers[careerId];
     if (!career) return res.status(404).json({ message: 'Career not found' });
-
-    await User.findByIdAndUpdate(req.userId, { ambition: careerId });
+    await User.findByIdAndUpdate(req.userId, { ambition: careerId, goal: career.title });
     res.json({ message: 'Ambition saved', career });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Complete a task (must be before /:careerId)
+// Save user ambition (free text from ambition.html)
+router.post('/set', auth, async (req, res) => {
+  try {
+    const { ambition, level, hoursPerDay } = req.body;
+    await User.findByIdAndUpdate(req.userId, { ambition, goal: ambition, careerGoals: ambition });
+    res.json({ message: 'Ambition saved' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Complete a task
 router.post('/task/complete', auth, async (req, res) => {
   try {
     const { careerId, taskTitle } = req.body;
@@ -57,7 +62,6 @@ router.post('/task/complete', auth, async (req, res) => {
     else if (totalTasks >= 50) certificate = 'Intermediate';
     else if (totalTasks >= 10) certificate = 'Beginner';
 
-    // Award badge for certificate milestones
     if (certificate) {
       const badgeKey = `${certificate} - ${careerId}`;
       if (!user.badges.includes(badgeKey)) {
@@ -66,11 +70,7 @@ router.post('/task/complete', auth, async (req, res) => {
       }
     }
 
-    res.json({ 
-      progress: user.progress[careerId],
-      certificate,
-      totalCompleted: totalTasks
-    });
+    res.json({ progress: user.progress[careerId], certificate, totalCompleted: totalTasks });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -87,7 +87,7 @@ router.get('/progress/:careerId', auth, async (req, res) => {
   }
 });
 
-// Get career by ID (must be last)
+// Get career by ID
 router.get('/:careerId', (req, res) => {
   const career = careers[req.params.careerId];
   if (!career) return res.status(404).json({ message: 'Career not found' });

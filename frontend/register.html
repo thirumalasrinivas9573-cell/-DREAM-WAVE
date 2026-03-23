@@ -5,61 +5,73 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Register - Dream Wave</title>
   <link rel="stylesheet" href="styles.css">
+  <style>
+    body { background: linear-gradient(135deg, #0f0c29, #302b63, #24243e); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .auth-wrap { width: 100%; max-width: 460px; padding: 20px; }
+    .auth-logo { text-align: center; margin-bottom: 28px; }
+    .auth-logo a { font-size: 1.8rem; font-weight: 800; color: white; text-decoration: none; }
+    .auth-logo span { color: #a78bfa; }
+    .glass-card { background: rgba(255,255,255,0.05); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; padding: 36px; box-shadow: 0 25px 50px rgba(0,0,0,0.4); }
+    .glass-card h2 { color: #fff; font-size: 1.6rem; font-weight: 700; margin-bottom: 4px; }
+    .glass-card .sub { color: rgba(255,255,255,0.5); font-size: 0.88rem; margin-bottom: 26px; }
+    .field { margin-bottom: 16px; }
+    .field label { display: block; color: rgba(255,255,255,0.65); font-size: 0.82rem; font-weight: 600; margin-bottom: 7px; letter-spacing: 0.4px; }
+    .field input { width: 100%; padding: 13px 16px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.13); border-radius: 12px; color: #fff; font-size: 0.92rem; outline: none; transition: border 0.2s, background 0.2s; box-sizing: border-box; }
+    .field input::placeholder { color: rgba(255,255,255,0.28); }
+    .field input:focus { border-color: #a78bfa; background: rgba(167,139,250,0.08); }
+    .aaid-wrap { position: relative; }
+    .aaid-wrap input { padding-left: 32px; }
+    .aaid-at { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #a78bfa; font-weight: 700; font-size: 0.95rem; pointer-events: none; }
+    .aaid-status { font-size: 0.75rem; margin-top: 5px; height: 16px; }
+    .aaid-status.ok { color: #6ee7b7; }
+    .aaid-status.taken { color: #f87171; }
+    .err { color: #f87171; font-size: 0.83rem; margin-bottom: 14px; display: none; padding: 10px 14px; background: rgba(248,113,113,0.1); border-radius: 8px; border: 1px solid rgba(248,113,113,0.3); }
+    .btn-auth { width: 100%; padding: 14px; background: linear-gradient(135deg, #7c3aed, #a78bfa); color: white; border: none; border-radius: 12px; font-size: 0.95rem; font-weight: 700; cursor: pointer; transition: opacity 0.2s, transform 0.2s; }
+    .btn-auth:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-auth:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .auth-links { text-align: center; margin-top: 18px; }
+    .auth-links a { color: #a78bfa; text-decoration: none; font-size: 0.88rem; }
+    .hint { color: rgba(255,255,255,0.3); font-size: 0.75rem; margin-top: 4px; }
+  </style>
 </head>
 <body>
-  <nav class="navbar">
-    <div class="container">
-      <a href="index.html" class="nav-brand">🌊 Dream Wave</a>
-    </div>
-  </nav>
-
-  <div class="auth-container">
-    <div class="auth-card">
-      <h2>Start Your Journey</h2>
-      <p class="auth-subtitle">Create an account to begin learning</p>
-
-      <form id="registerForm" class="auth-form">
-        <div class="form-group">
+  <div class="auth-wrap">
+    <div class="auth-logo"><a href="index.html">🌊 Dream<span>Wave</span></a></div>
+    <div class="glass-card">
+      <h2>Create your account</h2>
+      <p class="sub">Join the AI career community</p>
+      <form id="registerForm">
+        <div class="field">
           <label>Full Name</label>
-          <input type="text" id="name" required placeholder="John Doe">
+          <input type="text" id="name" required placeholder="Your full name">
         </div>
-
-        <div class="form-group">
+        <div class="field">
           <label>Email</label>
-          <input type="email" id="email" required placeholder="your@email.com">
+          <input type="email" id="email" required placeholder="you@example.com">
         </div>
-
-        <div class="form-group">
+        <div class="field">
           <label>Password</label>
-          <input type="password" id="password" required placeholder="••••••••" minlength="6">
+          <input type="password" id="password" required placeholder="Min 6 characters" minlength="6">
         </div>
-
-        <div id="errorMessage" class="error-message"></div>
-
-        <button type="submit" class="btn-primary btn-full">Create Account</button>
+        <div id="errorMessage" class="err"></div>
+        <button type="submit" class="btn-auth" id="submitBtn">Create Account</button>
       </form>
-
-      <p class="auth-footer">
-        Already have an account? <a href="login.html">Login here</a>
-      </p>
+      <div class="auth-links"><a href="login.html">Already have an account? Sign in</a></div>
     </div>
   </div>
 
   <script src="config.js"></script>
-  <script src="app.js"></script>
   <script>
     document.getElementById('registerForm').addEventListener('submit', async function(e) {
       e.preventDefault();
-
       const name = document.getElementById('name').value.trim();
       const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
       const errorDiv = document.getElementById('errorMessage');
-      const btn = e.target.querySelector('button[type="submit"]');
+      const btn = document.getElementById('submitBtn');
 
       errorDiv.style.display = 'none';
-      btn.disabled = true;
-      btn.textContent = 'Creating account...';
+      btn.disabled = true; btn.textContent = 'Creating account...';
 
       try {
         const res = await fetch(API_URL + '/auth/register', {
@@ -67,9 +79,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, email, password })
         });
-
         const data = await res.json();
-
         if (res.ok) {
           localStorage.setItem('token', data.token);
           localStorage.setItem('user', JSON.stringify(data.user));
@@ -79,11 +89,10 @@
           errorDiv.style.display = 'block';
         }
       } catch (err) {
-        errorDiv.textContent = 'Cannot connect to server. Make sure the backend is running.';
+        errorDiv.textContent = 'Cannot connect to server.';
         errorDiv.style.display = 'block';
       } finally {
-        btn.disabled = false;
-        btn.textContent = 'Create Account';
+        btn.disabled = false; btn.textContent = 'Create Account';
       }
     });
   </script>

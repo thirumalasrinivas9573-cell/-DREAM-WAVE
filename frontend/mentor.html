@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Mentor — Dream Wave</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { background: #07070f; color: #e0e0ff; font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+    body::before {
+      content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background: radial-gradient(ellipse at 15% 15%, rgba(124,58,237,0.1) 0%, transparent 55%),
+                  radial-gradient(ellipse at 85% 85%, rgba(79,70,229,0.08) 0%, transparent 55%);
+    }
+    .navbar { position: fixed; top: 0; width: 100%; z-index: 100;
+      background: rgba(7,7,15,0.85); backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .navbar .container { display: flex; align-items: center; justify-content: space-between;
+      max-width: 1200px; margin: 0 auto; padding: 0 20px; height: 60px; }
+    .nav-brand { font-size: 1.2rem; font-weight: 800; color: #a78bfa; text-decoration: none; }
+    .nav-links { display: flex; align-items: center; gap: 16px; }
+    .nav-links a { color: rgba(255,255,255,0.55); text-decoration: none; font-size: 0.88rem; transition: color 0.2s; }
+    .nav-links a:hover, .nav-links a.active { color: #a78bfa; }
+    .btn-secondary { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.6); padding: 7px 16px; border-radius: 8px; cursor: pointer;
+      font-size: 0.85rem; transition: all 0.2s; }
+    .btn-secondary:hover { background: rgba(255,255,255,0.12); color: #fff; }
+    .page { position: relative; z-index: 1; max-width: 1100px; margin: 80px auto 60px; padding: 0 20px; }
+
+    /* ── Goal banner ── */
+    .goal-banner {
+      background: rgba(124,58,237,0.1); border: 1px solid rgba(124,58,237,0.25);
+      border-radius: 18px; padding: 20px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 14px; margin-bottom: 28px; flex-wrap: wrap;
+    }
+    .goal-info h2 { font-size: 1.1rem; font-weight: 800; color: #c4b5fd; }
+    .goal-info p  { font-size: 0.82rem; color: rgba(255,255,255,0.4); margin-top: 3px; }
+    .goal-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .pill-btn {
+      padding: 8px 18px; border-radius: 50px; border: none;
+      font-size: 0.82rem; font-weight: 700; cursor: pointer; transition: all 0.2s;
+    }
+    .pill-btn.primary { background: linear-gradient(135deg,#7c3aed,#a855f7); color:#fff; }
+    .pill-btn.primary:hover { opacity: 0.85; }
+    .pill-btn.ghost { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); color: rgba(255,255,255,0.55); }
+    .pill-btn.ghost:hover { background: rgba(255,255,255,0.12); color:#fff; }
+    /* ── Stats row ── */
+    .stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 28px; }
+    @media(max-width:700px){ .stats-row { grid-template-columns: repeat(2,1fr); } }
+    .stat-card {
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px; padding: 18px 16px; text-align: center;
+    }
+    .stat-num { font-size: 2rem; font-weight: 900; color: #a855f7; }
+    .stat-lbl { font-size: 0.75rem; color: rgba(255,255,255,0.4); margin-top: 4px; }
+    /* ── Grid ── */
+    .mentor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media(max-width:768px){ .mentor-grid { grid-template-columns: 1fr; } }
+    .card {
+      background: rgba(255,255,255,0.03); border: 1px solid rgba(168,85,247,0.12);
+      border-radius: 18px; padding: 22px; position: relative;
+    }
+    .card.full { grid-column: 1 / -1; }
+    .card h3 { font-size: 0.9rem; font-weight: 700; color: #c4b5fd; margin-bottom: 16px;
+      display: flex; align-items: center; gap: 8px; }
+    /* ── Checkin ── */
+    .checkin-box {
+      background: rgba(124,58,237,0.08); border-left: 3px solid #7c3aed;
+      border-radius: 0 12px 12px 0; padding: 14px 16px;
+      font-size: 0.9rem; line-height: 1.7; color: rgba(255,255,255,0.8); min-height: 56px;
+    }
+    /* ── Tasks ── */
+    .task-item { display: flex; align-items: flex-start; gap: 12px; padding: 11px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .task-item:last-child { border-bottom: none; }
+    .task-check {
+      width: 22px; height: 22px; border: 2px solid rgba(168,85,247,0.4);
+      border-radius: 6px; flex-shrink: 0; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; transition: all 0.2s; margin-top: 2px;
+    }
+    .task-check.done { background: #7c3aed; border-color: #7c3aed; }
+    .task-check.done::after { content: '✓'; color: #fff; font-size: 0.75rem; font-weight: 700; }
+    .task-info { flex: 1; }
+    .task-title { font-size: 0.88rem; color: #e0e0ff; font-weight: 600; }
+    .task-title.done { text-decoration: line-through; color: rgba(255,255,255,0.3); }
+    .task-desc { font-size: 0.76rem; color: rgba(255,255,255,0.38); margin-top: 2px; }
+    .task-meta { display: flex; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
+    .badge { padding: 2px 9px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; }
+    .badge.easy   { background: rgba(110,231,183,0.12); color: #6ee7b7; }
+    .badge.medium { background: rgba(251,191,36,0.12);  color: #fbbf24; }
+    .badge.hard   { background: rgba(248,113,113,0.12); color: #f87171; }
+    .badge.type   { background: rgba(168,85,247,0.12);  color: #c4b5fd; }
+    .badge.pts    { background: rgba(124,58,237,0.12);  color: #a855f7; }
+    /* ── Progress bars ── */
+    .prog-wrap { margin-bottom: 12px; }
+    .prog-label { display: flex; justify-content: space-between; font-size: 0.76rem;
+      color: rgba(255,255,255,0.4); margin-bottom: 5px; }
+    .prog-track { height: 7px; background: rgba(255,255,255,0.07); border-radius: 10px; overflow: hidden; }
+    .prog-fill  { height: 100%; background: linear-gradient(90deg,#7c3aed,#a855f7); border-radius: 10px; transition: width 0.6s; }
+    /* ── Timetable ── */
+    .tt-item { display: flex; align-items: center; gap: 12px; padding: 9px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .tt-item:last-child { border-bottom: none; }
+    .tt-time { font-size: 0.76rem; color: #a855f7; font-weight: 700; min-width: 72px; }
+    .tt-act  { font-size: 0.84rem; color: rgba(255,255,255,0.72); flex: 1; }
+    .tt-dur  { font-size: 0.7rem; color: rgba(255,255,255,0.28); }
+    /* ── Books ── */
+    .book-item { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .book-item:last-child { border-bottom: none; }
+    .book-icon { font-size: 1.5rem; flex-shrink: 0; }
+    .book-info h4 { font-size: 0.86rem; color: #e0e0ff; font-weight: 600; }
+    .book-info p  { font-size: 0.74rem; color: rgba(255,255,255,0.38); margin-top: 2px; }
+    /* ── Buttons ── */
+    .gen-btn {
+      width: 100%; padding: 11px; background: linear-gradient(135deg,#7c3aed,#a855f7);
+      border: none; border-radius: 12px; color: #fff; font-size: 0.88rem; font-weight: 700;
+      cursor: pointer; margin-top: 14px; transition: opacity 0.2s;
+    }
+    .gen-btn:hover { opacity: 0.85; }
+    .gen-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    /* ── Empty / spinner ── */
+    .empty { text-align: center; padding: 28px 0; color: rgba(255,255,255,0.28); font-size: 0.86rem; }
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.25);
+      border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    /* ── No-goal state ── */
+    .no-goal-card {
+      background: rgba(124,58,237,0.07); border: 1px dashed rgba(124,58,237,0.3);
+      border-radius: 18px; padding: 40px 24px; text-align: center; margin-bottom: 28px;
+    }
+    .no-goal-card .icon { font-size: 3rem; margin-bottom: 14px; }
+    .no-goal-card h2 { font-size: 1.3rem; font-weight: 800; margin-bottom: 8px; }
+    .no-goal-card p { color: rgba(255,255,255,0.45); font-size: 0.9rem; margin-bottom: 20px; }
+    .start-btn {
+      display: inline-block; padding: 14px 32px;
+      background: linear-gradient(135deg,#7c3aed,#a855f7);
+      color: #fff; border: none; border-radius: 14px;
+      font-size: 1rem; font-weight: 700; cursor: pointer; text-decoration: none;
+      transition: opacity 0.2s;
+    }
+    .start-btn:hover { opacity: 0.88; }
+    /* ── Toast ── */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+      background: rgba(124,58,237,0.92); color: #fff;
+      padding: 12px 20px; border-radius: 12px; font-size: 0.88rem; font-weight: 600;
+      opacity: 0; transform: translateY(10px); transition: all 0.3s; pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.success { background: rgba(5,150,105,0.92); }
+    .toast.error   { background: rgba(220,38,38,0.92); }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="container">
+    <a href="dashboard.html" class="nav-brand">🌊 Dream Wave</a>
+    <div class="nav-links">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="mentor.html" class="active">AI Mentor</a>
+      <a href="ai-assistant.html">AI Chat</a>
+      <a href="study.html">Study</a>
+      <a href="community.html">Community</a>
+      <button onclick="logout()" class="btn-secondary">Logout</button>
+    </div>
+  </div>
+</nav>
+
+<div class="page" id="page">
+
+  <!-- No-goal state (shown if no goal set) -->
+  <div class="no-goal-card" id="noGoalCard" style="display:none">
+    <div class="icon">🎯</div>
+    <h2>Set Your Career Goal First</h2>
+    <p>Complete the AI Mentor onboarding to unlock your personalized daily training system.</p>
+    <a href="ambition.html" class="start-btn">🚀 Start AI Onboarding</a>
+  </div>
+
+  <!-- Main dashboard (shown when goal exists) -->
+  <div id="mainDash" style="display:none">
+
+    <!-- Goal banner -->
+    <div class="goal-banner">
+      <div class="goal-info">
+        <h2>🎯 <span id="goalTitle">Loading...</span></h2>
+        <p id="goalStatus">Fetching your progress...</p>
+      </div>
+      <div class="goal-actions">
+        <button class="pill-btn primary" id="lockBtn"   onclick="lockGoal()"   style="display:none">🔒 Lock Goal</button>
+        <button class="pill-btn ghost"   id="unlockBtn" onclick="unlockGoal()" style="display:none">🔓 Unlock</button>
+        <button class="pill-btn ghost"   onclick="window.location.href='ambition.html'">✏️ Change Goal</button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-num" id="sCredits">0</div><div class="stat-lbl">💰 Credits</div></div>
+      <div class="stat-card"><div class="stat-num" id="sStreak">0</div><div class="stat-lbl">🔥 Streak</div></div>
+      <div class="stat-card"><div class="stat-num" id="sDone">0/0</div><div class="stat-lbl">✅ Today</div></div>
+      <div class="stat-card"><div class="stat-num" id="sTotal">0</div><div class="stat-lbl">📚 All Time</div></div>
+    </div>
+
+    <div class="mentor-grid">
+
+      <!-- Daily Check-in -->
+      <div class="card full">
+        <h3>💬 AI Daily Check-in</h3>
+        <div class="checkin-box" id="checkinMsg"><span class="spinner"></span> Loading your daily message...</div>
+      </div>
+
+      <!-- Today's Tasks -->
+      <div class="card">
+        <h3>📋 Today's Tasks</h3>
+        <div id="tasksList"><div class="empty">Loading tasks...</div></div>
+        <button class="gen-btn" id="genBtn" onclick="generateTasks()">✨ Generate Today's Tasks</button>
+      </div>
+
+      <!-- Progress -->
+      <div class="card">
+        <h3>📊 Your Progress</h3>
+        <div id="progressSection"><div class="empty">Loading...</div></div>
+      </div>
+
+      <!-- Timetable -->
+      <div class="card">
+        <h3>⏰ Daily Timetable</h3>
+        <div id="timetableSection"><div class="empty">No timetable yet</div></div>
+        <button class="gen-btn" id="ttBtn" onclick="generateTimetable()">📅 Generate My Timetable</button>
+      </div>
+
+      <!-- Books -->
+      <div class="card">
+        <h3>📚 Recommended Books</h3>
+        <div id="booksSection"><div class="empty">Set your goal to get book suggestions</div></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+checkAuth();
+const token = () => localStorage.getItem('token');
+const API = API_URL;
+let currentGoal = '';
+
+function toast(msg, type = '', dur = 3000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), dur);
+}
+
+async function init() {
+  try {
+    const res = await fetch(`${API}/mentor/progress`, { headers: { 'Authorization': `Bearer ${token()}` } });
+    const data = await res.json();
+    currentGoal = data.goal || '';
+
+    if (!currentGoal) {
+      document.getElementById('noGoalCard').style.display = 'block';
+      return;
+    }
+
+    document.getElementById('mainDash').style.display = 'block';
+
+    // Goal banner
+    document.getElementById('goalTitle').textContent = currentGoal;
+    const locked = data.goalLocked;
+    document.getElementById('goalStatus').textContent = locked
+      ? `🔒 Goal locked · ${data.allTime.completed} tasks done · ${data.credits} credits`
+      : `Goal set — click "Lock Goal" to commit`;
+    document.getElementById('lockBtn').style.display   = locked ? 'none' : 'inline-block';
+    document.getElementById('unlockBtn').style.display = locked ? 'inline-block' : 'none';
+
+    // Stats
+    document.getElementById('sCredits').textContent = data.credits || 0;
+    document.getElementById('sStreak').textContent  = data.streak  || 0;
+    document.getElementById('sDone').textContent    = `${data.today.completed}/${data.today.total}`;
+    document.getElementById('sTotal').textContent   = data.allTime.completed || 0;
+
+    renderProgress(data);
+    loadBooks(currentGoal);
+  } catch (e) {
+    document.getElementById('noGoalCard').style.display = 'block';
+  }
+
+  loadCheckin();
+  loadTasks();
+  loadTimetable();
+}
+
+async function loadCheckin() {
+  try {
+    const res = await fetch(`${API}/mentor/checkin`, { headers: { 'Authorization': `Bearer ${token()}` } });
+    const data = await res.json();
+    document.getElementById('checkinMsg').textContent = data.message || 'Welcome back! Keep going!';
+  } catch {
+    document.getElementById('checkinMsg').textContent = 'Welcome back! Complete your daily tasks to earn credits and level up. 🚀';
+  }
+}
+
+async function loadTasks() {
+  try {
+    const res = await fetch(`${API}/mentor/tasks/today`, { headers: { 'Authorization': `Bearer ${token()}` } });
+    const tasks = await res.json();
+    renderTasks(tasks);
+    if (tasks.length > 0) document.getElementById('genBtn').textContent = '🔄 Regenerate Tasks';
+  } catch {
+    document.getElementById('tasksList').innerHTML = '<div class="empty">Could not load tasks</div>';
+  }
+}
+
+function renderTasks(tasks) {
+  const c = document.getElementById('tasksList');
+  if (!tasks || !tasks.length) {
+    c.innerHTML = '<div class="empty">No tasks yet — click Generate below</div>';
+    return;
+  }
+  c.innerHTML = tasks.map(t => `
+    <div class="task-item" id="ti-${t._id}">
+      <div class="task-check ${t.status==='completed'?'done':''}" onclick="completeTask('${t._id}',this)"></div>
+      <div class="task-info">
+        <div class="task-title ${t.status==='completed'?'done':''}" id="tt-${t._id}">${t.title}</div>
+        ${t.description ? `<div class="task-desc">${t.description}</div>` : ''}
+        <div class="task-meta">
+          <span class="badge ${t.difficulty}">${t.difficulty}</span>
+          <span class="badge type">${t.type}</span>
+          <span class="badge pts">+${t.points} pts</span>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+async function generateTasks() {
+  if (!currentGoal) { toast('Set your goal first', 'error'); return; }
+  const btn = document.getElementById('genBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Generating...';
+  try {
+    const res = await fetch(`${API}/mentor/generate-tasks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token()}` },
+      body: JSON.stringify({ goal: currentGoal })
+    });
+    const data = await res.json();
+    if (data.tasks) {
+      renderTasks(data.tasks);
+      toast(data.alreadyGenerated ? '📋 Tasks already generated today!' : '✨ Daily tasks generated!', 'success');
+    }
+  } catch { toast('Error generating tasks', 'error'); }
+  finally { btn.disabled = false; btn.textContent = '🔄 Regenerate Tasks'; }
+}
+
+async function completeTask(id, el) {
+  if (el.classList.contains('done')) return;
+  el.classList.add('done');
+  document.getElementById('tt-' + id)?.classList.add('done');
+  try {
+    const res = await fetch(`${API}/mentor/task/${id}/complete`, {
+      method: 'PUT', headers: { 'Authorization': `Bearer ${token()}` }
+    });
+    const data = await res.json();
+    if (res.ok) {
+      toast(`🎉 +${data.points} credits! Total: ${data.totalCredits}`, 'success');
+      document.getElementById('sCredits').textContent = data.totalCredits;
+      const done = document.querySelectorAll('.task-check.done').length;
+      const total = document.querySelectorAll('.task-check').length;
+      document.getElementById('sDone').textContent = `${done}/${total}`;
+    }
+  } catch { toast('Error completing task', 'error'); }
+}
+
+function renderProgress(data) {
+  const done = data.allTime.completed;
+  const pct  = Math.min((done / 100) * 100, 100);
+  const todayPct = data.today.total ? (data.today.completed / data.today.total * 100) : 0;
+  const level = done >= 100 ? 'Master' : done >= 50 ? 'Advanced' : done >= 10 ? 'Intermediate' : 'Beginner';
+  const next  = done >= 100 ? 100 : done >= 50 ? 100 : done >= 10 ? 50 : 10;
+  document.getElementById('progressSection').innerHTML = `
+    <div class="prog-wrap">
+      <div class="prog-label"><span>Level: ${level}</span><span>${done}/${next} tasks</span></div>
+      <div class="prog-track"><div class="prog-fill" style="width:${pct}%"></div></div>
+    </div>
+    <div class="prog-wrap">
+      <div class="prog-label"><span>Today</span><span>${data.today.completed}/${data.today.total}</span></div>
+      <div class="prog-track"><div class="prog-fill" style="width:${todayPct}%"></div></div>
+    </div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:12px;">
+      <span class="badge type" style="opacity:1">🥉 Beginner</span>
+      <span class="badge easy" style="opacity:${done>=10?1:0.3}">🥈 Intermediate</span>
+      <span class="badge medium" style="opacity:${done>=50?1:0.3}">🥇 Advanced</span>
+      <span class="badge pts" style="opacity:${done>=100?1:0.3}">👑 Master</span>
+    </div>
+    ${data.motivation ? `<div style="margin-top:14px;padding:12px;background:rgba(124,58,237,0.07);border-radius:10px;font-size:0.8rem;color:rgba(255,255,255,0.45);line-height:1.6">${data.motivation}</div>` : ''}
+  `;
+}
+
+async function loadTimetable() {
+  try {
+    const res = await fetch(`${API}/mentor/timetable`, { headers: { 'Authorization': `Bearer ${token()}` } });
+    const data = await res.json();
+    if (data.timetable && data.timetable.length) {
+      renderTimetable(data.timetable);
+      document.getElementById('ttBtn').textContent = '🔄 Regenerate Timetable';
+    }
+  } catch {}
+}
+
+function renderTimetable(schedule) {
+  document.getElementById('timetableSection').innerHTML = schedule.map(s => `
+    <div class="tt-item">
+      <span class="tt-time">${s.time}</span>
+      <span class="tt-act">${s.activity}</span>
+      <span class="tt-dur">${s.duration || ''}</span>
+    </div>`).join('');
+}
+
+async function generateTimetable() {
+  if (!currentGoal) { toast('Set your goal first', 'error'); return; }
+  const btn = document.getElementById('ttBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Generating...';
+  try {
+    const res = await fetch(`${API}/mentor/timetable/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token()}` },
+      body: JSON.stringify({ goal: currentGoal, hoursPerDay: 4 })
+    });
+    const data = await res.json();
+    if (data.timetable) { renderTimetable(data.timetable); toast('📅 Timetable generated!', 'success'); }
+  } catch { toast('Error generating timetable', 'error'); }
+  finally { btn.disabled = false; btn.textContent = '🔄 Regenerate Timetable'; }
+}
+
+function loadBooks(goal) {
+  const g = goal.toLowerCase();
+  let books = [];
+  if (g.match(/software|developer|coding|engineer|web|app/))
+    books = [{ i:'📘', t:'Clean Code', a:'Robert C. Martin' }, { i:'📗', t:'The Pragmatic Programmer', a:'Hunt & Thomas' }, { i:'📙', t:"You Don't Know JS", a:'Kyle Simpson' }];
+  else if (g.match(/data|ai|machine|ml/))
+    books = [{ i:'📘', t:'Hands-On ML with Scikit-Learn', a:'Aurélien Géron' }, { i:'📗', t:'Deep Learning', a:'Goodfellow et al.' }, { i:'📙', t:'Python for Data Analysis', a:'Wes McKinney' }];
+  else if (g.match(/business|entrepreneur|startup/))
+    books = [{ i:'📘', t:'Zero to One', a:'Peter Thiel' }, { i:'📗', t:'The Lean Startup', a:'Eric Ries' }, { i:'📙', t:'Good to Great', a:'Jim Collins' }];
+  else if (g.match(/design|ui|ux/))
+    books = [{ i:'📘', t:"Don't Make Me Think", a:'Steve Krug' }, { i:'📗', t:'The Design of Everyday Things', a:'Don Norman' }, { i:'📙', t:'Hooked', a:'Nir Eyal' }];
+  else if (g.match(/doctor|medical|mbbs|health/))
+    books = [{ i:'📘', t:'Gray\'s Anatomy', a:'Henry Gray' }, { i:'📗', t:'Harrison\'s Principles', a:'Kasper et al.' }, { i:'📙', t:'First Aid for USMLE', a:'Le & Bhushan' }];
+  else if (g.match(/ias|upsc|civil|government/))
+    books = [{ i:'📘', t:'Indian Polity', a:'M. Laxmikanth' }, { i:'📗', t:'Certificate Physical Geography', a:'G.C. Leong' }, { i:'📙', t:'India\'s Struggle for Independence', a:'Bipan Chandra' }];
+  else
+    books = [{ i:'📘', t:'Atomic Habits', a:'James Clear' }, { i:'📗', t:'Deep Work', a:'Cal Newport' }, { i:'📙', t:'Mindset', a:'Carol Dweck' }];
+
+  document.getElementById('booksSection').innerHTML = books.map(b => `
+    <div class="book-item">
+      <div class="book-icon">${b.i}</div>
+      <div class="book-info"><h4>${b.t}</h4><p>${b.a}</p></div>
+    </div>`).join('');
+}
+
+async function lockGoal() {
+  if (!currentGoal) { toast('No goal to lock', 'error'); return; }
+  try {
+    const res = await fetch(`${API}/mentor/lock-goal`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token()}` },
+      body: JSON.stringify({ goal: currentGoal })
+    });
+    if (res.ok) {
+      toast('🔒 Goal locked!', 'success');
+      document.getElementById('lockBtn').style.display   = 'none';
+      document.getElementById('unlockBtn').style.display = 'inline-block';
+      document.getElementById('goalStatus').textContent  = `🔒 Goal locked · pursuing ${currentGoal}`;
+    }
+  } catch { toast('Error locking goal', 'error'); }
+}
+
+async function unlockGoal() {
+  try {
+    const res = await fetch(`${API}/mentor/unlock-goal`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token()}` }
+    });
+    if (res.ok) {
+      toast('🔓 Goal unlocked', 'success');
+      document.getElementById('unlockBtn').style.display = 'none';
+      document.getElementById('lockBtn').style.display   = 'inline-block';
+      document.getElementById('goalStatus').textContent  = `Goal unlocked — click "Lock Goal" to recommit`;
+    }
+  } catch { toast('Error unlocking goal', 'error'); }
+}
+
+init();
+</script>
+</body>
+</html>

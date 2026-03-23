@@ -1,233 +1,200 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Study Mode - Dream Wave</title>
-    <link rel="stylesheet" href="styles.css">
-    <style>
-        .study-container { max-width: 1100px; margin: 80px auto 40px; padding: 20px; }
-        .study-header { text-align: center; margin-bottom: 40px; }
-        .study-header h1 { font-size: 2.5rem; color: #667eea; }
-        .study-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 25px; }
-        .study-card { background: white; border-radius: 15px; padding: 25px; box-shadow: 0 5px 20px rgba(0,0,0,0.08); }
-        .study-card h2 { font-size: 1.3rem; color: #333; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
-        .timetable { width: 100%; border-collapse: collapse; }
-        .timetable th { background: #667eea; color: white; padding: 10px; text-align: left; font-size: 0.9rem; }
-        .timetable td { padding: 10px; border-bottom: 1px solid #f0f0f0; font-size: 0.9rem; }
-        .timetable tr:hover td { background: #f8f9ff; }
-        .time-slot { color: #667eea; font-weight: 600; }
-        .goal-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
-        .goal-icon { font-size: 1.5rem; }
-        .goal-text h4 { color: #333; margin-bottom: 3px; font-size: 0.95rem; }
-        .goal-text p { color: #666; font-size: 0.85rem; }
-        .streak-display { text-align: center; padding: 20px; background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 12px; color: white; margin-bottom: 20px; }
-        .streak-num { font-size: 3rem; font-weight: 700; }
-        .streak-label { font-size: 0.9rem; opacity: 0.8; }
-        .weekly-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-top: 15px; }
-        .day-box { text-align: center; padding: 10px 5px; border-radius: 8px; background: #f0f0f0; }
-        .day-box.active { background: #667eea; color: white; }
-        .day-box.done { background: #10b981; color: white; }
-        .day-name { font-size: 0.7rem; font-weight: 600; }
-        .day-tasks { font-size: 0.8rem; margin-top: 3px; }
-        .points-bar { background: #f0f0f0; border-radius: 50px; height: 10px; margin: 10px 0; }
-        .points-fill { background: linear-gradient(135deg, #667eea, #764ba2); height: 100%; border-radius: 50px; transition: width 0.5s; }
-        body.dark-mode .study-card { background: #1e293b; }
-        body.dark-mode .study-card h2 { color: #f3f4f6; }
-        body.dark-mode .timetable td { border-color: #374151; color: #f3f4f6; }
-        body.dark-mode .timetable tr:hover td { background: #0f172a; }
-        body.dark-mode .goal-text h4 { color: #f3f4f6; }
-        body.dark-mode .goal-item { border-color: #374151; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Study Mode - Dream Wave</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .page-wrap { max-width: 1100px; margin: 90px auto 60px; padding: 0 20px; }
+    .page-title { font-size: 2rem; font-weight: 800; color: #fff; margin-bottom: 6px; }
+    .page-sub { color: rgba(255,255,255,0.5); margin-bottom: 30px; }
+    .study-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+    .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 24px; }
+    .glass h2 { color: #e2d9f3; font-size: 1rem; font-weight: 700; margin-bottom: 18px; display: flex; align-items: center; gap: 8px; }
+    .streak-display { text-align: center; padding: 20px; background: linear-gradient(135deg, #7c3aed, #a78bfa); border-radius: 14px; color: white; margin-bottom: 18px; }
+    .streak-num { font-size: 3rem; font-weight: 800; }
+    .streak-label { font-size: 0.85rem; opacity: 0.8; }
+    .weekly-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+    .day-box { text-align: center; padding: 8px 4px; border-radius: 8px; background: rgba(255,255,255,0.05); }
+    .day-box.done { background: rgba(110,231,183,0.2); }
+    .day-box.active { background: rgba(167,139,250,0.25); }
+    .day-name { font-size: 0.65rem; font-weight: 700; color: rgba(255,255,255,0.5); }
+    .day-mark { font-size: 0.75rem; margin-top: 3px; color: rgba(255,255,255,0.4); }
+    .day-box.done .day-mark { color: #6ee7b7; }
+    .day-box.active .day-mark { color: #a78bfa; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: rgba(167,139,250,0.15); color: #a78bfa; padding: 10px 12px; text-align: left; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.5px; }
+    td { padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.88rem; color: rgba(255,255,255,0.75); }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+    .time-slot { color: #a78bfa; font-weight: 600; }
+    .goal-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .goal-item:last-child { border-bottom: none; }
+    .goal-icon { font-size: 1.4rem; flex-shrink: 0; }
+    .goal-text h4 { color: #e2d9f3; font-size: 0.9rem; margin-bottom: 3px; }
+    .goal-text p { color: rgba(255,255,255,0.45); font-size: 0.8rem; }
+    .points-big { text-align: center; margin-bottom: 16px; }
+    .points-big .num { font-size: 2.5rem; font-weight: 800; color: #a78bfa; }
+    .points-big .lbl { color: rgba(255,255,255,0.45); font-size: 0.85rem; }
+    .level-bar-wrap { margin-bottom: 14px; }
+    .level-bar-label { display: flex; justify-content: space-between; color: rgba(255,255,255,0.5); font-size: 0.8rem; margin-bottom: 6px; }
+    .level-bar { background: rgba(255,255,255,0.08); border-radius: 50px; height: 8px; }
+    .level-fill { background: linear-gradient(90deg, #7c3aed, #a78bfa); height: 100%; border-radius: 50px; transition: width 0.5s; }
+    .level-badges { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-top: 14px; }
+    .level-badge { padding: 10px 6px; background: rgba(255,255,255,0.04); border-radius: 10px; text-align: center; font-size: 0.78rem; color: rgba(255,255,255,0.4); }
+    .level-badge.unlocked { background: rgba(167,139,250,0.12); color: #a78bfa; }
+  </style>
 </head>
 <body>
-    <nav class="navbar">
-        <div class="container">
-            <a href="dashboard.html" class="nav-brand">🌊 Dream Wave</a>
-            <div class="nav-links">
-                <a href="dashboard.html">Dashboard</a>
-                <a href="careers.html">Careers</a>
-                <a href="study.html" style="color:#667eea;font-weight:700">Study</a>
-                <a href="leaderboard.html">Leaderboard</a>
-                <a href="ai-assistant.html">AI</a>
-                <a href="community.html">Community</a>
-                <a href="profile.html" id="profileLink">Profile</a>
-                <button onclick="logout()" class="btn-secondary">Logout</button>
-                <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle">🌙</button>
-            </div>
-        </div>
-    </nav>
-
-    <div class="study-container">
-        <div class="study-header">
-            <h1>📚 Study Mode</h1>
-            <p>Your personalized daily timetable, weekly plan & monthly goals</p>
-        </div>
-
-        <div class="study-grid">
-            <!-- Streak -->
-            <div class="study-card">
-                <h2>🔥 Daily Streak</h2>
-                <div class="streak-display">
-                    <div class="streak-num" id="streakNum">0</div>
-                    <div class="streak-label">Day Streak</div>
-                </div>
-                <div class="weekly-grid" id="weeklyGrid"></div>
-                <p style="text-align:center;color:#666;font-size:0.85rem;margin-top:10px">Keep logging in daily to maintain your streak!</p>
-            </div>
-
-            <!-- Daily Timetable -->
-            <div class="study-card">
-                <h2>📅 Daily Timetable</h2>
-                <table class="timetable">
-                    <thead>
-                        <tr><th>Time</th><th>Activity</th><th>Duration</th></tr>
-                    </thead>
-                    <tbody id="timetableBody"></tbody>
-                </table>
-            </div>
-
-            <!-- Weekly Plan -->
-            <div class="study-card">
-                <h2>📆 Weekly Plan</h2>
-                <div id="weeklyPlan"></div>
-            </div>
-
-            <!-- Monthly Goals -->
-            <div class="study-card">
-                <h2>🎯 Monthly Goals</h2>
-                <div id="monthlyGoals"></div>
-            </div>
-
-            <!-- Points & Level -->
-            <div class="study-card">
-                <h2>⭐ Points & Level</h2>
-                <div id="pointsSection"></div>
-            </div>
-        </div>
+  <nav class="navbar">
+    <div class="container">
+      <a href="dashboard.html" class="nav-brand">🌊 Dream Wave</a>
+      <div class="nav-links">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="careers.html">Careers</a>
+        <a href="study.html" class="active">Study</a>
+        <a href="leaderboard.html">Leaderboard</a>
+        <a href="ai-assistant.html">AI</a>
+        <a href="community.html">Community</a>
+        <button onclick="logout()" class="btn-secondary">Logout</button>
+      </div>
     </div>
+  </nav>
 
-    <script src="app.js"></script>
-    <script>
-        checkAuth();
+  <div class="page-wrap">
+    <div class="page-title">📚 Study Mode</div>
+    <p class="page-sub">Your personalized daily timetable, weekly plan and monthly goals</p>
 
-        const API = window.location.hostname === 'localhost'
-            ? 'http://localhost:5000/api'
-            : 'https://aa-dream-wave-production.up.railway.app/api';
+    <div class="study-grid">
+      <!-- Streak -->
+      <div class="glass">
+        <h2>🔥 Daily Streak</h2>
+        <div class="streak-display">
+          <div class="streak-num" id="streakNum">0</div>
+          <div class="streak-label">Day Streak</div>
+        </div>
+        <div class="weekly-grid" id="weeklyGrid"></div>
+        <p style="text-align:center;color:rgba(255,255,255,0.35);font-size:0.8rem;margin-top:12px">Log in daily to maintain your streak!</p>
+      </div>
 
-        const timetable = [
-            { time: '6:00 AM', activity: '🧘 Morning Routine', duration: '30 min' },
-            { time: '6:30 AM', activity: '📖 Study Session 1', duration: '90 min' },
-            { time: '8:00 AM', activity: '🍳 Breakfast', duration: '30 min' },
-            { time: '8:30 AM', activity: '💻 Practice / Projects', duration: '2 hrs' },
-            { time: '10:30 AM', activity: '☕ Short Break', duration: '15 min' },
-            { time: '10:45 AM', activity: '📚 Study Session 2', duration: '90 min' },
-            { time: '12:15 PM', activity: '🍽️ Lunch Break', duration: '45 min' },
-            { time: '1:00 PM', activity: '🎯 Task Completion', duration: '2 hrs' },
-            { time: '3:00 PM', activity: '🏃 Exercise / Walk', duration: '30 min' },
-            { time: '3:30 PM', activity: '📝 Revision', duration: '90 min' },
-            { time: '5:00 PM', activity: '🤖 AI Chat / Learning', duration: '1 hr' },
-            { time: '6:00 PM', activity: '👥 Community / Network', duration: '30 min' },
-            { time: '8:00 PM', activity: '📖 Evening Study', duration: '1 hr' },
-            { time: '9:00 PM', activity: '🌙 Review & Plan Tomorrow', duration: '30 min' },
-        ];
+      <!-- Daily Timetable -->
+      <div class="glass">
+        <h2>📅 Daily Timetable</h2>
+        <table>
+          <thead><tr><th>Time</th><th>Activity</th><th>Duration</th></tr></thead>
+          <tbody id="timetableBody"></tbody>
+        </table>
+      </div>
 
-        const weeklyPlan = [
-            { day: 'Monday', focus: '📖 Theory & Concepts', tasks: 3 },
-            { day: 'Tuesday', focus: '💻 Coding Practice', tasks: 4 },
-            { day: 'Wednesday', focus: '🏗️ Project Building', tasks: 3 },
-            { day: 'Thursday', focus: '📝 Problem Solving', tasks: 5 },
-            { day: 'Friday', focus: '🔄 Revision & Review', tasks: 3 },
-            { day: 'Saturday', focus: '🚀 Full Project Day', tasks: 2 },
-            { day: 'Sunday', focus: '🎯 Mock Tests & Planning', tasks: 2 },
-        ];
+      <!-- Weekly Plan -->
+      <div class="glass">
+        <h2>📆 Weekly Plan</h2>
+        <div id="weeklyPlan"></div>
+      </div>
 
-        const monthlyGoals = [
-            { icon: '📚', title: 'Complete 30 Tasks', desc: 'Finish daily & weekly tasks consistently', target: 30 },
-            { icon: '💻', title: 'Build 2 Projects', desc: 'Create real-world projects for portfolio', target: 2 },
-            { icon: '🏆', title: 'Earn Beginner Certificate', desc: 'Complete 10 tasks to unlock certificate', target: 10 },
-            { icon: '🔥', title: 'Maintain 20-Day Streak', desc: 'Log in and study every day', target: 20 },
-            { icon: '⭐', title: 'Earn 300 Points', desc: 'Complete tasks to earn points', target: 300 },
-        ];
+      <!-- Monthly Goals -->
+      <div class="glass">
+        <h2>🎯 Monthly Goals</h2>
+        <div id="monthlyGoals"></div>
+      </div>
 
-        // Render timetable
-        document.getElementById('timetableBody').innerHTML = timetable.map(t => `
-            <tr>
-                <td class="time-slot">${t.time}</td>
-                <td>${t.activity}</td>
-                <td>${t.duration}</td>
-            </tr>
-        `).join('');
+      <!-- Points & Level -->
+      <div class="glass">
+        <h2>⭐ Points & Level</h2>
+        <div id="pointsSection"></div>
+      </div>
+    </div>
+  </div>
 
-        // Render weekly plan
-        document.getElementById('weeklyPlan').innerHTML = weeklyPlan.map(w => `
-            <div class="goal-item">
-                <div class="goal-icon">📅</div>
-                <div class="goal-text">
-                    <h4>${w.day} - ${w.focus}</h4>
-                    <p>${w.tasks} tasks planned</p>
-                </div>
-            </div>
-        `).join('');
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script>
+    checkAuth();
 
-        // Render monthly goals
-        document.getElementById('monthlyGoals').innerHTML = monthlyGoals.map(g => `
-            <div class="goal-item">
-                <div class="goal-icon">${g.icon}</div>
-                <div class="goal-text">
-                    <h4>${g.title}</h4>
-                    <p>${g.desc}</p>
-                </div>
-            </div>
-        `).join('');
+    const timetable = [
+      { time: '6:00 AM', activity: '🧘 Morning Routine', duration: '30 min' },
+      { time: '6:30 AM', activity: '📖 Study Session 1', duration: '90 min' },
+      { time: '8:00 AM', activity: '🍳 Breakfast', duration: '30 min' },
+      { time: '8:30 AM', activity: '💻 Practice / Projects', duration: '2 hrs' },
+      { time: '10:30 AM', activity: '☕ Short Break', duration: '15 min' },
+      { time: '10:45 AM', activity: '📚 Study Session 2', duration: '90 min' },
+      { time: '12:15 PM', activity: '🍽️ Lunch Break', duration: '45 min' },
+      { time: '1:00 PM', activity: '🎯 Task Completion', duration: '2 hrs' },
+      { time: '3:00 PM', activity: '🏃 Exercise / Walk', duration: '30 min' },
+      { time: '3:30 PM', activity: '📝 Revision', duration: '90 min' },
+      { time: '5:00 PM', activity: '🤖 AI Chat / Learning', duration: '1 hr' },
+      { time: '6:00 PM', activity: '👥 Community / Network', duration: '30 min' },
+      { time: '8:00 PM', activity: '📖 Evening Study', duration: '1 hr' },
+      { time: '9:00 PM', activity: '🌙 Review & Plan Tomorrow', duration: '30 min' },
+    ];
 
-        // Render weekly streak boxes
-        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        const today = new Date().getDay();
-        document.getElementById('weeklyGrid').innerHTML = days.map((d, i) => `
-            <div class="day-box ${i < today ? 'done' : i === today ? 'active' : ''}">
-                <div class="day-name">${d}</div>
-                <div class="day-tasks">${i < today ? '✓' : i === today ? '📍' : '○'}</div>
-            </div>
-        `).join('');
+    const weeklyPlan = [
+      { day: 'Monday', focus: '📖 Theory & Concepts', tasks: 3 },
+      { day: 'Tuesday', focus: '💻 Coding Practice', tasks: 4 },
+      { day: 'Wednesday', focus: '🏗️ Project Building', tasks: 3 },
+      { day: 'Thursday', focus: '📝 Problem Solving', tasks: 5 },
+      { day: 'Friday', focus: '🔄 Revision & Review', tasks: 3 },
+      { day: 'Saturday', focus: '🚀 Full Project Day', tasks: 2 },
+      { day: 'Sunday', focus: '🎯 Mock Tests & Planning', tasks: 2 },
+    ];
 
-        // Load user data
-        async function loadUserData() {
-            try {
-                const res = await fetch(`${API}/auth/me`, {
-                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-                });
-                const user = await res.json();
-                document.getElementById('streakNum').textContent = user.streak || 0;
-                document.getElementById('profileLink').href = `profile.html?username=${user.username}`;
+    const monthlyGoals = [
+      { icon: '📚', title: 'Complete 30 Tasks', desc: 'Finish daily & weekly tasks consistently' },
+      { icon: '💻', title: 'Build 2 Projects', desc: 'Create real-world projects for portfolio' },
+      { icon: '🏆', title: 'Earn Beginner Certificate', desc: 'Complete 10 tasks to unlock certificate' },
+      { icon: '🔥', title: 'Maintain 20-Day Streak', desc: 'Log in and study every day' },
+      { icon: '⭐', title: 'Earn 300 Points', desc: 'Complete tasks to earn points' },
+    ];
 
-                const points = user.points || 0;
-                const level = points >= 1000 ? 'Master' : points >= 500 ? 'Advanced' : points >= 200 ? 'Intermediate' : 'Beginner';
-                const nextLevel = points >= 1000 ? 1000 : points >= 500 ? 1000 : points >= 200 ? 500 : 200;
-                const pct = Math.min(100, Math.round((points / nextLevel) * 100));
+    document.getElementById('timetableBody').innerHTML = timetable.map(t =>
+      `<tr><td class="time-slot">${t.time}</td><td>${t.activity}</td><td>${t.duration}</td></tr>`
+    ).join('');
 
-                document.getElementById('pointsSection').innerHTML = `
-                    <div style="text-align:center;margin-bottom:15px">
-                        <div style="font-size:2.5rem;font-weight:700;color:#667eea">${points}</div>
-                        <div style="color:#666">Total Points</div>
-                    </div>
-                    <div style="margin-bottom:10px">
-                        <div style="display:flex;justify-content:space-between;margin-bottom:5px">
-                            <span style="font-weight:600">${level}</span>
-                            <span style="color:#666">${points}/${nextLevel}</span>
-                        </div>
-                        <div class="points-bar"><div class="points-fill" style="width:${pct}%"></div></div>
-                    </div>
-                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;text-align:center;margin-top:15px">
-                        ${['🥉 Beginner', '🥈 Intermediate', '🥇 Master'].map((l, i) => `
-                            <div style="padding:10px;background:${points >= [0,200,1000][i] ? '#f0f4ff' : '#f5f5f5'};border-radius:8px;font-size:0.8rem;color:${points >= [0,200,1000][i] ? '#667eea' : '#999'}">${l}</div>
-                        `).join('')}
-                    </div>
-                `;
-            } catch (err) { console.error(err); }
-        }
+    document.getElementById('weeklyPlan').innerHTML = weeklyPlan.map(w =>
+      `<div class="goal-item"><div class="goal-icon">📅</div><div class="goal-text"><h4>${w.day} — ${w.focus}</h4><p>${w.tasks} tasks planned</p></div></div>`
+    ).join('');
 
-        loadUserData();
-    </script>
+    document.getElementById('monthlyGoals').innerHTML = monthlyGoals.map(g =>
+      `<div class="goal-item"><div class="goal-icon">${g.icon}</div><div class="goal-text"><h4>${g.title}</h4><p>${g.desc}</p></div></div>`
+    ).join('');
+
+    const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const today = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
+    document.getElementById('weeklyGrid').innerHTML = days.map((d, i) =>
+      `<div class="day-box ${i < today ? 'done' : i === today ? 'active' : ''}">
+        <div class="day-name">${d}</div>
+        <div class="day-mark">${i < today ? '✓' : i === today ? '●' : '○'}</div>
+      </div>`
+    ).join('');
+
+    async function loadUserData() {
+      try {
+        const res = await fetch(API_URL + '/auth/me', {
+          headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
+        });
+        const user = await res.json();
+        document.getElementById('streakNum').textContent = user.streak || 0;
+        const points = user.points || 0;
+        const level = points >= 1000 ? 'Master' : points >= 500 ? 'Advanced' : points >= 200 ? 'Intermediate' : 'Beginner';
+        const nextLevel = points >= 1000 ? 1000 : points >= 500 ? 1000 : points >= 200 ? 500 : 200;
+        const pct = Math.min(100, Math.round((points / nextLevel) * 100));
+        document.getElementById('pointsSection').innerHTML = `
+          <div class="points-big"><div class="num">${points}</div><div class="lbl">Total Points</div></div>
+          <div class="level-bar-wrap">
+            <div class="level-bar-label"><span>${level}</span><span>${points}/${nextLevel}</span></div>
+            <div class="level-bar"><div class="level-fill" style="width:${pct}%"></div></div>
+          </div>
+          <div class="level-badges">
+            <div class="level-badge ${points >= 0 ? 'unlocked' : ''}">🥉 Beginner</div>
+            <div class="level-badge ${points >= 200 ? 'unlocked' : ''}">🥈 Intermediate</div>
+            <div class="level-badge ${points >= 1000 ? 'unlocked' : ''}">🥇 Master</div>
+          </div>
+        `;
+      } catch (err) { console.error(err); }
+    }
+
+    loadUserData();
+  </script>
 </body>
 </html>

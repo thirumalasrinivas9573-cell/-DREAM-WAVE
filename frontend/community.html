@@ -5,6 +5,50 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Community - Dream Wave</title>
   <link rel="stylesheet" href="styles.css">
+  <style>
+    .page-wrap { max-width: 1100px; margin: 90px auto 60px; padding: 0 20px; display: grid; grid-template-columns: 1fr 320px; gap: 24px; }
+    .page-title { font-size: 1.6rem; font-weight: 800; color: #fff; margin-bottom: 4px; }
+    .page-sub { color: rgba(255,255,255,0.45); margin-bottom: 20px; font-size: 0.88rem; }
+    .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.1); border-radius: 18px; padding: 22px; margin-bottom: 20px; }
+    .glass h3 { color: #e2d9f3; font-size: 0.88rem; font-weight: 700; margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
+    textarea { width: 100%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; color: #fff; padding: 12px 14px; font-size: 0.9rem; resize: vertical; min-height: 80px; outline: none; box-sizing: border-box; font-family: inherit; }
+    textarea:focus { border-color: #a78bfa; }
+    select { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; color: #fff; padding: 9px 12px; font-size: 0.85rem; outline: none; margin-top: 8px; width: 100%; }
+    select option { background: #1e1b4b; }
+    .btn-post { background: linear-gradient(135deg, #7c3aed, #a78bfa); color: white; border: none; padding: 9px 22px; border-radius: 10px; font-weight: 700; cursor: pointer; font-size: 0.88rem; margin-top: 10px; float: right; }
+    .btn-post:disabled { opacity: 0.5; cursor: not-allowed; }
+    .post-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; padding: 18px; margin-bottom: 14px; }
+    .post-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .post-avatar { width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #7c3aed, #a78bfa); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.9rem; flex-shrink: 0; }
+    .post-author { color: #e2d9f3; font-weight: 700; font-size: 0.9rem; }
+    .post-aaid { color: #a78bfa; font-size: 0.78rem; }
+    .post-time { color: rgba(255,255,255,0.3); font-size: 0.75rem; margin-left: auto; }
+    .post-badge { background: rgba(167,139,250,0.15); color: #a78bfa; padding: 2px 9px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
+    .post-content { color: rgba(255,255,255,0.75); font-size: 0.9rem; line-height: 1.6; margin-bottom: 12px; }
+    .post-actions { display: flex; gap: 14px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); }
+    .action-btn { background: none; border: none; color: rgba(255,255,255,0.4); cursor: pointer; font-size: 0.82rem; display: flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 8px; transition: all 0.2s; }
+    .action-btn:hover { background: rgba(167,139,250,0.1); color: #a78bfa; }
+    /* Search */
+    .search-input { width: 100%; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; color: #fff; padding: 11px 14px; font-size: 0.88rem; outline: none; box-sizing: border-box; }
+    .search-input::placeholder { color: rgba(255,255,255,0.3); }
+    .search-input:focus { border-color: #a78bfa; }
+    .user-card { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .user-card:last-child { border-bottom: none; }
+    .u-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #7c3aed, #a78bfa); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.85rem; flex-shrink: 0; }
+    .u-name { color: #e2d9f3; font-weight: 600; font-size: 0.88rem; }
+    .u-aaid { color: #a78bfa; font-size: 0.75rem; }
+    .u-ambition { color: rgba(255,255,255,0.4); font-size: 0.75rem; }
+    .connect-btn { margin-left: auto; background: rgba(167,139,250,0.15); color: #a78bfa; border: 1px solid rgba(167,139,250,0.3); padding: 5px 12px; border-radius: 8px; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+    .connect-btn:hover { background: rgba(167,139,250,0.25); }
+    .connect-btn.sent { color: rgba(255,255,255,0.4); border-color: rgba(255,255,255,0.1); cursor: default; }
+    .online-dot { width: 8px; height: 8px; border-radius: 50%; background: #6ee7b7; display: inline-block; margin-right: 4px; }
+    .req-card { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .req-actions { margin-left: auto; display: flex; gap: 6px; }
+    .btn-accept { background: rgba(110,231,183,0.15); color: #6ee7b7; border: 1px solid rgba(110,231,183,0.3); padding: 4px 10px; border-radius: 7px; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
+    .btn-reject { background: rgba(248,113,113,0.1); color: #f87171; border: 1px solid rgba(248,113,113,0.2); padding: 4px 10px; border-radius: 7px; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
+    .empty { text-align: center; padding: 30px 10px; color: rgba(255,255,255,0.3); font-size: 0.85rem; }
+    @media (max-width: 768px) { .page-wrap { grid-template-columns: 1fr; } }
+  </style>
 </head>
 <body>
   <nav class="navbar">
@@ -12,31 +56,60 @@
       <a href="dashboard.html" class="nav-brand">🌊 Dream Wave</a>
       <div class="nav-links">
         <a href="dashboard.html">Dashboard</a>
-        <a href="ai-assistant.html">AI Assistant</a>
-        <a href="community.html" style="color:#667eea;font-weight:700">Community</a>
+        <a href="ai-assistant.html">AI Mentor</a>
+        <a href="community.html" class="active">Community</a>
+        <a href="messages.html">💬 Chat</a>
         <button onclick="logout()" class="btn-secondary">Logout</button>
       </div>
     </div>
   </nav>
 
-  <div class="community-container">
-    <div class="container">
-      <h1>Student Community</h1>
+  <div class="page-wrap">
+    <!-- LEFT: Feed -->
+    <div>
+      <div class="page-title">👥 Community</div>
+      <p class="page-sub">Share achievements, connect with comrades on the same path</p>
 
-      <div class="create-post-card">
-        <h3>Share Your Achievement</h3>
-        <textarea id="postContent" placeholder="What's on your mind?"></textarea>
+      <div class="glass">
+        <textarea id="postContent" placeholder="Share an achievement, tip, or question..."></textarea>
         <select id="postType">
-          <option value="general">General</option>
-          <option value="achievement">Achievement</option>
-          <option value="project">Project</option>
-          <option value="goal">Goal</option>
+          <option value="general">💬 General</option>
+          <option value="achievement">🏆 Achievement</option>
+          <option value="project">🚀 Project</option>
+          <option value="goal">🎯 Goal</option>
         </select>
-        <button onclick="createPost()" id="postBtn" class="btn-primary">Post</button>
+        <button class="btn-post" onclick="createPost()" id="postBtn">Post</button>
+        <div style="clear:both"></div>
       </div>
 
-      <div id="postsContainer" class="posts-container">
-        <p style="text-align:center;color:#666">Loading posts...</p>
+      <div id="postsContainer"><div class="empty">Loading posts...</div></div>
+    </div>
+
+    <!-- RIGHT: Sidebar -->
+    <div>
+      <!-- Search -->
+      <div class="glass">
+        <h3>🔍 Find Comrades</h3>
+        <input class="search-input" type="text" id="searchInput" placeholder="Search by @AA ID or name..." oninput="searchUsers(this.value)">
+        <div id="searchResults" style="margin-top:12px"></div>
+      </div>
+
+      <!-- Pending requests -->
+      <div class="glass" id="requestsSection" style="display:none">
+        <h3>📨 Comrade Requests</h3>
+        <div id="requestsList"></div>
+      </div>
+
+      <!-- Suggestions -->
+      <div class="glass">
+        <h3>✨ Suggested Comrades</h3>
+        <div id="suggestions"><div class="empty">Loading...</div></div>
+      </div>
+
+      <!-- My Comrades -->
+      <div class="glass">
+        <h3>🤝 My Comrades</h3>
+        <div id="myComrades"><div class="empty">Loading...</div></div>
       </div>
     </div>
   </div>
@@ -45,82 +118,159 @@
   <script src="app.js"></script>
   <script>
     checkAuth();
+    const token = () => localStorage.getItem('token');
+    let searchTimer = null;
+
     loadPosts();
+    loadRequests();
+    loadSuggestions();
+    loadMyComrades();
 
     async function createPost() {
       const content = document.getElementById('postContent').value.trim();
       const type = document.getElementById('postType').value;
       const btn = document.getElementById('postBtn');
-
       if (!content) return;
-
-      btn.disabled = true;
-      btn.textContent = 'Posting...';
-
+      btn.disabled = true; btn.textContent = 'Posting...';
       try {
         const res = await fetch(API_URL + '/posts/create', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + localStorage.getItem('token')
-          },
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token() },
           body: JSON.stringify({ content, type })
         });
-
-        if (res.ok) {
-          document.getElementById('postContent').value = '';
-          loadPosts();
-        } else {
-          alert('Error creating post');
-        }
-      } catch (err) {
-        alert('Cannot connect to server');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Post';
-      }
+        if (res.ok) { document.getElementById('postContent').value = ''; loadPosts(); }
+      } catch (e) {}
+      finally { btn.disabled = false; btn.textContent = 'Post'; }
     }
 
     async function loadPosts() {
       try {
         const res = await fetch(API_URL + '/posts');
         const posts = await res.json();
-
-        const container = document.getElementById('postsContainer');
-
-        if (!posts.length) {
-          container.innerHTML = '<p style="text-align:center;color:#666">No posts yet. Be the first to share!</p>';
-          return;
-        }
-
-        container.innerHTML = posts.map(function(post) {
-          return '<div class="post-card">' +
-            '<div class="post-header">' +
-              '<strong>' + post.author.name + '</strong>' +
-              '<span class="post-type">' + post.type + '</span>' +
-            '</div>' +
-            '<p class="post-content">' + post.content + '</p>' +
-            '<div class="post-actions">' +
-              '<button onclick="likePost(\'' + post._id + '\')" class="action-icon">❤️ ' + post.likes.length + '</button>' +
-              '<span>💬 ' + post.comments.length + '</span>' +
-            '</div>' +
-          '</div>';
-        }).join('');
-      } catch (err) {
-        document.getElementById('postsContainer').innerHTML = '<p style="text-align:center;color:red">Error loading posts</p>';
-      }
+        const c = document.getElementById('postsContainer');
+        if (!posts.length) { c.innerHTML = '<div class="empty">No posts yet. Be the first!</div>'; return; }
+        const typeEmoji = { general:'💬', achievement:'🏆', project:'🚀', goal:'🎯' };
+        c.innerHTML = posts.map(p => `
+          <div class="post-card">
+            <div class="post-header">
+              <div class="post-avatar">${(p.author?.name||'U')[0].toUpperCase()}</div>
+              <div>
+                <div class="post-author">${p.author?.name||'Anonymous'}</div>
+                <div class="post-aaid">${p.author?.aaId ? '@'+p.author.aaId : ''}</div>
+              </div>
+              <span class="post-time">${new Date(p.createdAt).toLocaleDateString()}</span>
+              <span class="post-badge">${typeEmoji[p.type]||'💬'} ${p.type}</span>
+            </div>
+            <div class="post-content">${p.content}</div>
+            <div class="post-actions">
+              <button class="action-btn" onclick="likePost('${p._id}',this)">❤️ ${p.likes?.length||0}</button>
+              <button class="action-btn">💬 ${p.comments?.length||0}</button>
+            </div>
+          </div>`).join('');
+      } catch (e) { document.getElementById('postsContainer').innerHTML = '<div class="empty">Error loading posts</div>'; }
     }
 
-    async function likePost(postId) {
+    async function likePost(id, btn) {
       try {
-        await fetch(API_URL + '/posts/' + postId + '/like', {
-          method: 'POST',
-          headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
-        });
+        await fetch(API_URL + '/posts/' + id + '/like', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token() } });
         loadPosts();
-      } catch (err) {
-        console.error('Error liking post');
-      }
+      } catch (e) {}
+    }
+
+    function searchUsers(q) {
+      clearTimeout(searchTimer);
+      const res = document.getElementById('searchResults');
+      if (!q.trim()) { res.innerHTML = ''; return; }
+      res.innerHTML = '<div class="empty">Searching...</div>';
+      searchTimer = setTimeout(async () => {
+        try {
+          const r = await fetch(API_URL + '/comrades/search?q=' + encodeURIComponent(q), { headers: { 'Authorization': 'Bearer ' + token() } });
+          const users = await r.json();
+          if (!users.length) { res.innerHTML = '<div class="empty">No users found</div>'; return; }
+          res.innerHTML = users.map(u => userCardHTML(u)).join('');
+        } catch (e) { res.innerHTML = '<div class="empty">Error</div>'; }
+      }, 400);
+    }
+
+    async function loadSuggestions() {
+      try {
+        const r = await fetch(API_URL + '/comrades/suggestions', { headers: { 'Authorization': 'Bearer ' + token() } });
+        const users = await r.json();
+        const el = document.getElementById('suggestions');
+        if (!users.length) { el.innerHTML = '<div class="empty">No suggestions yet</div>'; return; }
+        el.innerHTML = users.map(u => userCardHTML(u)).join('');
+      } catch (e) {}
+    }
+
+    async function loadMyComrades() {
+      try {
+        const r = await fetch(API_URL + '/comrades/mine', { headers: { 'Authorization': 'Bearer ' + token() } });
+        const users = await r.json();
+        const el = document.getElementById('myComrades');
+        if (!users.length) { el.innerHTML = '<div class="empty">No comrades yet</div>'; return; }
+        el.innerHTML = users.map(u => `
+          <div class="user-card">
+            <div class="u-avatar">${(u.name||'U')[0].toUpperCase()}</div>
+            <div>
+              <div class="u-name">${u.isOnline ? '<span class="online-dot"></span>' : ''}${u.name}</div>
+              <div class="u-aaid">@${u.aaId||''}</div>
+            </div>
+            <a href="messages.html?with=${u._id}" style="margin-left:auto;background:rgba(167,139,250,0.15);color:#a78bfa;border:1px solid rgba(167,139,250,0.3);padding:5px 12px;border-radius:8px;font-size:0.78rem;font-weight:600;text-decoration:none">💬 Chat</a>
+          </div>`).join('');
+      } catch (e) {}
+    }
+
+    async function loadRequests() {
+      try {
+        const r = await fetch(API_URL + '/comrades/requests', { headers: { 'Authorization': 'Bearer ' + token() } });
+        const reqs = await r.json();
+        if (!reqs.length) return;
+        document.getElementById('requestsSection').style.display = 'block';
+        document.getElementById('requestsList').innerHTML = reqs.map(req => `
+          <div class="req-card" id="req-${req._id}">
+            <div class="u-avatar">${(req.requester?.name||'U')[0].toUpperCase()}</div>
+            <div>
+              <div class="u-name">${req.requester?.name}</div>
+              <div class="u-aaid">@${req.requester?.aaId||''}</div>
+            </div>
+            <div class="req-actions">
+              <button class="btn-accept" onclick="respondRequest('${req._id}','accept')">Accept</button>
+              <button class="btn-reject" onclick="respondRequest('${req._id}','reject')">Reject</button>
+            </div>
+          </div>`).join('');
+      } catch (e) {}
+    }
+
+    async function respondRequest(id, action) {
+      try {
+        await fetch(API_URL + '/comrades/respond/' + id, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token() },
+          body: JSON.stringify({ action })
+        });
+        document.getElementById('req-' + id)?.remove();
+        loadMyComrades();
+      } catch (e) {}
+    }
+
+    async function sendRequest(userId, btn) {
+      try {
+        const r = await fetch(API_URL + '/comrades/request/' + userId, { method: 'POST', headers: { 'Authorization': 'Bearer ' + token() } });
+        const d = await r.json();
+        btn.textContent = 'Sent ✓'; btn.className = 'connect-btn sent'; btn.disabled = true;
+      } catch (e) {}
+    }
+
+    function userCardHTML(u) {
+      return `<div class="user-card">
+        <div class="u-avatar">${(u.name||'U')[0].toUpperCase()}</div>
+        <div>
+          <div class="u-name">${u.name}</div>
+          <div class="u-aaid">@${u.aaId||''}</div>
+          <div class="u-ambition">${(u.ambition||'').replace(/-/g,' ')}</div>
+        </div>
+        <button class="connect-btn" onclick="sendRequest('${u._id}',this)">+ Comrade</button>
+      </div>`;
     }
   </script>
 </body>

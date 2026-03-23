@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Messages - Dream Wave</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body { overflow: hidden; }
+    .chat-layout { display: flex; height: calc(100vh - 64px); margin-top: 64px; }
+    .chat-list { width: 300px; border-right: 1px solid rgba(255,255,255,0.08); overflow-y: auto; flex-shrink: 0; background: rgba(10,10,15,0.6); }
+    .chat-list-header { padding: 20px 16px 12px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .chat-list-header h3 { color: #e2d9f3; font-size: 1rem; font-weight: 700; }
+    .chat-item { display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer; transition: background 0.2s; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .chat-item:hover, .chat-item.active { background: rgba(167,139,250,0.1); }
+    .c-avatar { width: 42px; height: 42px; border-radius: 50%; background: linear-gradient(135deg, #7c3aed, #a78bfa); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 1rem; flex-shrink: 0; position: relative; }
+    .online-ring { position: absolute; bottom: 1px; right: 1px; width: 10px; height: 10px; border-radius: 50%; background: #6ee7b7; border: 2px solid #0a0a0f; }
+    .c-info { flex: 1; min-width: 0; }
+    .c-name { color: #e2d9f3; font-weight: 600; font-size: 0.9rem; }
+    .c-last { color: rgba(255,255,255,0.35); font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+    .c-unread { background: #7c3aed; color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 0.7rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .chat-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .chat-header { padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 12px; background: rgba(10,10,15,0.4); }
+    .chat-header .c-avatar { width: 38px; height: 38px; font-size: 0.9rem; }
+    .chat-header-info h4 { color: #e2d9f3; font-weight: 700; font-size: 0.95rem; }
+    .chat-header-info p { color: rgba(255,255,255,0.4); font-size: 0.78rem; }
+    .messages-area { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+    .msg-row { display: flex; gap: 8px; }
+    .msg-row.mine { flex-direction: row-reverse; }
+    .msg-bubble { max-width: 65%; padding: 10px 14px; border-radius: 16px; font-size: 0.88rem; line-height: 1.5; }
+    .msg-row.theirs .msg-bubble { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.85); border-bottom-left-radius: 4px; }
+    .msg-row.mine .msg-bubble { background: linear-gradient(135deg, #7c3aed, #a78bfa); color: white; border-bottom-right-radius: 4px; }
+    .msg-time { font-size: 0.68rem; color: rgba(255,255,255,0.25); margin-top: 4px; text-align: right; }
+    .chat-input-bar { padding: 14px 20px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; gap: 10px; background: rgba(10,10,15,0.4); }
+    .chat-input-bar input { flex: 1; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1); border-radius: 50px; color: #fff; padding: 11px 18px; font-size: 0.9rem; outline: none; }
+    .chat-input-bar input:focus { border-color: #a78bfa; }
+    .chat-input-bar input::placeholder { color: rgba(255,255,255,0.3); }
+    .send-btn { background: linear-gradient(135deg, #7c3aed, #a78bfa); color: white; border: none; padding: 11px 20px; border-radius: 50px; font-weight: 700; cursor: pointer; font-size: 0.88rem; }
+    .no-chat { flex: 1; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.25); font-size: 0.95rem; flex-direction: column; gap: 12px; }
+    .no-chat .icon { font-size: 3rem; }
+    .empty { text-align: center; padding: 30px 16px; color: rgba(255,255,255,0.3); font-size: 0.85rem; }
+    @media (max-width: 600px) { .chat-list { width: 70px; } .c-info, .c-unread { display: none; } .c-avatar { width: 36px; height: 36px; font-size: 0.85rem; } }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container">
+      <a href="dashboard.html" class="nav-brand">🌊 Dream Wave</a>
+      <div class="nav-links">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="community.html">Community</a>
+        <a href="messages.html" class="active">💬 Messages</a>
+        <button onclick="logout()" class="btn-secondary">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="chat-layout">
+    <div class="chat-list">
+      <div class="chat-list-header"><h3>💬 Messages</h3></div>
+      <div id="chatList"><div class="empty">Loading...</div></div>
+    </div>
+
+    <div class="chat-main" id="chatMain">
+      <div class="no-chat"><div class="icon">💬</div><p>Select a comrade to start chatting</p></div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script>
+    checkAuth();
+    const token = () => localStorage.getItem('token');
+    let currentChat = null;
+    let pollTimer = null;
+
+    loadChats();
+
+    // Auto-open chat if ?with= param
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('with')) setTimeout(() => openChat(params.get('with'), '?', ''), 800);
+
+    async function loadChats() {
+      try {
+        const r = await fetch(API_URL + '/messages/chats', { headers: { 'Authorization': 'Bearer ' + token() } });
+        const chats = await r.json();
+        const el = document.getElementById('chatList');
+        if (!chats.length) { el.innerHTML = '<div class="empty">No chats yet.<br>Connect with comrades first.</div>'; return; }
+        el.innerHTML = chats.map(c => `
+          <div class="chat-item" id="ci-${c.user._id}" onclick="openChat('${c.user._id}','${c.user.name}','${c.user.aaId||''}',${c.user.isOnline})">
+            <div class="c-avatar">${(c.user.name||'U')[0].toUpperCase()}${c.user.isOnline ? '<div class="online-ring"></div>' : ''}</div>
+            <div class="c-info">
+              <div class="c-name">${c.user.name}</div>
+              <div class="c-last">${c.lastMessage?.text || 'Say hello!'}</div>
+            </div>
+            ${c.unread > 0 ? `<div class="c-unread">${c.unread}</div>` : ''}
+          </div>`).join('');
+      } catch (e) {}
+    }
+
+    async function openChat(userId, name, aaId, online) {
+      currentChat = userId;
+      document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
+      document.getElementById('ci-' + userId)?.classList.add('active');
+
+      document.getElementById('chatMain').innerHTML = `
+        <div class="chat-header">
+          <div class="c-avatar">${(name||'U')[0].toUpperCase()}${online ? '<div class="online-ring"></div>' : ''}</div>
+          <div class="chat-header-info">
+            <h4>${name}</h4>
+            <p>${aaId ? '@'+aaId : ''} ${online ? '• Online' : ''}</p>
+          </div>
+        </div>
+        <div class="messages-area" id="messagesArea"></div>
+        <div class="chat-input-bar">
+          <input type="text" id="msgInput" placeholder="Type a message..." onkeypress="if(event.key==='Enter')sendMsg()">
+          <button class="send-btn" onclick="sendMsg()">Send</button>
+        </div>`;
+
+      loadMessages();
+      clearInterval(pollTimer);
+      pollTimer = setInterval(loadMessages, 3000);
+    }
+
+    async function loadMessages() {
+      if (!currentChat) return;
+      try {
+        const r = await fetch(API_URL + '/messages/conversation/' + currentChat, { headers: { 'Authorization': 'Bearer ' + token() } });
+        const msgs = await r.json();
+        const me = JSON.parse(localStorage.getItem('user') || '{}');
+        const area = document.getElementById('messagesArea');
+        if (!area) return;
+        const wasAtBottom = area.scrollHeight - area.scrollTop <= area.clientHeight + 50;
+        area.innerHTML = msgs.length ? msgs.map(m => {
+          const mine = m.sender === me.id || m.sender === me._id;
+          return `<div class="msg-row ${mine ? 'mine' : 'theirs'}">
+            <div class="msg-bubble">${m.text}<div class="msg-time">${new Date(m.createdAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</div></div>
+          </div>`;
+        }).join('') : '<div style="text-align:center;color:rgba(255,255,255,0.25);padding:40px;font-size:0.85rem">No messages yet. Say hello!</div>';
+        if (wasAtBottom) area.scrollTop = area.scrollHeight;
+      } catch (e) {}
+    }
+
+    async function sendMsg() {
+      const input = document.getElementById('msgInput');
+      const text = input?.value.trim();
+      if (!text || !currentChat) return;
+      input.value = '';
+      try {
+        await fetch(API_URL + '/messages/send/' + currentChat, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token() },
+          body: JSON.stringify({ text })
+        });
+        loadMessages();
+        loadChats();
+      } catch (e) {}
+    }
+  </script>
+</body>
+</html>
