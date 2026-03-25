@@ -33,13 +33,12 @@
   </nav>
   <div class="mobile-nav" id="mobileNav">
     <a href="dashboard.html">🏠 Dashboard</a>
-    <a href="ai-assistant.html">🤖 AI Chat</a>
+    <a href="goal-dashboard.html">🎯 Goal Dashboard</a>
+    <a href="exam-prep.html">📝 Exam Prep</a>
     <a href="mentor.html">🎓 AI Mentor</a>
     <a href="comrades.html">🤝 Comrades</a>
-    <a href="community.html">👥 Community</a>
-    <a href="focus.html">🎯 Focus Mode</a>
-    <a href="daily-life.html">🌿 Daily Life AI</a>
     <a href="study.html">📚 Study</a>
+    <a href="daily-life.html">🌿 Daily Life AI</a>
     <a href="profile.html">👤 Profile</a>
     <button onclick="logout()">🚪 Logout</button>
   </div>
@@ -53,8 +52,10 @@
       <a href="careers.html" class="sidebar-item"><span class="icon">🚀</span> Careers</a>
       <a href="career-roadmap.html" class="sidebar-item"><span class="icon">🗺️</span> Roadmap</a>
       <a href="study.html" class="sidebar-item"><span class="icon">📚</span> Study</a>
-      <a href="ambition.html" class="sidebar-item"><span class="icon">🎯</span> Set Goal</a>
-
+      <a href="books.html" class="sidebar-item"><span class="icon">📖</span> Books</a>
+      <a href="goal-dashboard.html" class="sidebar-item"><span class="icon">🎯</span> Goal Dashboard</a>
+      <a href="exam-prep.html" class="sidebar-item"><span class="icon">📝</span> Exam Prep</a>
+      <a href="ambition.html" class="sidebar-item"><span class="icon">✨</span> Set Goal</a>
       <a href="focus.html" class="sidebar-item"><span class="icon">🎯</span> Focus Mode</a>
       <a href="daily-life.html" class="sidebar-item"><span class="icon">🌿</span> Daily Life AI</a>
 
@@ -153,11 +154,7 @@
         <!-- Daily Tasks -->
         <div class="dash-card">
           <h3>📋 Today's Tasks <a href="mentor.html" style="font-size:0.75rem;color:var(--accent);font-weight:600;margin-left:8px;text-decoration:none;">View All →</a></h3>
-          <div id="tasksList">
-            <div style="color: var(--text-dim); font-size: 0.88rem; text-align: center; padding: 20px 0;">
-              Loading tasks...
-            </div>
-          </div>
+          <div id="tasksList"><div class="loading-state"><div class="spinner"></div><p>Loading tasks...</p></div></div>
           <button onclick="window.location.href='mentor.html'" style="width:100%;margin-top:12px;padding:9px;background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.3);border-radius:10px;color:#c4b5fd;font-size:0.85rem;font-weight:600;cursor:pointer;">✨ AI Mentor Training</button>
         </div>
 
@@ -165,14 +162,14 @@
         <div class="dash-card">
           <h3>⚡ Quick Actions</h3>
           <div class="quick-actions">
-            <a href="ai-assistant.html" class="action-btn"><span>🤖</span> AI Mentor</a>
+            <a href="goal-dashboard.html" class="action-btn"><span>🎯</span> Goal Dashboard</a>
+            <a href="exam-prep.html" class="action-btn"><span>📝</span> Exam Prep</a>
+            <a href="ai-assistant.html" class="action-btn"><span>🤖</span> AI Chat</a>
             <a href="study.html" class="action-btn"><span>📚</span> Study Mode</a>
             <a href="comrades.html" class="action-btn"><span>🤝</span> Comrades</a>
             <a href="focus.html" class="action-btn"><span>🎯</span> Focus Mode</a>
             <a href="daily-life.html" class="action-btn"><span>🌿</span> Daily Life AI</a>
-            <a href="career-roadmap.html" class="action-btn"><span>🗺️</span> Roadmap</a>
             <a href="leaderboard.html" class="action-btn"><span>🏆</span> Leaderboard</a>
-            <a href="entertainment.html" class="action-btn"><span>🎬</span> Reels</a>
           </div>
         </div>
 
@@ -224,11 +221,7 @@
         <!-- Progress -->
         <div class="dash-card">
           <h3>📊 Progress</h3>
-          <div id="progressSection">
-            <div style="color: var(--text-dim); font-size: 0.88rem; text-align: center; padding: 20px 0;">
-              No active career goal yet
-            </div>
-          </div>
+          <div id="progressSection"><div class="loading-state"><div class="spinner"></div><p>Loading progress...</p></div></div>
         </div>
 
       </div>
@@ -239,94 +232,76 @@
   <script src="app.js"></script>
   <script>
     checkAuth();
-    const token = () => localStorage.getItem('token');
-    const user = () => JSON.parse(localStorage.getItem('user') || '{}');
     let currentMissionId = null;
+    let completedTaskCount = 0;
 
     async function loadDashboard() {
-      const u = user();
-      if (u.name) {
-        document.getElementById('userName').textContent = u.name.split(' ')[0];
+      const u = getUser();
+      if (u.name) document.getElementById('userName').textContent = u.name.split(' ')[0];
+
+      const hour = new Date().getHours();
+      const greet = hour < 12 ? '🌞 Good morning' : hour < 17 ? '☀️ Good afternoon' : '🌙 Good evening';
+      document.getElementById('welcomeSub').textContent = greet + ', ready to level up today?';
+
+      // Load stats, AI greeting, and mission in parallel
+      const [statsResult, checkinResult, missionResult] = await Promise.allSettled([
+        apiFetch('/progress/stats'),
+        apiFetch('/mentor/checkin'),
+        apiFetch('/mentor/daily-mission')
+      ]);
+
+      // Stats
+      if (statsResult.status === 'fulfilled') {
+        const data = statsResult.value;
+        document.getElementById('statCredits').textContent = data.points || 0;
+        document.getElementById('statStreak').textContent = data.streak || 0;
+        document.getElementById('statRank').textContent = '#' + (data.rank || '—');
+        document.getElementById('statLevel').textContent = data.level || 1;
+        document.getElementById('statDiscipline').textContent = (data.disciplineScore || 0) + '%';
+        document.getElementById('creditDisplay').textContent = data.points || 0;
+
+        const level = data.level || 1;
+        const pointsInLevel = (data.points || 0) % 100;
+        document.getElementById('creditProgress').style.width = Math.min(pointsInLevel, 100) + '%';
+        document.getElementById('creditNextLabel').textContent = `Level ${level} · ${pointsInLevel}/100 pts to Level ${level + 1}`;
+
+        if (data.learningMode) {
+          document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+          document.getElementById('mode-' + data.learningMode)?.classList.add('active');
+        }
+
+        if (data.ambition || data.goal) {
+          document.getElementById('ambitionBanner').style.display = 'flex';
+          document.getElementById('noAmbitionBanner').style.display = 'none';
+          document.getElementById('ambitionTitle').textContent = data.ambition || data.goal;
+          loadProgress(data);
+        }
+        loadTasks();
       }
 
       // AI greeting
-      const hour = new Date().getHours();
-      const greetEmoji = hour < 12 ? '🌞 Good morning' : hour < 17 ? '☀️ Good afternoon' : '🌙 Good evening';
-      document.getElementById('welcomeSub').textContent = greetEmoji + ', ready to level up today?';
+      if (checkinResult.status === 'fulfilled' && checkinResult.value.message) {
+        document.getElementById('aiGreetingText').textContent = checkinResult.value.message;
+        document.getElementById('aiGreeting').style.display = 'block';
+      }
 
-      try {
-        const res = await fetch(`${API_URL}/progress/stats`, {
-          headers: { 'Authorization': `Bearer ${token()}` }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          document.getElementById('statCredits').textContent = data.points || 0;
-          document.getElementById('statStreak').textContent = data.streak || 0;
-          document.getElementById('statRank').textContent = '#' + (data.rank || '—');
-          document.getElementById('statLevel').textContent = data.level || 1;
-          document.getElementById('statDiscipline').textContent = (data.disciplineScore || 0) + '%';
-          document.getElementById('creditDisplay').textContent = data.points || 0;
-
-          const level = data.level || 1;
-          const pointsInLevel = (data.points || 0) % 100;
-          const progress = Math.min(pointsInLevel, 100);
-          document.getElementById('creditProgress').style.width = progress + '%';
-          document.getElementById('creditNextLabel').textContent = `Level ${level} · ${pointsInLevel}/100 pts to Level ${level + 1}`;
-
-          if (data.learningMode) {
-            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-            const modeBtn = document.getElementById('mode-' + data.learningMode);
-            if (modeBtn) modeBtn.classList.add('active');
-          }
-
-          if (data.ambition || data.goal) {
-            document.getElementById('ambitionBanner').style.display = 'flex';
-            document.getElementById('noAmbitionBanner').style.display = 'none';
-            document.getElementById('ambitionTitle').textContent = data.ambition || data.goal;
-            loadTasks(data.ambition || data.goal);
-            loadProgress(data);
-          } else {
-            loadTasks(null);
+      // Daily mission
+      if (missionResult.status === 'fulfilled') {
+        const d = missionResult.value;
+        if (d.mission) {
+          currentMissionId = d.mission._id;
+          document.getElementById('missionTitle').textContent = d.mission.title;
+          document.getElementById('missionDesc').textContent = d.mission.description || '';
+          document.getElementById('missionPoints').textContent = '+' + d.mission.points + ' pts';
+          document.getElementById('dailyMissionCard').style.display = 'block';
+          if (d.allDone || d.mission.status === 'completed') {
+            const btn = document.getElementById('missionBtn');
+            btn.textContent = '✅ Done';
+            btn.disabled = true;
+            btn.style.opacity = '0.6';
           }
         }
-      } catch (e) { console.error('Stats error:', e); }
-
-      // Load AI check-in message
-      try {
-        const r = await fetch(`${API_URL}/mentor/checkin`, {
-          headers: { 'Authorization': `Bearer ${token()}` }
-        });
-        if (r.ok) {
-          const d = await r.json();
-          if (d.message) {
-            document.getElementById('aiGreetingText').textContent = d.message;
-            document.getElementById('aiGreeting').style.display = 'block';
-          }
-        }
-      } catch (e) {}
-
-      // Load daily mission
-      try {
-        const r = await fetch(`${API_URL}/mentor/daily-mission`, {
-          headers: { 'Authorization': `Bearer ${token()}` }
-        });
-        if (r.ok) {
-          const d = await r.json();
-          if (d.mission) {
-            currentMissionId = d.mission._id;
-            document.getElementById('missionTitle').textContent = d.mission.title;
-            document.getElementById('missionDesc').textContent = d.mission.description || '';
-            document.getElementById('missionPoints').textContent = '+' + d.mission.points + ' pts';
-            const missionCard = document.getElementById('dailyMissionCard');
-            missionCard.style.display = 'block';
-            if (d.allDone || d.mission.status === 'completed') {
-              document.getElementById('missionBtn').textContent = '✅ Done';
-              document.getElementById('missionBtn').disabled = true;
-              document.getElementById('missionBtn').style.opacity = '0.6';
-            }
-          }
-        }
-      } catch (e) {}
+      }
     }
 
     async function completeMission() {
@@ -334,31 +309,31 @@
       const btn = document.getElementById('missionBtn');
       btn.disabled = true; btn.textContent = 'Completing...';
       try {
-        const r = await fetch(`${API_URL}/mentor/task/${currentMissionId}/complete`, {
-          method: 'PUT',
-          headers: { 'Authorization': `Bearer ${token()}` }
-        });
-        const d = await r.json();
+        const d = await apiFetch(`/mentor/task/${currentMissionId}/complete`, { method: 'PUT' });
         btn.textContent = '✅ Done';
-        if (d.totalCredits !== undefined) {
-          document.getElementById('statCredits').textContent = d.totalCredits;
-          document.getElementById('creditDisplay').textContent = d.totalCredits;
-        }
+        if (d.totalCredits !== undefined) updateCredits(d.totalCredits);
       } catch (e) { btn.disabled = false; btn.textContent = 'Complete ✓'; }
     }
 
-    function loadTasks(careerId) {
+    function updateCredits(val) {
+      document.getElementById('statCredits').textContent = val;
+      document.getElementById('creditDisplay').textContent = val;
+    }
+
+    async function loadTasks() {
       const container = document.getElementById('tasksList');
-      fetch(`${API_URL}/mentor/tasks/today`, {
-        headers: { 'Authorization': `Bearer ${token()}` }
-      }).then(r => r.json()).then(tasks => {
-        if (!tasks || tasks.length === 0) {
-          container.innerHTML = `<div style="color:var(--text-dim);font-size:0.85rem;text-align:center;padding:16px 0;">No tasks yet — <a href="mentor.html" style="color:var(--accent)">generate with AI Mentor</a></div>`;
+      showLoading('tasksList', 'Loading tasks...');
+      try {
+        const tasks = await apiFetch('/mentor/tasks/today');
+        if (!tasks || !tasks.length) {
+          container.innerHTML = `<div class="loading-state" style="padding:16px 0"><p>No tasks yet — <a href="mentor.html" style="color:var(--accent)">generate with AI Mentor</a></p></div>`;
           return;
         }
+        completedTaskCount = tasks.filter(t => t.status === 'completed').length;
+        document.getElementById('statTasks').textContent = completedTaskCount;
         container.innerHTML = tasks.slice(0, 4).map((t, i) => `
           <div class="task-item">
-            <div class="task-check ${t.status === 'completed' ? 'done' : ''}" id="tc-${i}" onclick="toggleTask(${i}, '${t._id}', this)"></div>
+            <div class="task-check ${t.status === 'completed' ? 'done' : ''}" id="tc-${i}" onclick="toggleTask(${i},'${t._id}',this)" role="checkbox" aria-checked="${t.status === 'completed'}"></div>
             <div class="task-info">
               <div class="task-title ${t.status === 'completed' ? 'done' : ''}" id="tt-${i}">${t.title}</div>
               <div class="task-meta">
@@ -366,77 +341,53 @@
                 <span class="task-points">+${t.points} pts</span>
               </div>
             </div>
-          </div>
-        `).join('');
-        const done = tasks.filter(t => t.status === 'completed').length;
-        document.getElementById('statTasks').textContent = done;
-      }).catch(() => {
-        container.innerHTML = `<div style="color:var(--text-dim);font-size:0.85rem;text-align:center;padding:16px 0;"><a href="mentor.html" style="color:var(--accent)">Open AI Mentor →</a></div>`;
-      });
+          </div>`).join('');
+      } catch (e) {
+        container.innerHTML = `<div class="loading-state"><p><a href="mentor.html" style="color:var(--accent)">Open AI Mentor →</a></p></div>`;
+      }
     }
 
-    let completedTasks = 0;
-    function toggleTask(i, taskId, el) {
+    async function toggleTask(i, taskId, el) {
       if (el.classList.contains('done')) return;
       el.classList.add('done');
       document.getElementById('tt-' + i)?.classList.add('done');
-      fetch(`${API_URL}/mentor/task/${taskId}/complete`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token()}` }
-      }).then(r => r.json()).then(data => {
-        if (data.totalCredits !== undefined) {
-          document.getElementById('statCredits').textContent = data.totalCredits;
-          document.getElementById('creditDisplay').textContent = data.totalCredits;
-        }
-        completedTasks++;
-        document.getElementById('statTasks').textContent = completedTasks;
-      }).catch(() => {});
+      try {
+        const data = await apiFetch(`/mentor/task/${taskId}/complete`, { method: 'PUT' });
+        if (data.totalCredits !== undefined) updateCredits(data.totalCredits);
+        completedTaskCount++;
+        document.getElementById('statTasks').textContent = completedTaskCount;
+      } catch (e) {
+        el.classList.remove('done');
+        document.getElementById('tt-' + i)?.classList.remove('done');
+      }
     }
 
     function loadProgress(data) {
       const container = document.getElementById('progressSection');
-      const progress = data.progress || {};
-      const careerId = data.ambition;
-      const careerProgress = progress[careerId] || { completedTasks: [], points: 0 };
+      const careerId = data.ambition || data.goal;
+      const careerProgress = (data.progress || {})[careerId] || {};
       const total = careerProgress.completedTasks?.length || 0;
       const pct = Math.min((total / 100) * 100, 100);
       container.innerHTML = `
-        <div style="margin-bottom: 12px;">
-          <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-            <span style="font-size: 0.85rem; color: var(--text-muted);">Overall Progress</span>
-            <span style="font-size: 0.85rem; color: var(--accent); font-weight: 600;">${total} tasks</span>
+        <div style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+            <span style="font-size:0.85rem;color:var(--text-muted)">Overall Progress</span>
+            <span style="font-size:0.85rem;color:var(--accent);font-weight:600">${total} tasks</span>
           </div>
-          <div class="progress-bar"><div class="progress-fill" style="width: ${pct}%"></div></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
         </div>
-        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px;">
-          ${total >= 10 ? '<span class="tag tag-green">🎓 Beginner</span>' : ''}
-          ${total >= 50 ? '<span class="tag tag-purple">⚡ Intermediate</span>' : ''}
-          ${total >= 100 ? '<span class="tag tag-pink">🏆 Master</span>' : ''}
-          ${total < 10 ? '<span style="color: var(--text-dim); font-size: 0.82rem;">Complete 10 tasks for Beginner certificate</span>' : ''}
-        </div>
-      `;
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+          ${total >= 100 ? '<span class="tag tag-pink">🏆 Master</span>' : total >= 50 ? '<span class="tag tag-purple">⚡ Intermediate</span>' : total >= 10 ? '<span class="tag tag-green">🎓 Beginner</span>' : `<span style="color:var(--text-dim);font-size:0.82rem">Complete 10 tasks for Beginner badge</span>`}
+        </div>`;
     }
 
     async function setMode(mode) {
       document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-      document.getElementById('mode-' + mode).classList.add('active');
-      try {
-        await fetch(`${API_URL}/profile/update`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token()}` },
-          body: JSON.stringify({ learningMode: mode })
-        });
-      } catch (e) {}
+      document.getElementById('mode-' + mode)?.classList.add('active');
+      try { await apiFetch('/profile/update', { method: 'PUT', body: { learningMode: mode } }); } catch (e) {}
     }
 
     loadDashboard();
-
-    function toggleMobileNav() {
-      const nav = document.getElementById('mobileNav');
-      const btn = document.getElementById('hamburger');
-      nav.classList.toggle('open');
-      btn.classList.toggle('open');
-    }
   </script>
 </body>
 </html>

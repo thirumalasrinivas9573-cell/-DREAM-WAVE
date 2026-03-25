@@ -87,18 +87,26 @@ router.get('/status/:targetId', auth, async (req, res) => {
   }
 });
 
-// Search users by aaId or name
+// Search users by aaId or name — returns all users (paginated) if no query
 router.get('/search', auth, async (req, res) => {
   try {
     const q = req.query.q;
-    if (!q) return res.json([]);
-    const users = await User.find({
-      _id: { $ne: req.userId },
-      $or: [
-        { aaId: { $regex: q, $options: 'i' } },
-        { name: { $regex: q, $options: 'i' } }
-      ]
-    }).select('name aaId profilePhoto ambition isOnline').limit(10);
+    const page = parseInt(req.query.page) || 1;
+    const limit = 20;
+    const skip = (page - 1) * limit;
+
+    const filter = { _id: { $ne: req.userId } };
+    if (q && q.trim()) {
+      filter.$or = [
+        { aaId: { $regex: q.trim(), $options: 'i' } },
+        { name: { $regex: q.trim(), $options: 'i' } }
+      ];
+    }
+
+    const users = await User.find(filter)
+      .select('name aaId profilePhoto ambition isOnline')
+      .skip(skip)
+      .limit(limit);
     res.json(users);
   } catch (err) {
     res.status(500).json({ message: 'Server error' });

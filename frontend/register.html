@@ -19,62 +19,132 @@
     .field input{width:100%;padding:13px 16px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.13);border-radius:12px;color:#fff;font-size:0.92rem;outline:none;transition:border 0.2s,background 0.2s;box-sizing:border-box;}
     .field input::placeholder{color:rgba(255,255,255,0.28);}
     .field input:focus{border-color:#a78bfa;background:rgba(167,139,250,0.08);}
+    .aaid-row{display:flex;align-items:center;gap:0;}
+    .aaid-prefix{padding:13px 12px 13px 16px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.13);border-right:none;border-radius:12px 0 0 12px;color:#a78bfa;font-weight:700;font-size:0.92rem;}
+    .aaid-row input{border-radius:0 12px 12px 0;}
+    .aaid-status{font-size:0.75rem;margin-top:5px;height:16px;}
+    .aaid-status.ok{color:#10b981;}
+    .aaid-status.taken{color:#f87171;}
+    .hint{color:rgba(255,255,255,0.3);font-size:0.75rem;margin-top:4px;}
     .err{color:#f87171;font-size:0.83rem;margin-bottom:14px;display:none;padding:10px 14px;background:rgba(248,113,113,0.1);border-radius:8px;border:1px solid rgba(248,113,113,0.3);}
     .btn-auth{width:100%;padding:14px;background:linear-gradient(135deg,#7c3aed,#a78bfa);color:white;border:none;border-radius:12px;font-size:0.95rem;font-weight:700;cursor:pointer;transition:opacity 0.2s,transform 0.2s;}
     .btn-auth:hover{opacity:0.9;transform:translateY(-1px);}
     .btn-auth:disabled{opacity:0.5;cursor:not-allowed;transform:none;}
     .auth-links{text-align:center;margin-top:18px;}
     .auth-links a{color:#a78bfa;text-decoration:none;font-size:0.88rem;}
-    .hint{color:rgba(255,255,255,0.3);font-size:0.75rem;margin-top:4px;}
   </style>
 </head>
 <body>
   <div class="auth-wrap">
-    <div class="auth-logo"><a href="index.html">🌊 Dream<span>Wave</span></a></div>
+    <div class="auth-logo"><a href="index.html">&#127754; Dream<span>Wave</span></a></div>
     <div class="glass-card">
       <h2>Create your account</h2>
-      <p class="sub">Join the AI career community</p>
-      <form id="registerForm">
+      <p class="sub">Join the AI-powered learning community</p>
+      <form id="registerForm" onsubmit="handleRegister(event)">
         <div class="field">
           <label>Full Name</label>
-          <input type="text" id="name" required placeholder="Your full name">
+          <input type="text" id="name" required placeholder="Your full name" autocomplete="name">
+        </div>
+        <div class="field">
+          <label>AA ID <span style="color:rgba(255,255,255,0.3);font-weight:400">(your unique handle)</span></label>
+          <div class="aaid-row">
+            <span class="aaid-prefix">@</span>
+            <input type="text" id="aaId" required placeholder="yourhandle" autocapitalize="none" autocomplete="username" oninput="checkAaId(this.value)">
+          </div>
+          <div class="aaid-status" id="aaidStatus"></div>
         </div>
         <div class="field">
           <label>Email</label>
-          <input type="email" id="email" required placeholder="you@example.com">
+          <input type="email" id="email" required placeholder="you@example.com" autocomplete="email">
         </div>
         <div class="field">
           <label>Password</label>
-          <input type="password" id="password" required placeholder="Min 6 characters" minlength="6">
+          <input type="password" id="password" required placeholder="Min 6 characters" minlength="6" autocomplete="new-password">
         </div>
-        <div class="hint" style="margin-bottom:16px;">🪪 You can set your AA ID later from your Profile page</div>
         <div id="errorMessage" class="err"></div>
         <button type="submit" class="btn-auth" id="submitBtn">Create Account</button>
       </form>
       <div class="auth-links"><a href="login.html">Already have an account? Sign in</a></div>
     </div>
   </div>
-  <script type="module">
-    import { firebaseSignup, friendlyError } from './firebase.js';
-    document.getElementById('registerForm').addEventListener('submit', async function(e) {
+  <script src="config.js"></script>
+  <script>
+    let aaIdAvailable = false;
+    let aaIdTimer = null;
+
+    function checkAaId(val) {
+      const status = document.getElementById('aaidStatus');
+      val = val.trim().toLowerCase().replace(/^@/, '');
+      if (!val) { status.textContent = ''; aaIdAvailable = false; return; }
+      if (val.length < 3) { status.textContent = 'Min 3 characters'; status.className = 'aaid-status taken'; aaIdAvailable = false; return; }
+      if (!/^[a-z0-9_]+$/.test(val)) { status.textContent = 'Only letters, numbers, underscores'; status.className = 'aaid-status taken'; aaIdAvailable = false; return; }
+      status.textContent = 'Checking...'; status.className = 'aaid-status';
+      clearTimeout(aaIdTimer);
+      aaIdTimer = setTimeout(async () => {
+        try {
+          const r = await fetch(API_URL + '/auth/check-aaid/' + val);
+          const d = await r.json();
+          aaIdAvailable = d.available;
+          status.textContent = d.available ? '&#10003; Available' : '&#10007; Already taken';
+          status.className = 'aaid-status ' + (d.available ? 'ok' : 'taken');
+        } catch { status.textContent = ''; }
+      }, 500);
+    }
+
+    async function handleRegister(e) {
       e.preventDefault();
       const name = document.getElementById('name').value.trim();
+      const aaId = document.getElementById('aaId').value.trim().toLowerCase().replace(/^@/, '');
       const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
       const errorDiv = document.getElementById('errorMessage');
       const btn = document.getElementById('submitBtn');
+
       errorDiv.style.display = 'none';
+
+      if (!aaIdAvailable) { showError('Please choose an available AA ID'); return; }
+      if (aaId.length < 3) { showError('AA ID must be at least 3 characters'); return; }
+
       btn.disabled = true; btn.textContent = 'Creating account...';
+
       try {
-        await firebaseSignup({ name, email, password });
-        window.location.href = 'dashboard.html';
-      } catch (err) {
-        errorDiv.textContent = friendlyError(err.code);
-        errorDiv.style.display = 'block';
+        // Register with backend
+        const res = await fetch(API_URL + '/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, password })
+        });
+        const data = await res.json();
+
+        if (!res.ok) { showError(data.message || 'Registration failed'); return; }
+
+        // Save token
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+
+        // Set AA ID
+        try {
+          await fetch(API_URL + '/profile/update-aaid', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + data.token },
+            body: JSON.stringify({ aaId })
+          });
+          const u = data.user; u.aaId = aaId;
+          localStorage.setItem('user', JSON.stringify(u));
+        } catch(e) {}
+
+        window.location.href = 'ambition.html';
+      } catch(err) {
+        showError('Cannot connect to server. Please try again.');
       } finally {
         btn.disabled = false; btn.textContent = 'Create Account';
       }
-    });
+    }
+
+    function showError(msg) {
+      const e = document.getElementById('errorMessage');
+      e.textContent = msg; e.style.display = 'block';
+    }
   </script>
 </body>
 </html>

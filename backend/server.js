@@ -4,6 +4,7 @@ const cors = require('cors');
 const compression = require('compression');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -26,8 +27,9 @@ app.use(cors({
 app.use(express.json({ limit: '60mb' }));
 app.use(express.urlencoded({ extended: true, limit: '60mb' }));
 
-// Serve frontend — no cache for HTML so updates show immediately
-app.use(express.static('frontend', {
+// Serve frontend — absolute path so it works from any working directory
+const FRONTEND_DIR = path.join(__dirname, '../frontend');
+app.use(express.static(FRONTEND_DIR, {
   maxAge: '1d',
   etag: true,
   setHeaders: (res, filePath) => {
@@ -69,6 +71,8 @@ app.use('/api/roadmap',  require('./routes/roadmap'));
 app.use('/api/comrades', require('./routes/comrades'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/mentor',   require('./routes/mentor'));
+app.use('/api/exam',     require('./routes/exam'));
+app.use('/api/books',    require('./routes/books'));
 
 // Health check
 app.get('/health', (req, res) => {
@@ -78,6 +82,19 @@ app.get('/health', (req, res) => {
     timestamp: new Date(),
     mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
   });
+});
+
+// Default route — serve index.html
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/index.html'));
+});
+
+// Catch-all — serve any .html page by name
+app.get('/:page', (req, res, next) => {
+  const page = req.params.page;
+  if (page.startsWith('api')) return next();
+  const filePath = path.join(__dirname, '../frontend', page.endsWith('.html') ? page : page + '.html');
+  res.sendFile(filePath, err => { if (err) next(); });
 });
 
 // Global error handler

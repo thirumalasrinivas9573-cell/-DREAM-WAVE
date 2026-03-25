@@ -14,4 +14,8 @@ const taskSchema = new mongoose.Schema({
   createdAt:   { type: Date, default: Date.now }
 });
 
+// Compound index for fast daily task queries
+taskSchema.index({ userId: 1, date: 1 });
+taskSchema.index({ userId: 1, status: 1 });
+
 module.exports = mongoose.model('Task', taskSchema);

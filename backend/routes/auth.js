@@ -6,13 +6,22 @@ const auth = require('../middleware/auth');
 
 const router = express.Router();
 
-// Register — only name, email, password required. AA ID set later in profile.
+// Register — name, email, password required. aaId optional (can be set now or later).
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, aaId } = req.body;
 
     if (!name || !email || !password)
       return res.status(400).json({ message: 'Name, email and password are required' });
+
+    // Validate aaId if provided
+    if (aaId) {
+      const handle = aaId.trim().toLowerCase().replace(/^@/, '');
+      if (handle.length < 3) return res.status(400).json({ message: 'AA ID must be at least 3 characters' });
+      if (!/^[a-z0-9_]+$/.test(handle)) return res.status(400).json({ message: 'AA ID can only contain letters, numbers, and underscores' });
+      const existingAaId = await User.findOne({ aaId: handle });
+      if (existingAaId) return res.status(400).json({ message: 'AA ID already taken' });
+    }
 
     if (password.length < 6)
       return res.status(400).json({ message: 'Password must be at least 6 characters' });
@@ -22,7 +31,10 @@ router.post('/register', async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = new User({ name: name.trim(), email: email.trim().toLowerCase(), password: hashedPassword });
+    const userData = { name: name.trim(), email: email.trim().toLowerCase(), password: hashedPassword };
+    if (aaId) userData.aaId = aaId.trim().toLowerCase().replace(/^@/, '');
+
+    const user = new User(userData);
     await user.save();
 
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET || 'dreamwave_secret', { expiresIn: '7d' });

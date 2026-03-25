@@ -22,7 +22,7 @@ Always be structured, clear, and actionable.`;
 
 // Regular chat
 router.post('/', auth, async (req, res) => {
-  const { message, context } = req.body;
+  const { message } = req.body;
   if (!message) return res.status(400).json({ message: 'Message is required' });
 
   try {
@@ -108,6 +108,102 @@ Rules: minimum 2500 words, deep practical content, real-world insights.`;
   } catch (error) {
     console.error('Report error:', error.message);
     res.status(500).json({ message: 'Error generating report', error: error.message });
+  }
+});
+
+// Daily Life AI — handles cooking, health, workout, routine, room design, etc.
+router.post('/message', auth, async (req, res) => {
+  const { message, mode } = req.body;
+  if (!message) return res.status(400).json({ message: 'Message is required' });
+
+  const systemPrompts = {
+    cooking: `You are a master chef and traditional cooking expert with deep knowledge of world cuisines, nutrition, and food science. When given ingredients or a recipe request:
+- Provide detailed, step-by-step recipes with exact measurements
+- Include cooking time, temperature, and technique tips
+- Suggest ingredient substitutions if needed
+- Add nutritional highlights and health benefits
+- Share traditional cooking secrets and pro tips
+Be warm, practical, and thorough. Format clearly with sections.`,
+
+    health: `You are a certified health and wellness advisor with expertise in natural medicine, nutrition, and lifestyle optimization. When asked about health topics:
+- Give evidence-based natural remedies and lifestyle advice
+- Include specific herbs, foods, and practices with dosages/timing
+- Provide a structured daily health protocol
+- Mention when to consult a doctor
+- Be holistic — address body, mind, and habits
+Never diagnose. Be practical, warm, and detailed.`,
+
+    workout: `You are an expert personal trainer and sports scientist. When asked about workouts, fitness, or exercise:
+- Create detailed workout plans with sets, reps, rest times
+- Explain proper form and technique for each exercise
+- Include warm-up and cool-down routines
+- Adapt plans for different fitness levels (beginner/intermediate/advanced)
+- Add nutrition tips for pre/post workout
+- Include weekly progression plans
+Be motivating, precise, and safety-conscious.`,
+
+    jogging: `You are a certified running coach and endurance sports expert. When asked about jogging, running, or cardio:
+- Provide structured running programs (Couch to 5K style or beyond)
+- Include pace guidance, breathing techniques, and form tips
+- Create weekly training schedules with rest days
+- Address common running injuries and prevention
+- Give gear recommendations and warm-up/cool-down routines
+- Include mental strategies for long runs
+Be encouraging, detailed, and practical.`,
+
+    routine: `You are a productivity coach and life optimization expert. When asked to build a daily routine:
+- Create a detailed hour-by-hour schedule
+- Balance work, exercise, meals, learning, and rest
+- Include morning and evening rituals
+- Add time-blocking strategies and habit stacking tips
+- Customize for the person's specific goals and lifestyle
+- Include weekly review and adjustment strategies
+Be structured, realistic, and motivating.`,
+
+    room: `You are an expert interior designer with knowledge of space planning, color theory, and home decor. When asked about room design:
+- Provide detailed room layout and furniture arrangement suggestions
+- Recommend color palettes with specific color codes
+- Suggest lighting setups (ambient, task, accent)
+- Include budget-friendly and premium options
+- Add storage solutions and space optimization tips
+- Recommend specific furniture styles and decor items
+Be creative, practical, and visually descriptive.`,
+
+    general: `You are a knowledgeable daily life assistant covering cooking, fitness, health, home design, productivity, and lifestyle. Provide detailed, practical, and actionable advice. Be thorough, warm, and helpful. Format your response clearly with sections when appropriate.`
+  };
+
+  const systemContent = systemPrompts[mode] || systemPrompts.general;
+
+  try {
+    const openaiRes = await fetch(OPENAI_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemContent },
+          { role: 'user', content: message }
+        ],
+        max_tokens: 1200,
+        temperature: 0.75
+      })
+    });
+
+    if (!openaiRes.ok) {
+      const err = await openaiRes.json();
+      console.error('OpenAI daily-life error:', err);
+      return res.status(500).json({ message: 'OpenAI API error', error: err.error?.message });
+    }
+
+    const data = await openaiRes.json();
+    res.json({ reply: data.choices[0].message.content, mode, aiProvider: 'gpt-4o-mini' });
+
+  } catch (error) {
+    console.error('Daily life AI error:', error.message);
+    res.status(500).json({ message: 'Error communicating with AI', error: error.message });
   }
 });
 

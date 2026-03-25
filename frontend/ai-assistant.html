@@ -146,12 +146,10 @@
   <script src="app.js"></script>
   <script>
     checkAuth();
-    const token = () => localStorage.getItem('token');
 
     function switchTab(tab, el) {
       document.querySelectorAll('.tab-btn, .sidebar-btn').forEach(b => b.classList.remove('active'));
       el.classList.add('active');
-      // sync both tab bars
       if (tab === 'chat') { document.getElementById('tabChat').classList.add('active'); }
       else { document.getElementById('tabReport').classList.add('active'); }
       document.getElementById('chatPanel').style.display = tab === 'chat' ? 'flex' : 'none';
@@ -181,20 +179,15 @@
       addMessage(message, 'user');
       input.value = '';
       const typingId = 'typing-' + Date.now();
-      addMessage('...', 'ai', typingId);
+      addMessage('✨ Thinking...', 'ai', typingId);
       try {
-        const response = await fetch(`${API_URL}/chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token()}` },
-          body: JSON.stringify({ message, context: 'career-guidance' })
-        });
-        const data = await response.json();
+        const data = await apiFetch('/chat', { method: 'POST', body: { message } });
         document.getElementById(typingId)?.remove();
-        if (response.ok && data.response) addMessage(data.response, 'ai');
-        else addMessage(`Error: ${data.error || data.message || 'No response received'}`, 'ai');
+        if (data.response) addMessage(data.response, 'ai');
+        else addMessage('No response received. Please try again.', 'ai');
       } catch (error) {
         document.getElementById(typingId)?.remove();
-        addMessage('Sorry, could not reach the server. Please try again.', 'ai');
+        addMessage('Could not reach the server. Please check your connection.', 'ai');
       }
     }
 
@@ -231,18 +224,13 @@
       output.classList.remove('visible');
       actions.style.display = 'none';
       try {
-        const response = await fetch(`${API_URL}/chat/report`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token()}` },
-          body: JSON.stringify({ occupation })
-        });
-        const data = await response.json();
+        const data = await apiFetch('/chat/report', { method: 'POST', body: { occupation } });
         if (data.report) {
           output.textContent = data.report;
           output.classList.add('visible');
           actions.style.display = 'flex';
         } else {
-          output.textContent = `Error: ${data.error || data.message || 'Failed to generate report'}`;
+          output.textContent = `Error: ${data.message || 'Failed to generate report'}`;
           output.classList.add('visible');
         }
       } catch (err) {
@@ -257,13 +245,43 @@
     document.getElementById('reportOccupation').addEventListener('keypress', e => { if (e.key === 'Enter') generateReport(); });
 
     function copyReport() {
-      navigator.clipboard.writeText(document.getElementById('reportOutput').textContent).then(() => alert('Copied!'));
+      navigator.clipboard.writeText(document.getElementById('reportOutput').textContent)
+        .then(() => { const btn = event.target; btn.textContent = '✅ Copied!'; setTimeout(() => btn.textContent = '📋 Copy', 2000); });
     }
+
     function printReport() {
       const content = document.getElementById('reportOutput').textContent;
+      const occupation = document.getElementById('reportOccupation').value.trim();
+      const date = new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' });
       const win = window.open('', '_blank');
-      win.document.write(`<pre style="font-family:Arial;font-size:13px;line-height:1.8;padding:30px;white-space:pre-wrap">${content}</pre>`);
-      win.document.close(); win.print();
+      win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>${occupation} Career Report — Dream Wave</title>
+<style>
+  body { font-family: Georgia, serif; max-width: 820px; margin: 40px auto; padding: 0 40px; color: #1a1a1a; line-height: 1.8; }
+  .header { border-bottom: 3px solid #7c3aed; padding-bottom: 20px; margin-bottom: 30px; }
+  .brand { color: #7c3aed; font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  h1 { font-size: 1.9rem; margin: 0 0 6px; }
+  .meta { color: #666; font-size: 0.85rem; }
+  pre { white-space: pre-wrap; font-family: Georgia, serif; font-size: 0.92rem; line-height: 1.8; color: #333; }
+  .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #ddd; color: #999; font-size: 0.78rem; text-align: center; }
+  @media print { body { margin: 20px; } }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">🌊 Dream Wave — Career Intelligence Report</div>
+    <h1>${occupation}</h1>
+    <div class="meta">Generated: ${date}</div>
+  </div>
+  <pre>${content.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>
+  <div class="footer">Dream Wave · dreamwave.app · Generated on ${date}</div>
+</body>
+</html>`);
+      win.document.close();
+      win.onload = () => win.print();
     }
   </script>
 </body>

@@ -139,37 +139,34 @@
   <script src="app.js"></script>
   <script>
     checkAuth();
-    const token = () => localStorage.getItem('token');
     let searchTimer = null;
 
-    loadMyComrades();
-    loadSuggestions();
-    loadRequests();
+    // Load all data in parallel on init
+    Promise.allSettled([loadMyComrades(), loadSuggestions(), loadRequests()]);
 
     function switchTab(name) {
-      document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['my','find','requests'][i] === name));
+      document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', ['my','find','requests'][i] === name));
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       document.getElementById('panel-' + name).classList.add('active');
+      if (name === 'find') loadAllUsers();
     }
 
     async function loadMyComrades() {
-      const el = document.getElementById('myComradesList');
+      showLoading('myComradesList', 'Loading comrades...');
       try {
-        const r = await fetch(API_URL + '/comrades/mine', { headers: { Authorization: 'Bearer ' + token() } });
-        const users = await r.json();
-        if (!users.length) { el.innerHTML = '<div class="empty-state"><div class="ei">🤝</div><p>No comrades yet</p></div>'; return; }
+        const users = await apiFetch('/comrades/mine');
+        if (!users.length) { showEmpty('myComradesList', '🤝', 'No comrades yet — find people to connect with!'); return; }
 
-        // Load stats for each comrade
-        const cards = await Promise.all(users.map(async u => {
-          let stats = { points: 0, streak: 0, level: 1 };
-          try {
-            const sr = await fetch(API_URL + '/progress/stats?userId=' + u._id, { headers: { Authorization: 'Bearer ' + token() } });
-            if (sr.ok) stats = await sr.json();
-          } catch(e) {}
+        // Load all stats in parallel
+        const statsResults = await Promise.allSettled(
+          users.map(u => apiFetch('/progress/stats?userId=' + u._id))
+        );
+        const cards = users.map((u, i) => {
+          const stats = statsResults[i].status === 'fulfilled' ? statsResults[i].value : {};
           return comradeDetailCard(u, stats);
-        }));
-        el.innerHTML = cards.join('');
-      } catch(e) { el.innerHTML = '<div class="empty-state"><div class="ei">⚠️</div><p>Error loading comrades</p></div>'; }
+        });
+        document.getElementById('myComradesList').innerHTML = cards.join('');
+      } catch(e) { showEmpty('myComradesList', '⚠️', 'Error loading comrades'); }
     }
 
     function comradeDetailCard(u, stats) {
@@ -185,49 +182,35 @@
           <a href="messages.html?with=${u._id}" class="btn-chat" style="margin-left:auto">💬 Chat</a>
         </div>
         <div class="progress-compare">
-          <div class="pc-side">
-            <div class="pc-label">Credits</div>
-            <div class="pc-val">${stats.points || 0}</div>
-          </div>
-          <div class="pc-side">
-            <div class="pc-label">Streak</div>
-            <div class="pc-val">${stats.streak || 0} 🔥</div>
-          </div>
-          <div class="pc-side">
-            <div class="pc-label">Level</div>
-            <div class="pc-val">Lv.${stats.level || 1}</div>
-          </div>
-          <div class="pc-side">
-            <div class="pc-label">Discipline</div>
-            <div class="pc-val">${stats.disciplineScore || 0}%</div>
-          </div>
+          <div class="pc-side"><div class="pc-label">Credits</div><div class="pc-val">${stats.points || 0}</div></div>
+          <div class="pc-side"><div class="pc-label">Streak</div><div class="pc-val">${stats.streak || 0} 🔥</div></div>
+          <div class="pc-side"><div class="pc-label">Level</div><div class="pc-val">Lv.${stats.level || 1}</div></div>
+          <div class="pc-side"><div class="pc-label">Discipline</div><div class="pc-val">${stats.disciplineScore || 0}%</div></div>
         </div>
       </div>`;
     }
 
     async function loadSuggestions() {
-      const el = document.getElementById('suggestions');
+      showLoading('suggestions', 'Finding suggestions...');
       try {
-        const r = await fetch(API_URL + '/comrades/suggestions', { headers: { Authorization: 'Bearer ' + token() } });
-        const users = await r.json();
-        if (!users.length) { el.innerHTML = '<div class="empty-state"><div class="ei">🔍</div><p>No suggestions yet</p></div>'; return; }
-        el.innerHTML = users.map(u => userCard(u)).join('');
-      } catch(e) {}
+        const users = await apiFetch('/comrades/suggestions');
+        if (!users.length) { showEmpty('suggestions', '🔍', 'No suggestions yet'); return; }
+        document.getElementById('suggestions').innerHTML = users.map(u => userCard(u)).join('');
+      } catch(e) { showEmpty('suggestions', '⚠️', 'Could not load suggestions'); }
     }
 
     async function loadRequests() {
       try {
-        const r = await fetch(API_URL + '/comrades/requests', { headers: { Authorization: 'Bearer ' + token() } });
-        const reqs = await r.json();
+        const reqs = await apiFetch('/comrades/requests');
         const el = document.getElementById('requestsList');
-        if (!reqs.length) { el.innerHTML = '<div class="empty-state"><div class="ei">📨</div><p>No pending requests</p></div>'; return; }
+        if (!reqs.length) { showEmpty('requestsList', '📨', 'No pending requests'); return; }
         const badge = document.getElementById('reqBadge');
         badge.style.display = 'inline'; badge.textContent = reqs.length;
         el.innerHTML = reqs.map(req => `
           <div class="req-card" id="req-${req._id}">
             <div class="uc-avatar">${(req.requester?.name||'U')[0].toUpperCase()}</div>
             <div>
-              <div style="font-weight:700">${req.requester?.name}</div>
+              <div style="font-weight:700">${req.requester?.name || 'Unknown'}</div>
               <div style="color:var(--accent);font-size:0.78rem">@${req.requester?.aaId||''}</div>
             </div>
             <div class="req-actions">
@@ -241,23 +224,32 @@
     function searchUsers(q) {
       clearTimeout(searchTimer);
       const el = document.getElementById('searchResults');
-      if (!q.trim()) { el.innerHTML = ''; return; }
-      el.innerHTML = '<div style="color:var(--text-dim);font-size:0.85rem;padding:10px 0">Searching...</div>';
+      if (!q.trim()) { loadAllUsers(); return; }
+      el.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Searching...</p></div>';
       searchTimer = setTimeout(async () => {
         try {
-          const r = await fetch(API_URL + '/comrades/search?q=' + encodeURIComponent(q), { headers: { Authorization: 'Bearer ' + token() } });
-          const users = await r.json();
-          if (!users.length) { el.innerHTML = '<div style="color:var(--text-dim);font-size:0.85rem;padding:10px 0">No users found</div>'; return; }
+          const users = await apiFetch('/comrades/search?q=' + encodeURIComponent(q));
+          if (!users.length) { el.innerHTML = '<div class="loading-state"><p>No users found for "' + q + '"</p></div>'; return; }
           el.innerHTML = '<div class="user-grid" style="margin-bottom:20px">' + users.map(u => userCard(u)).join('') + '</div>';
-        } catch(e) { el.innerHTML = '<div style="color:var(--text-dim)">Error searching</div>'; }
-      }, 400);
+        } catch(e) { el.innerHTML = '<div class="loading-state"><p>Search failed. Try again.</p></div>'; }
+      }, 350);
+    }
+
+    async function loadAllUsers() {
+      const el = document.getElementById('searchResults');
+      el.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Loading users...</p></div>';
+      try {
+        const users = await apiFetch('/comrades/search');
+        if (!users.length) { el.innerHTML = ''; return; }
+        el.innerHTML = '<div class="user-grid" style="margin-bottom:20px">' + users.map(u => userCard(u)).join('') + '</div>';
+      } catch(e) { el.innerHTML = ''; }
     }
 
     function userCard(u) {
       const init = (u.name || 'U')[0].toUpperCase();
       return `<div class="user-card">
         <div class="uc-top">
-          <div class="uc-avatar">${init}</div>
+          <div class="uc-avatar">${init}${u.isOnline ? '<div class="online-ring"></div>' : ''}</div>
           <div>
             <div class="uc-name">${u.name || 'Unknown'}</div>
             <div class="uc-aaid">@${u.aaId || ''}</div>
@@ -271,23 +263,21 @@
     }
 
     async function sendRequest(userId, btn) {
+      btn.disabled = true; btn.textContent = 'Sending...';
       try {
-        const r = await fetch(API_URL + '/comrades/request/' + userId, { method: 'POST', headers: { Authorization: 'Bearer ' + token() } });
-        const d = await r.json();
-        btn.textContent = 'Sent ✓'; btn.className = 'btn-connect sent'; btn.disabled = true;
-      } catch(e) {}
+        await apiFetch('/comrades/request/' + userId, { method: 'POST' });
+        btn.textContent = 'Sent ✓'; btn.className = 'btn-connect sent';
+      } catch(e) { btn.disabled = false; btn.textContent = '+ Connect'; }
     }
 
     async function respondRequest(id, action) {
+      const card = document.getElementById('req-' + id);
+      if (card) { card.style.opacity = '0.5'; card.style.pointerEvents = 'none'; }
       try {
-        await fetch(API_URL + '/comrades/respond/' + id, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() },
-          body: JSON.stringify({ action })
-        });
-        document.getElementById('req-' + id)?.remove();
+        await apiFetch('/comrades/respond/' + id, { method: 'POST', body: { action } });
+        card?.remove();
         if (action === 'accept') loadMyComrades();
-      } catch(e) {}
+      } catch(e) { if (card) { card.style.opacity = '1'; card.style.pointerEvents = ''; } }
     }
   </script>
 </body>
