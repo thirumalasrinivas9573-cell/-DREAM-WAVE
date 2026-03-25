@@ -3,6 +3,7 @@ services:
     name: dreamwave-backend
     env: node
     region: singapore
+    rootDir: .
     buildCommand: npm install
     startCommand: node backend/server.js
     envVars:
