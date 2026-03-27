@@ -1,4 +1,4 @@
-const API_URL = "https://your-backend-name.onrender.com";
+const API_URL = "https://dream-wave.onrender.com";
 function getToken() { return localStorage.getItem('token') || ''; }
 function scrollBottom() { const c = document.getElementById('chat'); c.scrollTop = c.scrollHeight; }
 function removeWelcome() { const w = document.getElementById('welcome-card'); if (w) w.remove(); }
@@ -101,16 +101,17 @@ async function send(question) {
     } catch (err) {
       hideTyping();
       appendError('Network error. Please try again.');
+      alert("Server not responding. Please try again later.");
       return;
     }
     hideTyping();
-    if (!res.ok) { const err = await res.json().catch(function(){return{};}); appendError('Krishna could not respond. '+(err.message||'Please try again.')); }
+    if (!res.ok) { const err = await res.json().catch(function(){return{};}); appendError('Krishna could not respond. '+(err.message||'Please try again.')); alert("Server not responding. Please try again later."); }
     else {
       const data = await res.json();
       const reply = data.reply || data.response || 'No response from AI.';
       await appendKrishna(reply, question);
     }
-  } catch(e) { hideTyping(); appendError('Could not reach the server.'); }
+  } catch(e) { hideTyping(); appendError('Could not reach the server.'); alert("Server not responding. Please try again later."); }
   finally { btn.disabled = false; input.focus(); }
 }
 function askSuggestion(el) { send(el.textContent); }

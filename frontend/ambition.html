@@ -98,6 +98,30 @@ var STEPS = [
   { key: 'skills', ask: "What skills do you already have? (even basic ones count!)", placeholder: 'e.g. Python basics, communication, drawing...', chips: ['No skills yet', 'Basic computer skills', 'Some coding', 'Communication', 'Design basics'] },
   { key: 'hoursPerDay', ask: "How many hours can you dedicate to learning every day?", placeholder: 'e.g. 2', chips: ['1 hour', '2 hours', '3 hours', '4+ hours'] }
 ];
+async function getAIResponse(key, val) {
+  const prompts = {
+    goal: `User just shared their goal: "${val}". Respond encouragingly as Krishna, acknowledge it, and ask for their age.`,
+    age: `User said their age is ${val}. Respond positively as Krishna and ask for their education level.`,
+    education: `User said their education is "${val}". Respond supportively as Krishna and ask for their current skills.`,
+    skills: `User said their skills are "${val}". Respond motivatingly as Krishna and ask how many hours per day they can dedicate.`,
+    hoursPerDay: `User said they can dedicate ${val} hours per day. Respond enthusiastically as Krishna, summarize their profile briefly, and prepare for roadmap generation.`
+  };
+  const prompt = prompts[key];
+  if (!prompt) return 'Great!';
+  try {
+    const res = await fetch(API_URL + '/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: prompt })
+    });
+    const data = await res.json();
+    return data.reply || 'Good choice!';
+  } catch (e) {
+    console.error(e);
+    alert("Server not responding. Please try again later.");
+    return 'Good choice!';
+  }
+}
 var msgBox = document.getElementById('messages');
 var inputEl = document.getElementById('chatInput');
 var sendBtn = document.getElementById('sendBtn');
@@ -181,7 +205,12 @@ async function handleSend() {
   inputEl.value = ''; sendBtn.disabled = true; setInputVisible(false);
   var step = STEPS[state.step];
   if (step) state[step.key] = val;
-  await delay(300); await startStep(state.step + 1);
+  await delay(300);
+  if (step) {
+    await aiSay(await getAIResponse(step.key, val));
+    await delay(300);
+  }
+  await startStep(state.step + 1);
 }
 async function askReport() {
   updateDots(4);
@@ -241,6 +270,7 @@ async function askConfirm() {
     }
   } catch (e) { 
     console.error('❌ AI request error:', e.message);
+    alert("Server not responding. Please try again later.");
   } finally {
     // ✅ ALWAYS RESET FLAG
     ambitionReportInProgress = false;

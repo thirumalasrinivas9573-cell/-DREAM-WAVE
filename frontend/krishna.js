@@ -30,7 +30,7 @@ window.saveMentorGoal = function() {
   localStorage.setItem('mentorJourney', JSON.stringify(state));
   showMentorStep(1);
 };
-const API_URL = "https://your-backend-name.onrender.com";
+const API_URL = "https://dream-wave.onrender.com";
 document.addEventListener('DOMContentLoaded', () => {
   const flute = document.getElementById("fluteMusic");
   const musicBtn = document.getElementById("musicBtn");

@@ -32,6 +32,7 @@ async function generateReportContent(author) {
     ];
   } catch (error) {
     console.error("Report generation error:", error);
+    alert("Server not responding. Please try again later.");
     return [`# Error\n\nFailed to generate report. Please try again.`];
   }
 }
