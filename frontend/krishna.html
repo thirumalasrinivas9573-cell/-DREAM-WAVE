@@ -1,3 +1,41 @@
+  <style>
+    .mentor-modal-bg { position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(30,20,60,0.92);z-index:3000;display:none;align-items:center;justify-content:center; }
+    .mentor-modal { background:#fffbe6;color:#232526;max-width:420px;width:95vw;max-height:90vh;overflow-y:auto;border-radius:18px;box-shadow:0 8px 40px #7c3aed44;padding:36px 32px 28px 32px;position:relative;display:flex;flex-direction:column;align-items:center; }
+    .mentor-modal h2 { color:#7c3aed;font-size:1.4rem;margin-bottom:18px; }
+    .mentor-modal label { font-weight:700;color:#7c3aed;margin-bottom:8px;display:block; }
+    .mentor-modal input, .mentor-modal select { width:100%;padding:10px 14px;margin-bottom:18px;border-radius:10px;border:1.5px solid #d6c2ff;font-size:1.08rem; }
+    .mentor-modal .mentor-btn { background:linear-gradient(135deg,#7c3aed,#e879a0);color:#fff;padding:12px 28px;border:none;border-radius:10px;font-size:1.1rem;font-weight:700;cursor:pointer;margin-top:8px; }
+    .mentor-modal .mentor-btn:hover { background:linear-gradient(135deg,#e879a0,#7c3aed); }
+    .mentor-modal .mentor-close { position:absolute;top:18px;right:18px;font-size:1.5rem;background:none;border:none;color:#7c3aed;cursor:pointer; }
+    .mentor-modal .mentor-step { margin-bottom:18px;text-align:center; }
+    .mentor-modal .mentor-confirm { margin-top:18px; }
+    .mentor-modal .mentor-roadmap { background:#f8c8dc22;padding:18px 14px;border-radius:12px;margin:18px 0; }
+    .mentor-modal .mentor-books { background:#d6c2ff22;padding:14px 12px;border-radius:12px;margin:12px 0; }
+    .mentor-modal .mentor-timetable { background:#e3c7a622;padding:14px 12px;border-radius:12px;margin:12px 0; }
+    .mentor-modal .mentor-streak { font-size:1.1rem;color:#7c3aed;font-weight:700;margin:10px 0; }
+    .mentor-modal .mentor-credits { font-size:1.1rem;color:#e879a0;font-weight:700;margin:10px 0; }
+  </style>
+  <div class="mentor-modal-bg" id="mentorModalBg">
+    <div class="mentor-modal" id="mentorModal">
+      <button class="mentor-close" onclick="closeMentorModal()">&times;</button>
+      <div id="mentorModalContent"></div>
+    </div>
+  </div>
+  <script src="krishna.js"></script>
+  <script>
+    // Guided AI Mentor Journey
+    function openMentorModal() {
+      document.getElementById('mentorModalBg').style.display = 'flex';
+      showMentorStep(0);
+    }
+    function closeMentorModal() {
+      document.getElementById('mentorModalBg').style.display = 'none';
+    }
+    // Show first step on load for demo
+    window.addEventListener('DOMContentLoaded',()=>{
+      setTimeout(openMentorModal, 600);
+    });
+  </script>
 <!DOCTYPE html>
 <html lang="te">
 <head>

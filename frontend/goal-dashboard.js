@@ -1,4 +1,4 @@
-const API_URL = "https://YOUR-RENDER-URL.onrender.com";
+const API_URL = "https://your-render-url.onrender.com";
 checkAuth();
 let currentRoadmap = null;
 let currentTopicContent = null;
@@ -24,10 +24,10 @@ async function askUnifiedAI(userInput, type = 'task') {
 
     let res;
     try {
-      res = await fetch(API_URL + '/api/ai/ask', {
+      res = await fetch(API_URL + '/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: userInput, type }),
+      body: JSON.stringify({ message: userInput }),
       signal: controller.signal
     });
     } catch (err) {

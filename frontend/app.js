@@ -1,6 +1,6 @@
 // app.js — shared utilities for Dream Wave
 
-const API_URL = "https://YOUR-RENDER-URL.onrender.com";
+const API_URL = "https://your-render-url.onrender.com";
 
 // ── Auth ──
 function checkAuth() {

@@ -1,3 +1,43 @@
+  <link rel="stylesheet" href="report-generator.css">
+  <style>
+    .report-modal-bg { position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(30,20,60,0.85);z-index:2000;display:none;align-items:center;justify-content:center; }
+    .report-modal { background:#fff;color:#222;max-width:800px;width:95vw;max-height:90vh;overflow-y:auto;border-radius:18px;box-shadow:0 8px 40px #7c3aed44;padding:36px 32px 28px 32px;position:relative; }
+    .report-modal h1,.report-modal h2,.report-modal h3 { color:#7c3aed; }
+    .report-modal .close-btn { position:absolute;top:18px;right:18px;font-size:1.5rem;background:none;border:none;color:#7c3aed;cursor:pointer; }
+    .report-section { margin-bottom:32px; }
+    .report-hr { border:0;border-top:1.5px solid #e3c7a6;margin:32px 0; }
+    .report-download-btn { background:linear-gradient(135deg,#7c3aed,#e879a0);color:#fff;padding:12px 28px;border:none;border-radius:10px;font-size:1.1rem;font-weight:700;cursor:pointer;margin-top:18px; }
+    .report-download-btn:hover { background:linear-gradient(135deg,#e879a0,#7c3aed); }
+    .report-modal::-webkit-scrollbar { width:8px;background:#eee; }
+    .report-modal::-webkit-scrollbar-thumb { background:#d6c2ff;border-radius:8px; }
+  </style>
+  <div class="report-modal-bg" id="reportModalBg">
+    <div class="report-modal" id="reportModal">
+      <button class="close-btn" onclick="closeReportModal()">&times;</button>
+      <div id="reportContent"></div>
+      <button class="report-download-btn" id="downloadReportBtn">Download Report</button>
+    </div>
+  </div>
+    <div class="feature-card" style="animation-delay:0.7s">
+      <span class="feature-icon">📄</span>
+      <div class="feature-title">4-Year R&D Report Generator</div>
+      <div class="feature-desc">Generate a professional, 10-page academic R&D report for Dream Wave.</div>
+      <button class="btn-primary" onclick="openReportModal()">Generate 4-Year R&D Report</button>
+    </div>
+  <script src="report-generator.js"></script>
+    // R&D Report Modal Logic
+    function openReportModal() {
+      const author = (getUser().name || 'Student').replace(/[^a-zA-Z0-9 ]/g,'').trim() || 'Student';
+      const reportArr = DreamWaveReport.generateReportContent(author);
+      document.getElementById('reportContent').innerHTML = DreamWaveReport.renderReport(reportArr);
+      document.getElementById('reportModalBg').style.display = 'flex';
+      document.getElementById('downloadReportBtn').onclick = function() {
+        DreamWaveReport.downloadReport(reportArr, author);
+      };
+    }
+    function closeReportModal() {
+      document.getElementById('reportModalBg').style.display = 'none';
+    }
 <!DOCTYPE html>
 <html lang="en">
 <head>

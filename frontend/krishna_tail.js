@@ -1,4 +1,4 @@
-const API_URL = "https://YOUR-RENDER-URL.onrender.com";
+const API_URL = "https://your-render-url.onrender.com";
 function getToken() { return localStorage.getItem('token') || ''; }
 function scrollBottom() { const c = document.getElementById('chat'); c.scrollTop = c.scrollHeight; }
 function removeWelcome() { const w = document.getElementById('welcome-card'); if (w) w.remove(); }
@@ -97,7 +97,7 @@ async function send(question) {
   try {
     let res;
     try {
-      res = await fetch(API_URL + '/api/ai/ask', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message:question}) });
+      res = await fetch(API_URL + '/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message:question}) });
     } catch (err) {
       hideTyping();
       appendError('Network error. Please try again.');
@@ -105,7 +105,11 @@ async function send(question) {
     }
     hideTyping();
     if (!res.ok) { const err = await res.json().catch(function(){return{};}); appendError('Krishna could not respond. '+(err.message||'Please try again.')); }
-    else { const data = await res.json(); await appendKrishna(data.reply || data.response || '', question); }
+    else {
+      const data = await res.json();
+      const reply = data.reply || data.response || 'No response from AI.';
+      await appendKrishna(reply, question);
+    }
   } catch(e) { hideTyping(); appendError('Could not reach the server.'); }
   finally { btn.disabled = false; input.focus(); }
 }

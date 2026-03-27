@@ -1,8 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
-const User = require('../models/User');
-const Roadmap = require('../models/Roadmap');
+// MongoDB removed for demo mode. No model needed.
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 

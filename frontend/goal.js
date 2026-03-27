@@ -1,4 +1,4 @@
-const API_URL = "https://YOUR-RENDER-URL.onrender.com";
+const API_URL = "https://your-render-url.onrender.com";
 document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('goalForm');
   const list = document.getElementById('goalList');

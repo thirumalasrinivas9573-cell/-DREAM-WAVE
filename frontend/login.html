@@ -114,17 +114,17 @@
       btn.textContent = 'Signing in...';
 
       try {
-        const res = await fetch(API_URL + '/auth/login', {
+        const res = await fetch(API_URL + '/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: identifier, password })
         });
         const data = await res.json();
-
-        if (res.ok) {
-          localStorage.setItem('token', data.token);
-          localStorage.setItem('user', JSON.stringify(data.user));
-          window.location.href = '/dashboard';
+        if (res.ok && data.success) {
+          // Demo mode: set dummy token/user
+          localStorage.setItem('token', 'demo-token');
+          localStorage.setItem('user', JSON.stringify({ email: identifier }));
+          window.location.href = '/dashboard.html';
         } else {
           showError(data.message || 'Login failed. Check your credentials.');
         }

@@ -1,7 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+// MongoDB removed for demo mode. No model needed.
 const auth = require('../middleware/auth');
 
 const router = express.Router();

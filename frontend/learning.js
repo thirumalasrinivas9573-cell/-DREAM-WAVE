@@ -1,4 +1,4 @@
-const API_URL = "https://YOUR-RENDER-URL.onrender.com";
+// [OFFLINE DEMO] No API_URL needed
 // ============================================
 // PHASE 3: LEARNING + CONTENT SYSTEM
 // Krishna AI - Books, Exams, Learning, Voice
@@ -53,30 +53,8 @@ const LEARNING = {
     // ✅ PREVENT DUPLICATE CALLS
     if (learningBooksInProgress) {
       console.warn('⚠️ Book suggestions already in progress');
-      return null;
-    }
-
-    learningBooksInProgress = true;
-    console.log('🚀 SINGLE API CALL: getBooksByGoal');
-
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-      let response;
-      try {
-        response = await fetch(API_URL + '/api/ai/ask', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: `Suggest 5 best books for: ${goal}. Format: Book Name | Author | Why useful`,
-          type: 'books'
-        }),
-        signal: controller.signal
-      });
-      } catch (error) {
-        console.error('API error:', error);
-        learningBooksInProgress = false;
+      // [OFFLINE DEMO] Return static book suggestions
+      return `1. Bhagavad Gita | Lord Krishna | Timeless wisdom for life
         return 'Unable to fetch suggestions. Please try again.';
       }
 
@@ -187,12 +165,11 @@ const LEARNING = {
 
       let response;
       try {
-        response = await fetch(API_URL + '/api/ai/ask', {
+        response = await fetch(API_URL + '/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: `Generate 10 multiple choice exam questions for: Subject: ${subject}, Topic: ${topic}, Difficulty: ${difficulty}. Format each as: Q1) Question? A) Option A B) Option B C) Option C D) Option D. After all questions, put "ANSWERS: 1-A, 2-B..." on new lines.`,
-          type: 'exam'
+          message: `Generate 10 multiple choice exam questions for: Subject: ${subject}, Topic: ${topic}, Difficulty: ${difficulty}. Format each as: Q1) Question? A) Option A B) Option B C) Option C D) Option D. After all questions, put "ANSWERS: 1-A, 2-B..." on new lines.`
         }),
         signal: controller.signal
       });
@@ -324,35 +301,12 @@ const LEARNING = {
   submitExam: function() {
     if (!this.currentExam) return;
     
-    let score = 0;
-    this.currentExam.questions.forEach((q, idx) => {
-      if (this.currentExam.userAnswers[idx] === this.currentExam.answers[idx]) {
-        score++;
-      }
-    });
-    
-    this.currentExam.score = score;
-    this.currentExam.completed = true;
-    const percentage = Math.round((score / this.currentExam.questions.length) * 100);
-    
-    const container = document.getElementById('exam-questions-container');
-    container.innerHTML = `
-      <div class="exam-result">
-        <div class="result-title">📊 Your Score</div>
-        <div class="result-score">${score} / ${this.currentExam.questions.length}</div>
-        <div class="result-percentage">${percentage}%</div>
-        <div class="result-message">
-          ${percentage >= 80 ? '🌟 Excellent! You mastered this topic!' 
-            : percentage >= 60 ? '👍 Good effort! Review weak areas.' 
-            : '📚 Keep practicing! You can do better.'}
-        </div>
-        <button class="exam-retry-btn" onclick="LEARNING.resetExam()">
-          🔄 Try Another Exam
-        </button>
-      </div>
-    `;
+      // [OFFLINE DEMO] Return static exam questions
+      const reply = `Q1) What is Karma? A) Action B) Result C) Thought D) None
     
     // Award XP for exam completion
+      this.parseExamQuestions(reply);
+      if (msgDiv) msgDiv.textContent = '✅ Exam loaded! Complete all questions and click "Submit Exam"';
     if (typeof GAMIFICATION !== 'undefined') {
       GAMIFICATION.addXP(score * 5, `Exam: ${percentage}% Score`);
       updateGamificationWidget();
@@ -369,32 +323,10 @@ const LEARNING = {
     // ✅ PREVENT DUPLICATE CALLS
     if (learningTopicInProgress) {
       console.warn('⚠️ Topic learning already in progress');
-      return;
-    }
-
-    learningTopicInProgress = true;
-    const msgDiv = document.getElementById('learn-message');
-    if (msgDiv) msgDiv.textContent = '🔄 Preparing learning content...';
-
-    console.log('🚀 SINGLE API CALL: learnTopic');
-
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-      let response;
-      try {
-        response = await fetch(API_URL + '/api/ai/ask', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: `Teach me about: ${topic}. Include: 1) Core Concept (2-3 lines), 2) Real-World Example (2-3 lines), 3) Step-by-Step Guide (4-5 bullet points), 4) Key Takeaway (1 line)`,
-          type: 'learn'
-        }),
-        signal: controller.signal
-      });
-      } catch (error) {
-        console.error('API error:', error);
+      // [OFFLINE DEMO] Return static learning content
+      const reply = `Core Concept: Karma means action.\nReal-World Example: Helping others selflessly.\nStep-by-Step Guide:\n- Set a goal\n- Work with discipline\n- Avoid attachment to results\nKey Takeaway: Focus on your duty.`;
+      this.renderLearningContent(topic, reply);
+      if (msgDiv) msgDiv.innerHTML = `✅ Content loaded! <button onclick="LEARNING.toggleVoice('learn')" class="voice-btn">🔊 Play Audio</button>`;
         if (msgDiv) msgDiv.textContent = '❌ Error loading content. Please try again.';
         return;
       }
@@ -587,21 +519,9 @@ window.addEventListener('DOMContentLoaded', function() {
      spinner.style.display = 'inline-block';
      const goal = form.goal.value.trim();
      try {
-       let res;
-       try {
-         res = await fetch(API_URL + '/api/learning', {
-         method: 'POST',
-         headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify({ goal })
-       });
-         if (!res.ok) throw new Error('API error');
-         const data = await res.json();
-         output.innerHTML = formatLearning(data.learning);
-       } catch (e) {
-         output.innerHTML = `<span style='color:#f44'>Error: ${e.message}</span>`;
-       } finally {
-         spinner.style.display = 'none';
-       }
+       // [OFFLINE DEMO] Show static learning output
+       output.innerHTML = formatLearning('Learning for goal: ' + goal + '\n- Read Gita\n- Practice daily discipline\n- Meditate\n- Help others');
+       spinner.style.display = 'none';
      } catch (e) {
        output.innerHTML = `<span style='color:#f44'>Error: ${e.message}</span>`;
      } finally {

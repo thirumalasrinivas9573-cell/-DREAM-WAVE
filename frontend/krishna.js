@@ -1,4 +1,36 @@
-const API_URL = "https://YOUR-RENDER-URL.onrender.com";
+// Guided Krishna AI Mentor Journey
+window.showMentorStep = function(step) {
+  const modal = document.getElementById('mentorModalContent');
+  if (!modal) return;
+  let state = JSON.parse(localStorage.getItem('mentorJourney')||'{}');
+  if (!state.step || step === 0) state = { step: 0 };
+  state.step = step;
+  localStorage.setItem('mentorJourney', JSON.stringify(state));
+  if (step === 0) {
+    modal.innerHTML = `
+      <h2>Welcome to Krishna AI Mentor</h2>
+      <div class="mentor-step">Let Krishna guide you to your dream goal.<br><br><b>What is your main goal?</b></div>
+      <input id="mentorGoalInput" type="text" maxlength="80" placeholder="e.g. Crack JEE, Become a Coder, etc." autofocus>
+      <button class="mentor-btn" onclick="saveMentorGoal()">Continue</button>
+    `;
+    setTimeout(()=>{document.getElementById('mentorGoalInput').focus();}, 200);
+  }
+  // More steps will be added here (AI Q&A, roadmap, streak, etc.)
+};
+
+window.saveMentorGoal = function() {
+  const goal = document.getElementById('mentorGoalInput').value.trim();
+  if (!goal) {
+    document.getElementById('mentorGoalInput').style.borderColor = '#e879a0';
+    return;
+  }
+  let state = JSON.parse(localStorage.getItem('mentorJourney')||'{}');
+  state.goal = goal;
+  state.step = 1;
+  localStorage.setItem('mentorJourney', JSON.stringify(state));
+  showMentorStep(1);
+};
+const API_URL = "https://your-render-url.onrender.com";
 document.addEventListener('DOMContentLoaded', () => {
   const flute = document.getElementById("fluteMusic");
   const musicBtn = document.getElementById("musicBtn");
@@ -115,10 +147,10 @@ document.addEventListener('DOMContentLoaded', () => {
     loading = true;
     showTyping();
     try {
-      const res = await fetch(`${API_URL}/ai/ask`, {
+      const res = await fetch(`${API_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, type: 'krishna' })
+        body: JSON.stringify({ message: text })
       });
       if (!res.ok) throw new Error('API error');
       const data = await res.json();

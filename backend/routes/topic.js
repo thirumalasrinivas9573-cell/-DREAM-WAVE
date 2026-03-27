@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const Topic = require('../models/Topic');
+// MongoDB removed for demo mode. No model needed.
 
 function buildTopicContent(topic) {
   return {

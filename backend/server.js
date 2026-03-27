@@ -5,6 +5,41 @@ const path = require('path');
 
 const app = express();
 
+// DEMO LOGIN (Step 2)
+app.post('/login', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Login successful (Demo Mode)'
+  });
+});
+
+// AI CHAT API (Step 3)
+app.post('/chat', async (req, res) => {
+  const { message } = req.body;
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: message }]
+      })
+    });
+    const data = await response.json();
+    res.json({ reply: data.choices[0].message.content });
+  } catch (error) {
+    res.status(500).json({ reply: 'AI server error' });
+  }
+});
+
+// HEALTH CHECK (Step 4)
+app.get('/', (req, res) => {
+  res.send('Server running successfully');
+});
+
 // In-memory stores
 let roadmapStore = {};
 let topicStore = {};
@@ -147,7 +182,6 @@ process.on('uncaughtException', (err) => {
   console.error('Uncaught exception:', err);
 });
 
-const PORT = process.env.PORT || 5001;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// SERVER START (Step 5)
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log('Server running on ' + PORT));

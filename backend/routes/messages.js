@@ -1,7 +1,5 @@
 const express = require('express');
-const Message = require('../models/Message');
-const Comrade = require('../models/Comrade');
-const User = require('../models/User');
+// MongoDB removed for demo mode. No model needed.
 const auth = require('../middleware/auth');
 
 const router = express.Router();

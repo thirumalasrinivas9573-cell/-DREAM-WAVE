@@ -1,4 +1,4 @@
-const API_URL = "https://YOUR-RENDER-URL.onrender.com";
+const API_URL = "https://your-render-url.onrender.com";
 document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('examPrepForm');
   const output = document.getElementById('examPrepOutput');
@@ -12,10 +12,10 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       let res;
       try {
-        res = await fetch(API_URL + '/api/exam', {
+        res = await fetch(API_URL + '/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subject, topic })
+        body: JSON.stringify({ message: `Generate an exam for subject: ${subject}, topic: ${topic}` })
       });
         if (!res.ok) throw new Error('API error');
         const data = await res.json();

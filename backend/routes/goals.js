@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
-const Goal = require('../models/Goal');
+// MongoDB removed for demo mode. No model needed.
 
 // POST /api/goals (create goal)
 router.post('/', auth, async (req, res) => {
