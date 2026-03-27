@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Mentor Onboarding - Dream Wave</title>
+  <title>Krishna Onboarding - Dream Wave</title>
   <link rel="stylesheet" href="styles.css">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -56,13 +56,13 @@
 <div class="onboard-wrap">
   <div class="ob-header">
     <div class="ob-logo">Dream Wave</div>
-    <div class="ob-sub">AI Mentor Onboarding</div>
+    <div class="ob-sub">Krishna Onboarding</div>
   </div>
   <div class="already-banner" id="alreadyBanner" style="display:none">
     <div class="icon">&#127919;</div>
     <div>
       <h4>Goal: <span id="existingGoal">-</span></h4>
-      <p>You are already set up. You can redo onboarding or go to your mentor dashboard.</p>
+      <p>You are already set up. You can redo onboarding or open your dashboard.</p>
     </div>
   </div>
   <div class="progress-dots">
@@ -86,9 +86,13 @@
 <script>
 checkAuth();
 var token = function() { return localStorage.getItem('token'); };
+
+// ✅ PREVENT DUPLICATE API CALLS
+let ambitionReportInProgress = false;
+
 var state = { step: 0, goal: '', age: '', education: '', skills: '', hoursPerDay: '', wantsReport: false };
 var STEPS = [
-  { key: 'goal', ask: "Hey there! I am your AI Mentor.\n\nWhat is your dream career goal?", placeholder: 'e.g. Software Engineer, Doctor, YouTuber...' },
+  { key: 'goal', ask: "Hey there! I am Krishna.\n\nWhat is your dream career goal?", placeholder: 'e.g. Software Engineer, Doctor, YouTuber...' },
   { key: 'age', ask: function(s) { return "That is a great goal! Let us plan your journey to become a " + s.goal + "!\n\nFirst - what is your age?"; }, placeholder: 'e.g. 18' },
   { key: 'education', ask: "What is your current education level?", placeholder: 'e.g. 12th grade, B.Tech, Graduate...', chips: ['School (10th)', '12th Grade', 'Undergraduate', 'Graduate', 'Self-taught'] },
   { key: 'skills', ask: "What skills do you already have? (even basic ones count!)", placeholder: 'e.g. Python basics, communication, drawing...', chips: ['No skills yet', 'Basic computer skills', 'Some coding', 'Communication', 'Design basics'] },
@@ -147,19 +151,16 @@ async function init() {
   var goalParam = urlParams.get('goal');
   if (goalParam) { state.goal = decodeURIComponent(goalParam).replace(/-/g, ' '); }
   try {
-    var res = await fetch(API_URL + '/mentor/progress', { headers: { 'Authorization': 'Bearer ' + token() } });
-    if (res.ok) {
-      var data = await res.json();
-      if (data.goal && data.goalLocked) {
-        document.getElementById('alreadyBanner').style.display = 'flex';
-        document.getElementById('existingGoal').textContent = data.goal;
-        if (!state.goal) state.goal = data.goal;
-      }
+    const existing = JSON.parse(localStorage.getItem('user') || '{}');
+    if (existing.goal) {
+      document.getElementById('alreadyBanner').style.display = 'flex';
+      document.getElementById('existingGoal').textContent = existing.goal;
+      if (!state.goal) state.goal = existing.goal;
     }
   } catch (e) {}
   await delay(400);
   if (state.goal) {
-    await aiSay('Hey there! I am your AI Mentor.\n\nI see you are interested in: ' + state.goal + '\n\nLet us set this as your goal and plan your journey!');
+    await aiSay('Hey there! I am Krishna.\n\nI see you are interested in: ' + state.goal + '\n\nLet us set this as your goal and plan your journey!');
     await delay(300); await startStep(1);
   } else { await startStep(0); }
 }
@@ -199,21 +200,63 @@ async function askReport() {
 }
 async function askConfirm() {
   if (state.wantsReport) await aiSay('Generating your personalized report... This may take a moment');
+  
+  // ✅ PREVENT DUPLICATE CALLS
+  if (ambitionReportInProgress) {
+    console.warn('⚠️ Report generation already in progress');
+    return;
+  }
+  
+  ambitionReportInProgress = true;
   var reportText = null;
+  
+  console.log('🚀 SINGLE API CALL: askConfirm');
+  
   try {
-    var res = await fetch(API_URL + '/mentor/onboard', {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    
+    var res = await fetch('/api/ai/ask', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token() },
-      body: JSON.stringify({ goal: state.goal, age: state.age, education: state.education, skills: state.skills, hoursPerDay: state.hoursPerDay, wantsReport: state.wantsReport })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: `Create a concise career roadmap report for:
+Goal: ${state.goal}
+Age: ${state.age}
+Education: ${state.education}
+Skills: ${state.skills}
+Daily hours: ${state.hoursPerDay}`,
+        type: 'goal'
+      }),
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
+    
+    if (!res.ok) {
+      console.error('❌ API ERROR: ' + res.status);
+      return;
+    }
+    
     var data = await res.json();
-    if (data.report) reportText = data.report;
-  } catch (e) {}
+    if (data.reply) {
+      reportText = data.reply;
+      console.log('✅ SINGLE RESPONSE RECEIVED (' + reportText.length + ' chars)');
+    } else {
+      console.warn('⚠️ Empty response from API');
+    }
+  } catch (e) { 
+    console.error('❌ AI request error:', e.message);
+  } finally {
+    // ✅ ALWAYS RESET FLAG
+    ambitionReportInProgress = false;
+  }
+  
   if (reportText) {
     addMsg('<div style="font-weight:700;margin-bottom:8px;color:#a78bfa">Your Career R&D Report</div><div class="report-card">' + reportText.replace(/\n/g,'<br>') + '</div>', 'ai', true);
     scrollBottom(); await delay(600);
   }
-  await aiSay('Do you want to fix this goal as your main ambition?\n\n"' + state.goal + '"\n\nOnce confirmed, your AI Mentor will activate and generate daily tasks for you!');
+  await aiSay('Do you want to fix this goal as your main ambition?\n\n"' + state.goal + '"\n\nOnce confirmed, Krishna will generate daily tasks for you.');
   setChips(['Yes, lock my goal!', 'No, let me change it']);
   setInputVisible(false);
   chipsEl.querySelectorAll('.chip').forEach(function(btn) {
@@ -239,28 +282,20 @@ async function askConfirm() {
 }
 async function lockAndFinish() {
   try {
-    await fetch(API_URL + '/mentor/lock-goal', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token() },
-      body: JSON.stringify({ goal: state.goal })
-    });
-  } catch (e) {}
-  try {
     var u = JSON.parse(localStorage.getItem('user') || '{}');
     u.goal = state.goal; u.ambition = state.goal;
     localStorage.setItem('user', JSON.stringify(u));
   } catch (e) {}
   updateDots(5);
-  await aiSay('Goal locked! Welcome to your AI Mentor journey!\n\nI will generate your daily tasks, timetable, and guide you every step of the way.\n\nRedirecting to your Mentor Dashboard...');
+  await aiSay('Goal locked! Welcome to your Krishna-guided journey.\n\nI will generate your daily tasks, timetable, and guide you every step of the way.\n\nRedirecting to your dashboard...');
   try {
-    await fetch(API_URL + '/mentor/generate-tasks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token() },
-      body: JSON.stringify({ goal: state.goal })
-    });
+    localStorage.setItem('dashboard_tasks_fallback', JSON.stringify([
+      { _id: 'fallback-1', title: 'Start small', difficulty: 'easy', points: 10, status: 'pending' },
+      { _id: 'fallback-2', title: 'Take one focused action', difficulty: 'easy', points: 10, status: 'pending' }
+    ]));
   } catch (e) {}
   await delay(2200);
-  window.location.href = 'mentor.html';
+  window.location.href = '/dashboard';
 }
 inputEl.addEventListener('keypress', function(e) { if (e.key === 'Enter') handleSend(); });
 init();

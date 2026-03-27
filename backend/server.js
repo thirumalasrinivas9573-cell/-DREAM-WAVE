@@ -1,110 +1,153 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const compression = require('compression');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const path = require('path');
 require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
 
 const app = express();
 
-// Security
-app.use(helmet({ contentSecurityPolicy: false }));
-app.use(compression());
+// In-memory stores
+let roadmapStore = {};
+let topicStore = {};
 
-// Rate limiting
-app.use('/api/', rateLimit({ windowMs: 15 * 60 * 1000, max: 500, message: { message: 'Too many requests.' } }));
-app.use('/api/auth/', rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { message: 'Too many login attempts.' } }));
+app.use(cors());
+app.use(express.json());
 
-// CORS
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+// Static frontend
+app.use(express.static(path.join(__dirname, '../frontend')));
+// Static audio
+app.use('/audio', express.static(path.join(__dirname, '../public/audio')));
 
-app.use(express.json({ limit: '60mb' }));
-app.use(express.urlencoded({ extended: true, limit: '60mb' }));
-
-// Serve frontend — absolute path so it works from any working directory
-const FRONTEND_DIR = path.join(__dirname, '../frontend');
-app.use(express.static(FRONTEND_DIR, {
-  maxAge: '1d',
-  etag: true,
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.html')) {
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    }
-  }
-}));
-
-// MongoDB connection
-const connectMongo = () => {
-  mongoose.connect(process.env.MONGODB_URL, {
-    maxPoolSize: 50,
-    serverSelectionTimeoutMS: 5000,
-    socketTimeoutMS: 45000
-  })
-    .then(() => console.log('✅ MongoDB connected'))
-    .catch(err => console.error('❌ MongoDB connection failed:', err.message));
-};
-
-connectMongo();
-
-mongoose.connection.on('disconnected', () => {
-  console.log('⚠️  MongoDB disconnected, retrying in 5s...');
-  setTimeout(connectMongo, 5000);
-});
-
-// Routes
-app.use('/api/auth',     require('./routes/auth'));
-app.use('/api/posts',    require('./routes/posts'));
-app.use('/api/profile',  require('./routes/profile'));
-app.use('/api/ambition', require('./routes/ambition'));
-app.use('/api/progress', require('./routes/progress'));
-app.use('/api/chat',     require('./routes/chat'));
-app.use('/api/payments', require('./routes/payments'));
-app.use('/api/tasks',    require('./routes/tasks'));
-app.use('/api/reels',    require('./routes/reels'));
-app.use('/api/roadmap',  require('./routes/roadmap'));
-app.use('/api/comrades', require('./routes/comrades'));
-app.use('/api/messages', require('./routes/messages'));
-app.use('/api/mentor',   require('./routes/mentor'));
-app.use('/api/exam',     require('./routes/exam'));
-app.use('/api/books',    require('./routes/books'));
-
-// Health check
+// Health
 app.get('/health', (req, res) => {
-  res.json({
-    status: 'OK',
-    uptime: process.uptime(),
-    timestamp: new Date(),
-    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
-  });
+  res.send('Server running');
 });
 
-// Default route — serve index.html
+// Builders
+function buildRoadmap(goal) {
+  return {
+    goal,
+    overview: `A practical learning roadmap to master ${goal}.`,
+    duration: '12-24 weeks',
+    phases: [
+      {
+        phase: 1,
+        title: 'Foundation',
+        duration: '4-6 weeks',
+        description: `Build strong fundamentals of ${goal}.`,
+        topics: [
+          { id: 'f1', title: `${goal} Basics`, description: 'Core concepts and terms', duration: '1-2 weeks', type: 'reading', resources: ['Official docs', 'Intro course'] },
+          { id: 'f2', title: 'Hands-on Practice', description: 'Simple exercises and mini tasks', duration: '1-2 weeks', type: 'practice', resources: ['Practice sets', 'Tutorials'] }
+        ]
+      },
+      {
+        phase: 2,
+        title: 'Intermediate',
+        duration: '4-8 weeks',
+        description: `Apply ${goal} concepts in real scenarios.`,
+        topics: [
+          { id: 'i1', title: 'Advanced Concepts', description: 'Deeper understanding and patterns', duration: '2-3 weeks', type: 'reading', resources: ['Books', 'Advanced guides'] },
+          { id: 'i2', title: 'Project Building', description: 'Build a meaningful project', duration: '2-4 weeks', type: 'project', resources: ['Sample apps', 'Templates'] }
+        ]
+      },
+      {
+        phase: 3,
+        title: 'Advanced',
+        duration: '4-10 weeks',
+        description: `Specialize and polish your ${goal} skills.`,
+        topics: [
+          { id: 'a1', title: 'Specialization', description: 'Choose a niche and go deep', duration: '2-4 weeks', type: 'practice', resources: ['Specialization courses'] },
+          { id: 'a2', title: 'Portfolio & Readiness', description: 'Polish portfolio and prepare for opportunities', duration: '2-3 weeks', type: 'project', resources: ['Checklists', 'Review guides'] }
+        ]
+      }
+    ],
+    skills: ['Fundamentals', 'Problem Solving', 'Projects', 'Communication'],
+    resources: ['Official Documentation', 'Community Forums', 'YouTube Tutorials']
+  };
+}
+
+function buildTopicContent(topic) {
+  return {
+    title: topic,
+    introduction: `${topic} is a key concept that helps you understand core principles and apply them effectively.`,
+    keyPoints: [
+      `${topic} definition and scope`,
+      `Why ${topic} matters`,
+      `Common pitfalls in ${topic}`,
+      `Best practices for ${topic}`,
+      `Real-world applications of ${topic}`
+    ],
+    explanation: `${topic} involves understanding the foundational theory and practicing it with progressively complex examples. Start small, validate your understanding, and iterate.`,
+    examples: [
+      { title: `Basic ${topic} Example`, content: `A simple demonstration showing the essentials of ${topic}.` },
+      { title: `Advanced ${topic} Example`, content: `A more complex scenario where ${topic} is applied in a realistic context.` }
+    ],
+    practiceQuestions: [
+      `What is ${topic}?`,
+      `Explain a use case for ${topic}.`,
+      `List best practices for ${topic}.`
+    ],
+    notes: `Practice ${topic} consistently. Focus on clarity over complexity.`,
+    resources: ['Official Docs', 'High-quality tutorials', 'Reference guides']
+  };
+}
+
+// APIs
+app.post('/api/roadmap', (req, res, next) => {
+  try {
+    const { goal } = req.body || {};
+    if (!goal) return res.status(400).json({ message: 'Goal is required' });
+    const roadmap = buildRoadmap(goal);
+    roadmapStore.latest = roadmap;
+    roadmapStore[goal.toLowerCase()] = roadmap;
+    res.json({ roadmap });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.get('/api/roadmap', (req, res, next) => {
+  try {
+    const { goal } = req.query || {};
+    if (goal && roadmapStore[goal.toLowerCase()]) {
+      return res.json({ roadmap: roadmapStore[goal.toLowerCase()] });
+    }
+    res.json({ roadmap: roadmapStore.latest || null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post('/api/topic-content', (req, res, next) => {
+  try {
+    const { topic } = req.body || {};
+    if (!topic) return res.status(400).json({ message: 'Topic is required' });
+    const content = buildTopicContent(topic);
+    topicStore[topic.toLowerCase()] = content;
+    res.json({ content });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Fallback root
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../frontend/index.html'));
+  res.sendFile(path.join(__dirname, '../frontend/dashboard.html'));
 });
 
-// Catch-all — serve any .html page by name
-app.get('/:page', (req, res, next) => {
-  const page = req.params.page;
-  if (page.startsWith('api')) return next();
-  const filePath = path.join(__dirname, '../frontend', page.endsWith('.html') ? page : page + '.html');
-  res.sendFile(filePath, err => { if (err) next(); });
-});
-
-// Global error handler
+// Errors
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: 'Something went wrong!' });
+  console.error(err && err.stack ? err.stack : err);
+  res.status(500).json({ message: 'Server error', error: err && err.message ? err.message : 'Unknown error' });
 });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🌐 Health: http://localhost:${PORT}/health`);
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled promise rejection:', err);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err);
+});
+
+const PORT = process.env.PORT || 5001;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`);
 });

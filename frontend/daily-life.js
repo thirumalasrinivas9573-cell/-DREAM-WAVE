@@ -79,41 +79,115 @@ function clearChat() {
   renderHistory(currentCat);
 }
 
+
+let loading = false;
+let debounceTimeout = null;
+
 async function sendMessage() {
+  if (loading) return;
   const input = document.getElementById('chatInput');
   const text = input.value.trim();
   if (!text) return;
-
+  clearTimeout(debounceTimeout);
+  loading = true;
   const btn = document.getElementById('sendBtn');
   input.value = '';
   input.style.height = 'auto';
-  addBubble('user', text);
-
+  addBubble('user', text, true);
   btn.disabled = true;
   btn.textContent = 'Thinking...';
-
-  // Typing indicator
+  // Typing animation
   const typingDiv = document.createElement('div');
   typingDiv.className = 'msg ai';
-  typingDiv.innerHTML = '<div class="msg-avatar">🤖</div><div class="msg-bubble" style="opacity:0.6">✨ Generating response...</div>';
+  typingDiv.innerHTML = '<div class="msg-avatar">🤖</div><div class="msg-bubble ai-typing"><span class="dot"></span><span class="dot"></span><span class="dot"></span> <span class="typing-text">AI is thinking...</span></div>';
   document.getElementById('chatMessages').appendChild(typingDiv);
-  document.getElementById('chatMessages').scrollTop = 99999;
-
-  try {
-    const data = await apiFetch('/chat/message', {
-      method: 'POST',
-      body: { message: text, mode: currentCat }
-    });
-    typingDiv.remove();
-    addBubble('ai', data.reply || data.message || 'Sorry, no response received.');
-  } catch (e) {
-    typingDiv.remove();
-    addBubble('ai', getFallback(currentCat, text));
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Ask AI';
+  scrollChatToBottom();
+  let retryCount = 0;
+  let reply = '';
+  async function fetchAI() {
+    try {
+      const modeContext = currentCat !== 'general'
+        ? `[Mode: ${CATS[currentCat].title}] ${text}`
+        : text;
+      const res = await fetch(`${API_URL}/ai/ask`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: modeContext, type: 'daily' })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        reply = data.reply || '';
+        typingDiv.remove();
+        addBubble('ai', formatAIResponse(reply), false, true);
+        loading = false;
+        btn.disabled = false;
+        btn.textContent = 'Ask AI';
+        scrollChatToBottom();
+      } else {
+        throw new Error('API error');
+      }
+    } catch (e) {
+      retryCount++;
+      if (retryCount <= 1) {
+        setTimeout(fetchAI, 1200);
+      } else {
+        typingDiv.remove();
+        addBubble('ai', `<span style='color:#f44'>AI error. <button onclick='sendMessage()'>Retry</button></span>`, false, true);
+        loading = false;
+        btn.disabled = false;
+        btn.textContent = 'Ask AI';
+        scrollChatToBottom();
+      }
+    }
   }
+  fetchAI();
 }
+
+function addBubble(role, text, save = true, isAI = false) {
+  const container = document.getElementById('chatMessages');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  const formatted = role === 'ai' ? formatAIResponse(text) : escapeHtml(text).replace(/\n/g, '<br>');
+  const now = new Date();
+  const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  div.innerHTML = `
+    <div class="msg-avatar">${role === 'ai' ? '🤖' : '👤'}</div>
+    <div class="msg-bubble">${formatted}<div class="msg-time">${time}</div></div>`;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  if (save) chatHistories[currentCat].push({ role, text });
+}
+
+function scrollChatToBottom() {
+  const chat = document.getElementById('chatMessages');
+  chat.scrollTop = chat.scrollHeight;
+}
+
+document.getElementById('chatInput').addEventListener('input', function() {
+  clearTimeout(debounceTimeout);
+  debounceTimeout = setTimeout(() => {}, 300);
+});
+
+function formatAIResponse(text) {
+  if (!text) return '';
+  text = text.replace(/^(\d+\.[^\n]+)/gm, '<h4 style="color:#7c3aed;font-weight:800;">$1</h4>');
+  text = text.replace(/^[\-\*] (.+)$/gm, '<li>$1</li>');
+  text = text.replace(/^Q:/gm, '<b>Q:</b>');
+  text = text.replace(/^A:/gm, '<b>A:</b>');
+  text = text.replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>');
+  return text;
+}
+// Typing animation CSS
+const style = document.createElement('style');
+style.innerHTML = `
+.ai-typing { display: flex; align-items: center; gap: 6px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: #a78bfa; display: inline-block; animation: blink 1.2s infinite both; }
+.dot:nth-child(2) { animation-delay: 0.2s; }
+.dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes blink { 0%, 80%, 100% { opacity: 0.2; } 40% { opacity: 1; } }
+.msg-time { font-size: 0.7rem; color: #b4b4b4; margin-top: 6px; text-align: right; }
+`;
+document.head.appendChild(style);
 
 function getFallback(cat, input) {
   const fb = {

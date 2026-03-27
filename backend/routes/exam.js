@@ -1,7 +1,6 @@
 const express = require('express');
-const auth = require('../middleware/auth');
-
 const router = express.Router();
+const auth = require('../middleware/auth');
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 
 async function callAI(prompt, maxTokens = 2000) {
@@ -14,6 +13,37 @@ async function callAI(prompt, maxTokens = 2000) {
   const data = await res.json();
   return data.choices[0].message.content;
 }
+
+// POST /api/exam
+router.post('/', async (req, res) => {
+  try {
+    const { subject, topic } = req.body;
+    if (!topic) return res.status(400).json({ error: 'Topic required' });
+    const prompt = `Generate a full structured answer for the topic: "${topic}" in subject: "${subject || ''}". Format:
+1. Introduction
+2. Definition
+3. Historical Background
+4. Discovery & Scientists
+5. Basic Concept
+6. Chemical Process
+7. Step-by-step Mechanism
+8. Types
+9. Components
+10. Role in Ecosystem
+11. Advantages
+12. Disadvantages
+13. Applications
+14. Interesting Facts
+15. Summary
+Also include:
+- 5 MCQs with answers
+- 3 long questions`;
+    const answer = await callAI(prompt, 2000);
+    res.json({ answer });
+  } catch (e) {
+    res.status(500).json({ error: 'Exam AI error', details: e.message });
+  }
+});
 
 // Analyze syllabus and generate exam prep content
 router.post('/analyze', auth, async (req, res) => {

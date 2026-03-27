@@ -45,7 +45,7 @@
       <a href="dashboard.html" class="nav-brand">🌊 Dream Wave</a>
       <div class="nav-links">
         <a href="dashboard.html">Dashboard</a>
-        <a href="ai-assistant.html">AI Mentor</a>
+        <a href="krishna.html">Krishna</a>
         <a href="career-roadmap.html" class="active">Roadmap</a>
         <a href="community.html">Community</a>
         <button onclick="logout()" class="btn-secondary">Logout</button>
@@ -77,6 +77,9 @@
   <script src="app.js"></script>
   <script>
     checkAuth();
+    // ✅ PREVENT DUPLICATE ROADMAP GENERATION
+    let roadmapInProgress = false;
+
     loadSavedRoadmap();
 
     async function loadSavedRoadmap() {
@@ -94,17 +97,30 @@
     async function generateRoadmap() {
       const goal = document.getElementById('goalInput').value.trim();
       if (!goal) { alert('Please enter a career goal'); return; }
+      
+      // ✅ PREVENT DUPLICATE CALLS
+      if (roadmapInProgress) {
+        console.warn('⚠️ Roadmap generation already in progress');
+        return;
+      }
+      
+      roadmapInProgress = true;
       const btn = document.getElementById('genBtn');
       btn.disabled = true; btn.textContent = 'Generating...';
       document.getElementById('spinnerWrap').style.display = 'block';
       document.getElementById('roadmapOutput').innerHTML = '';
 
+      console.log('🚀 SINGLE API CALL: generateRoadmap');
+
       try {
-        const res = await fetch(API_URL + '/chat', {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+        const res = await fetch('/api/ai/ask', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            message: `Generate a structured career roadmap for: "${goal}". 
+            message: `Generate a structured career roadmap for: "${goal}".
 Format as exactly 4 phases: Beginner, Intermediate, Advanced, Expert.
 For each phase provide: title, duration (e.g. "3 months"), description (2 sentences), and 5 key skills.
 Use this exact format for each phase:
@@ -112,21 +128,41 @@ PHASE: [title]
 DURATION: [duration]
 DESCRIPTION: [description]
 SKILLS: [skill1, skill2, skill3, skill4, skill5]`,
-            context: 'career-roadmap'
-          })
+            type: 'career'
+          }),
+          signal: controller.signal
         });
-        const data = await res.json();
-        if (data.response) {
-          const phases = parseRoadmap(data.response);
-          renderRoadmap(goal, phases, true);
-        } else {
+
+        clearTimeout(timeoutId);
+
+        if (!res.ok) {
+          console.error('❌ API ERROR: ' + res.status);
           document.getElementById('roadmapOutput').innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>Failed to generate roadmap. Try again.</p></div>';
+          return;
         }
+
+        const data = await res.json();
+        const reply = data.reply || data.response || '';
+        
+        if (!reply) {
+          console.warn('⚠️ Empty response from API');
+          document.getElementById('roadmapOutput').innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>Failed to generate roadmap. Try again.</p></div>';
+          return;
+        }
+
+        console.log('✅ SINGLE RESPONSE RECEIVED (' + reply.length + ' chars)');
+        const phases = parseRoadmap(reply);
+        renderRoadmap(goal, phases, true);
+
       } catch (err) {
+        console.error('❌ Error generating roadmap:', err.message);
         document.getElementById('roadmapOutput').innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>Error connecting to server.</p></div>';
       } finally {
+        // ✅ ALWAYS RESET FLAGS
         document.getElementById('spinnerWrap').style.display = 'none';
-        btn.disabled = false; btn.textContent = 'Generate';
+        roadmapInProgress = false;
+        btn.disabled = false; 
+        btn.textContent = 'Generate';
       }
     }
 

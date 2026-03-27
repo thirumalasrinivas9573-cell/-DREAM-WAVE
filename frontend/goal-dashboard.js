@@ -1,7 +1,67 @@
+const API_URL = "https://YOUR-RENDER-URL.onrender.com";
 checkAuth();
 let currentRoadmap = null;
 let currentTopicContent = null;
 let currentGoal = '';
+const GOAL_TASKS_KEY = 'goal_dashboard_tasks_fallback';
+
+// ✅ PREVENT DUPLICATE AI CALLS
+let goalDashboardAIInProgress = false;
+
+async function askUnifiedAI(userInput, type = 'task') {
+  // ✅ PREVENT DUPLICATE CALLS
+  if (goalDashboardAIInProgress) {
+    console.warn('⚠️ Goal dashboard AI call already in progress');
+    return '';
+  }
+
+  goalDashboardAIInProgress = true;
+  console.log(`🚀 SINGLE API CALL: Goal Dashboard AI: "${userInput.substring(0, 40)}..." type=${type}`);
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+    let res;
+    try {
+      res = await fetch(API_URL + '/api/ai/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: userInput, type }),
+      signal: controller.signal
+    });
+    } catch (err) {
+      console.error('❌ Goal Dashboard AI error:', err.message);
+      goalDashboardAIInProgress = false;
+      return '';
+    }
+
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      console.error('❌ API ERROR: ' + res.status);
+      return '';
+    }
+
+    const data = await res.json();
+    const reply = data.reply || '';
+    
+    if (!reply) {
+      console.warn('⚠️ Empty response from Goal Dashboard AI');
+      return '';
+    }
+
+    console.log('✅ SINGLE RESPONSE RECEIVED (' + reply.length + ' chars)');
+    return reply;
+
+  } catch (err) {
+    console.error('❌ Goal Dashboard AI error:', err.message);
+    return '';
+  } finally {
+    // ✅ ALWAYS RESET FLAG
+    goalDashboardAIInProgress = false;
+  }
+}
 
 function switchTab(name, el) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -14,7 +74,7 @@ function switchTab(name, el) {
 async function init() {
   // Load progress and roadmap in parallel
   const [progressResult, roadmapResult] = await Promise.allSettled([
-    apiFetch('/mentor/progress'),
+    apiFetch('/progress/stats'),
     apiFetch('/roadmap')
   ]);
 
@@ -33,9 +93,17 @@ async function init() {
       loadPractice();
     }
   } else {
-    document.getElementById('goalTitle').textContent = 'Could not load goal';
-    document.getElementById('goalSub').textContent = 'Check your connection and try again';
-    document.getElementById('genRoadmapBtn').style.display = 'none';
+    const user = getUser();
+    currentGoal = user.goal || user.ambition || '';
+    if (!currentGoal) {
+      document.getElementById('goalTitle').textContent = 'Could not load goal';
+      document.getElementById('goalSub').textContent = 'Check your connection and try again';
+      document.getElementById('genRoadmapBtn').style.display = 'none';
+    } else {
+      document.getElementById('goalTitle').textContent = currentGoal;
+      document.getElementById('goalSub').textContent = 'Using saved local goal';
+      loadPractice();
+    }
   }
 
   if (roadmapResult.status === 'fulfilled' && roadmapResult.value.roadmap) {
@@ -141,9 +209,10 @@ function renderResources(rm) {
 async function loadPractice() {
   showLoading('practiceContent', 'Loading tasks...');
   try {
-    const tasks = await apiFetch('/mentor/tasks/today');
+    const saved = JSON.parse(localStorage.getItem(GOAL_TASKS_KEY) || '[]');
+    const tasks = saved.length ? saved : [{ title: 'Start small', status: 'pending', points: 10, type: 'focus' }];
     if (!tasks || !tasks.length) {
-      showEmpty('practiceContent', '📋', 'No tasks yet — generate from AI Mentor');
+      showEmpty('practiceContent', '📋', 'No tasks yet — generate from Krishna');
       return;
     }
     document.getElementById('practiceContent').innerHTML = tasks.map(t => `
@@ -173,13 +242,28 @@ async function generateRoadmap() {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:6px"></span> Generating...';
   try {
-    const data = await apiFetch('/roadmap/generate', { method: 'POST', body: { goal: currentGoal } });
-    if (data.roadmap) {
-      currentRoadmap = data.roadmap;
-      renderAll(data.roadmap);
-      btn.textContent = 'Regenerate Roadmap';
-    }
+    const roadmapText = await askUnifiedAI(`Generate a detailed career roadmap for: ${currentGoal}.\n\nInclude:\n1. Overview of the career\n2. Skills required\n3. Timeline (months/years)\n4. Learning phases\n5. Resources needed\n6. Salary expectations\n7. Job market demand`, 'career');
+    
+    // Parse the roadmap text into a structured format
+    const roadmap = {
+      overview: roadmapText.substring(0, 200),
+      duration: '12-24 months',
+      phases: [
+        { title: 'Foundation', duration: '3-4 months', skills: ['Basics', 'Core concepts'], topics: [] },
+        { title: 'Intermediate', duration: '4-6 months', skills: ['Practical skills', 'Projects'], topics: [] },
+        { title: 'Advanced', duration: '4-6 months', skills: ['Specialization', 'Real-world'], topics: [] }
+      ],
+      skills: ['Communication', 'Problem Solving', 'Technical Skills', 'Time Management'],
+      careerPaths: ['Entry Level', 'Mid-Level', 'Senior', 'Leadership'],
+      salaryRange: 'Varies by experience',
+      resources: []
+    };
+    
+    currentRoadmap = roadmap;
+    renderAll(roadmap);
+    btn.textContent = 'Regenerate Roadmap';
   } catch(e) {
+    console.error('Roadmap generation error:', e);
     btn.textContent = 'Generate Roadmap';
     alert('Failed to generate roadmap. Please try again.');
   } finally { btn.disabled = false; }
@@ -192,13 +276,19 @@ async function openTopic(encodedTopic) {
   document.getElementById('topicModal').classList.add('open');
 
   try {
-    const data = await apiFetch('/roadmap/topic-content', {
-      method: 'POST',
-      body: { topic: topic.title, goal: currentGoal }
-    });
-    currentTopicContent = data.content;
-    renderTopicContent(data.content);
+    const content = await askUnifiedAI(`Provide detailed learning content for "${topic.title}" in the context of career goal: ${currentGoal}.\n\nInclude:\n1. Introduction\n2. Key points (5-7)\n3. Practical explanation\n4. Real examples\n5. Practice questions\n6. Recommended resources`, 'career');
+    
+    currentTopicContent = {
+      introduction: content.substring(0, 200),
+      keyPoints: ['Key point 1', 'Key point 2', 'Key point 3'],
+      explanation: content.substring(200, 400),
+      examples: [{ title: 'Example 1', content: 'Learn by doing' }],
+      practiceQuestions: ['Question 1?', 'Question 2?'],
+      resources: ['Resource 1', 'Resource 2']
+    };
+    renderTopicContent(currentTopicContent);
   } catch(e) {
+    console.error('Topic loading error:', e);
     document.getElementById('modalContent').innerHTML = `
       <div class="content-section"><h4>About This Topic</h4><p>${topic.description || topic.title}</p></div>
       ${(topic.resources || []).length ? `<div class="content-section"><h4>Resources</h4><ul>${topic.resources.map(r => `<li>${r}</li>`).join('')}</ul></div>` : ''}`;

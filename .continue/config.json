@@ -1,0 +1,12 @@
+{
+  "models": [
+    {
+      "title": "My OpenAI",
+      "provider": "openai",
+      "model": "gpt-4o-mini",
+      "apiKey": "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
+"
+    }
+  ],
+  "defaultModel": "My OpenAI"
+}

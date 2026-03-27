@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Books - Dream Wave</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .navbar{position:fixed;top:0;width:100%;z-index:1000}
+    .dashboard-layout{margin-top:64px}
+    .books-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:20px}
+    .book-card{background:var(--card-bg);border:1px solid var(--glass-border);border-radius:var(--radius);padding:20px;text-align:center;transition:all 0.3s;cursor:pointer;position:relative;overflow:hidden}
+    .book-card:hover{border-color:rgba(214,194,255,0.35);transform:translateY(-4px);box-shadow:var(--shadow-soft)}
+    .book-cover{font-size:3.2rem;margin-bottom:12px;display:block}
+    .book-title{font-size:0.9rem;font-weight:700;color:var(--text);margin-bottom:5px;line-height:1.3}
+    .book-author{font-size:0.76rem;color:var(--text-dim);margin-bottom:10px}
+    .book-tag{display:inline-block;background:rgba(214,194,255,0.1);border:1px solid rgba(214,194,255,0.2);color:var(--purple);padding:2px 10px;border-radius:20px;font-size:0.7rem;font-weight:600}
+    .book-actions{display:flex;gap:8px;margin-top:12px;justify-content:center}
+    .btn-read{background:var(--grad-primary);color:white;border:none;padding:6px 14px;border-radius:8px;font-size:0.78rem;font-weight:700;cursor:pointer}
+    .btn-save{background:rgba(214,194,255,0.1);border:1px solid rgba(214,194,255,0.2);color:var(--purple);padding:6px 14px;border-radius:8px;font-size:0.78rem;font-weight:700;cursor:pointer}
+    .search-bar{display:flex;gap:10px;margin-bottom:24px}
+    .search-bar input{flex:1;background:var(--card-bg);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:10px 16px;color:var(--text);font-size:0.9rem;outline:none}
+    .search-bar input:focus{border-color:var(--purple-mid)}
+    .search-bar input::placeholder{color:var(--text-dim)}
+    .filter-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+    .filter-tab{background:var(--card-bg);border:1px solid var(--glass-border);color:var(--text-muted);padding:5px 14px;border-radius:20px;font-size:0.78rem;cursor:pointer;transition:all 0.2s}
+    .filter-tab.active,.filter-tab:hover{background:rgba(214,194,255,0.15);border-color:var(--purple-mid);color:var(--purple)}
+    .featured-banner{background:linear-gradient(135deg,rgba(124,58,237,0.2),rgba(232,121,160,0.1));border:1px solid rgba(167,139,250,0.3);border-radius:var(--radius);padding:24px 28px;margin-bottom:28px;display:flex;align-items:center;gap:20px}
+    .featured-banner .feat-icon{font-size:3rem;flex-shrink:0}
+    .featured-banner h3{font-size:1.1rem;font-weight:800;margin-bottom:4px}
+    .featured-banner p{color:var(--text-muted);font-size:0.85rem;line-height:1.6}
+    .section-label{font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);margin-bottom:14px}
+    .empty-state{text-align:center;padding:60px 20px;color:var(--text-dim)}
+    @media(max-width:600px){.books-grid{grid-template-columns:repeat(2,1fr)}.featured-banner{flex-direction:column}}
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container">
+      <a href="dashboard.html" class="nav-brand">&#x1F30A; Dream Wave</a>
+      <div class="nav-links">
+        <a href="profile.html">&#x1F464; Profile</a>
+        <button onclick="logout()" class="btn-secondary">Logout</button>
+        <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle">&#x1F319;</button>
+      </div>
+      <button class="hamburger" id="hamburger" onclick="toggleMobileNav()"><span></span><span></span><span></span></button>
+    </div>
+  </nav>
+  <div class="mobile-nav" id="mobileNav">
+    <a href="dashboard.html">&#x1F3E0; Dashboard</a>
+    <a href="books.html">&#x1F4D6; Books</a>
+    <a href="krishna.html">🪷 AA AI Mentor</a>
+    <a href="comrades.html">&#x1F91D; Comrades</a>
+    <button onclick="logout()">&#x1F6AA; Logout</button>
+  </div>
+  <div class="dashboard-layout">
+    <aside class="sidebar">
+      <div class="sidebar-section">Main</div>
+      <a href="dashboard.html" class="sidebar-item"><span class="icon">&#x1F3E0;</span> Dashboard</a>
+      <a href="krishna.html" class="sidebar-item"><span class="icon">&#x1F916;</span> AI Chat</a>
+      <a href="krishna.html" class="sidebar-item"><span class="icon">&#x1F393;</span> Krishna</a>
+      <a href="krishna.html" class="sidebar-item"><span class="icon">&#x1F9ED;</span> Krishna</a>
+      <a href="krishna.html" class="sidebar-item"><span class="icon">&#x1FAB7;</span> Krishna</a>
+      <a href="careers.html" class="sidebar-item"><span class="icon">&#x1F680;</span> Careers</a>
+      <a href="career-roadmap.html" class="sidebar-item"><span class="icon">&#x1F5FA;&#xFE0F;</span> Roadmap</a>
+      <a href="study.html" class="sidebar-item"><span class="icon">&#x1F4DA;</span> Study</a>
+      <a href="books.html" class="sidebar-item active"><span class="icon">&#x1F4D6;</span> Books</a>
+      <a href="goal-dashboard.html" class="sidebar-item"><span class="icon">&#x1F3AF;</span> Goal Dashboard</a>
+      <a href="exam-prep.html" class="sidebar-item"><span class="icon">&#x1F4DD;</span> Exam Prep</a>
+      <a href="ambition.html" class="sidebar-item"><span class="icon">&#x2728;</span> Set Goal</a>
+      <a href="daily-life.html" class="sidebar-item"><span class="icon">&#x1F33F;</span> Daily Life AI</a>
+      <div class="sidebar-section">Social</div>
+      <a href="comrades.html" class="sidebar-item"><span class="icon">&#x1F91D;</span> Comrades</a>
+      <a href="community.html" class="sidebar-item"><span class="icon">&#x1F465;</span> Community</a>
+      <a href="messages.html" class="sidebar-item"><span class="icon">&#x1F4AC;</span> Messages</a>
+      <a href="leaderboard.html" class="sidebar-item"><span class="icon">&#x1F3C6;</span> Leaderboard</a>
+      <div class="sidebar-section">Tools</div>
+      <a href="code-generator.html" class="sidebar-item"><span class="icon">&#x26A1;</span> Code Gen</a>
+      <a href="profile.html" class="sidebar-item"><span class="icon">&#x1F464;</span> Profile</a>
+    </aside>
+    <main class="main-content">
+      <div class="welcome-section">
+        <h1>&#x1F4D6; Books Library</h1>
+        <p>Curated books for your growth journey</p>
+      </div>
+      <div class="featured-banner">
+        <div class="feat-icon">&#x1F549;&#xFE0F;</div>
+        <div>
+          <h3>Bhagavad Gita &mdash; Featured Book</h3>
+          <p>Timeless wisdom for duty, clarity, and balanced action, now available through AA AI Mentor guidance.</p>
+          <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;">
+            <a href="krishna.html" class="btn-read" style="text-decoration:none;display:inline-block;">🪷 Ask AA AI Mentor</a>
+            <span class="book-tag">Spirituality</span><span class="book-tag">Philosophy</span>
+          </div>
+        </div>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="searchInput" placeholder="Search books by title, author, or topic..." oninput="filterBooks()" />
+      </div>
+      <div class="filter-tabs">
+        <button class="filter-tab active" onclick="setFilter('all',this)">All</button>
+        <button class="filter-tab" onclick="setFilter('spirituality',this)">&#x1F549;&#xFE0F; Spirituality</button>
+        <button class="filter-tab" onclick="setFilter('career',this)">&#x1F4BC; Career</button>
+        <button class="filter-tab" onclick="setFilter('mindset',this)">&#x1F9E0; Mindset</button>
+        <button class="filter-tab" onclick="setFilter('productivity',this)">&#x26A1; Productivity</button>
+        <button class="filter-tab" onclick="setFilter('finance',this)">&#x1F4B0; Finance</button>
+      </div>
+      <div class="section-label">All Books</div>
+      <div class="books-grid" id="booksGrid"></div>
+    </main>
+  </div>
+  <script src="app.js"></script>
+  <script>
+    checkAuth();
+    const BOOKS = [
+      {id:1,emoji:"&#x1F549;&#xFE0F;",title:"Bhagavad Gita As It Is",author:"A.C. Bhaktivedanta Swami",tag:"spirituality",desc:"The complete guide to dharma, karma, and liberation."},
+      {id:2,emoji:"&#x1F9D8;",title:"The Power of Now",author:"Eckhart Tolle",tag:"mindset",desc:"A guide to spiritual enlightenment through present-moment awareness."},
+      {id:3,emoji:"&#x1F680;",title:"Zero to One",author:"Peter Thiel",tag:"career",desc:"Notes on startups, or how to build the future."},
+      {id:4,emoji:"&#x1F9E0;",title:"Atomic Habits",author:"James Clear",tag:"productivity",desc:"Tiny changes, remarkable results. Build systems that last."},
+      {id:5,emoji:"&#x1F4B0;",title:"Rich Dad Poor Dad",author:"Robert Kiyosaki",tag:"finance",desc:"What the rich teach their kids about money."},
+      {id:6,emoji:"&#x1F3AF;",title:"Deep Work",author:"Cal Newport",tag:"productivity",desc:"Rules for focused success in a distracted world."},
+      {id:7,emoji:"&#x1F31F;",title:"Think and Grow Rich",author:"Napoleon Hill",tag:"mindset",desc:"The classic guide to achieving success through mindset."},
+      {id:8,emoji:"&#x1F4CA;",title:"The Lean Startup",author:"Eric Ries",tag:"career",desc:"How constant innovation creates radically successful businesses."},
+      {id:9,emoji:"&#x1F9D8;",title:"Meditations",author:"Marcus Aurelius",tag:"mindset",desc:"Personal writings of the Roman Emperor on Stoic philosophy."},
+      {id:10,emoji:"&#x1F4A1;",title:"The 4-Hour Workweek",author:"Tim Ferriss",tag:"productivity",desc:"Escape the 9-5, live anywhere, and join the new rich."},
+      {id:11,emoji:"&#x1F33F;",title:"Ikigai",author:"Hector Garcia",tag:"spirituality",desc:"The Japanese secret to a long and happy life."},
+      {id:12,emoji:"&#x1F4BC;",title:"Good to Great",author:"Jim Collins",tag:"career",desc:"Why some companies make the leap and others don't."}
+    ];
+    let currentFilter = 'all';
+    let savedBooks = JSON.parse(localStorage.getItem('saved_books') || '[]');
+    function setFilter(f,btn){ currentFilter=f; document.querySelectorAll('.filter-tab').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderBooks(); }
+    function filterBooks(){ renderBooks(); }
+    function renderBooks(){
+      const q = document.getElementById('searchInput').value.toLowerCase();
+      const grid = document.getElementById('booksGrid');
+      const filtered = BOOKS.filter(b=>{
+        const mf = currentFilter==='all'||b.tag===currentFilter;
+        const ms = !q||b.title.toLowerCase().includes(q)||b.author.toLowerCase().includes(q)||b.tag.includes(q);
+        return mf&&ms;
+      });
+      if(!filtered.length){ grid.innerHTML='<div class="empty-state"><div class="empty-icon">&#x1F4ED;</div><p>No books found.</p></div>'; return; }
+      grid.innerHTML = filtered.map(b=>{
+        const saved = savedBooks.includes(b.id);
+        const safeTitle = b.title.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        return '<div class="book-card"><span class="book-cover">'+b.emoji+'</span><div class="book-title">'+b.title+'</div><div class="book-author">'+b.author+'</div><span class="book-tag">'+b.tag+'</span><p style="font-size:0.78rem;color:var(--text-dim);margin-top:8px;line-height:1.5;">'+b.desc+'</p><div class="book-actions"><button class="btn-read" onclick="askAboutBook(\''+safeTitle+'\')">🪷 Ask AA AI Mentor</button><button class="btn-save" id="save-'+b.id+'" onclick="toggleSave('+b.id+')">'+(saved?'&#x2605; Saved':'&#x2606; Save')+'</button></div></div>';
+      }).join('');
+    }
+    function toggleSave(id){ const i=savedBooks.indexOf(id); if(i>-1)savedBooks.splice(i,1); else savedBooks.push(id); localStorage.setItem('saved_books',JSON.stringify(savedBooks)); renderBooks(); }
+    function askAboutBook(title){ localStorage.setItem('krishna_prefill','Tell me the wisdom from "'+title+'"'); window.location.href='/krishna'; }
+    renderBooks();
+    function toggleTheme(){ document.body.classList.toggle('light-mode'); localStorage.setItem('theme',document.body.classList.contains('light-mode')?'light':'dark'); }
+    function toggleMobileNav(){ document.getElementById('mobileNav').classList.toggle('open'); document.getElementById('hamburger').classList.toggle('open'); }
+    if(localStorage.getItem('theme')==='light') document.body.classList.add('light-mode');
+  </script>
+</body>
+</html>

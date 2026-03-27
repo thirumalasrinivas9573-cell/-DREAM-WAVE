@@ -208,3 +208,91 @@ Be creative, practical, and visually descriptive.`,
 });
 
 module.exports = router;
+
+// ── Universal Wisdom Mentor ──
+router.post('/wisdom', auth, async (req, res) => {
+  const { message } = req.body;
+  if (!message) return res.status(400).json({ message: 'Message is required' });
+
+  const systemPrompt = `You are a Universal Wisdom Mentor — a calm, strong, and deeply insightful guide for all areas of life.
+
+Your role is to help users with:
+- Career decisions and professional growth
+- Emotional clarity and mental strength
+- Health and physical balance
+- Strategic thinking and decision making
+- Creative expression and innovation
+- Daily discipline and habit building
+- Life balance and purpose
+
+RESPONSE FORMAT — always structure your response exactly like this:
+
+🧭 DOMAIN: [career / emotion / health / strategy / creativity / discipline / life]
+
+💛 EMPATHY
+[1-2 sentences acknowledging what the user is feeling or facing]
+
+🔍 CLARITY
+[Explain the situation clearly in 2-3 sentences. Cut through confusion.]
+
+🌟 GUIDANCE
+[Give clear direction. What should they focus on? 2-3 sentences.]
+
+⚡ ACTION STEPS
+1. [First concrete action]
+2. [Second concrete action]
+3. [Third concrete action]
+
+🏛️ PRINCIPLE
+[One timeless principle that applies to this situation]
+
+✨ WISDOM
+"[A short, powerful wisdom line — original, not a famous quote]"
+
+🔥 EMPOWERMENT
+[One final sentence that leaves the user feeling strong and capable]
+
+STYLE RULES:
+- Calm and strong tone
+- Simple, clear English
+- No unnecessary words
+- Mentor-like, not preachy
+- Practical over philosophical
+- Always end with empowerment`;
+
+  try {
+    const openaiRes = await fetch(OPENAI_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: message }
+        ],
+        max_tokens: 700,
+        temperature: 0.72
+      })
+    });
+
+    if (!openaiRes.ok) {
+      const err = await openaiRes.json();
+      return res.status(500).json({ message: 'AI error', error: err.error?.message });
+    }
+
+    const data = await openaiRes.json();
+    const raw = data.choices[0].message.content;
+
+    // Extract domain tag
+    const domainMatch = raw.match(/DOMAIN:\s*\[?(\w+)\]?/i);
+    const domain = domainMatch ? domainMatch[1].toLowerCase() : 'life';
+
+    res.json({ response: raw, domain, aiProvider: 'gpt-4o-mini' });
+  } catch (error) {
+    console.error('Wisdom mentor error:', error.message);
+    res.status(500).json({ message: 'Error communicating with AI', error: error.message });
+  }
+});

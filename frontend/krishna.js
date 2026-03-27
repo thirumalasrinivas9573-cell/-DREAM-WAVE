@@ -1,0 +1,144 @@
+const API_URL = "https://YOUR-RENDER-URL.onrender.com";
+document.addEventListener('DOMContentLoaded', () => {
+  const flute = document.getElementById("fluteMusic");
+  const musicBtn = document.getElementById("musicBtn");
+  const musicStatus = document.getElementById("musicStatus");
+  const slokaBtn = document.getElementById("slokaBtn");
+  const slokaStatus = document.getElementById("slokaStatus");
+
+  const slokas = [
+    "/audio/sloka1.mp3",
+    "/audio/sloka2.mp3",
+    "/audio/sloka3.mp3"
+  ];
+  let played = [];
+  let currentSlokaAudio = null;
+
+  window.onload = () => {
+    flute.volume = 0.3;
+    // Autoplay fix for browser
+    setTimeout(() => {
+      flute.play().catch(()=>{});
+    }, 200);
+    document.body.addEventListener('click', () => {
+      flute.play().catch(() => {});
+    }, { once: true });
+    musicStatus.textContent = "🎵 Flute Playing...";
+  };
+
+  function toggleMusic() {
+    if (flute.paused) {
+      flute.play();
+      musicStatus.textContent = "🎵 Flute Playing...";
+    } else {
+      flute.pause();
+      musicStatus.textContent = "⏸️ Flute Paused";
+    }
+  }
+
+  function startKrishnaMode() {
+    flute.volume = 0.3;
+    flute.loop = true;
+    flute.play().catch(()=>{});
+    musicStatus.textContent = "🎵 Flute Playing...";
+  }
+
+  function playRandomSloka() {
+    if (currentSlokaAudio) {
+      currentSlokaAudio.pause();
+      currentSlokaAudio.currentTime = 0;
+    }
+    if (played.length === slokas.length) {
+      played = [];
+    }
+    const remaining = slokas.filter(s => !played.includes(s));
+    const random = remaining[Math.floor(Math.random() * remaining.length)];
+    played.push(random);
+    currentSlokaAudio = new Audio(random);
+    currentSlokaAudio.volume = 1.0;
+    currentSlokaAudio.play();
+    slokaStatus.textContent = "🔊 Playing Sloka...";
+    slokaBtn.classList.add('glow');
+    setTimeout(() => slokaBtn.classList.remove('glow'), 600);
+    currentSlokaAudio.onended = () => {
+      slokaStatus.textContent = "";
+    };
+  }
+
+  // expose controls to global for inline onclick
+  window.toggleMusic = toggleMusic;
+  window.playRandomSloka = playRandomSloka;
+  window.startKrishnaMode = startKrishnaMode;
+
+  // Krishna chat
+  const form = document.getElementById('krishnaForm');
+  const input = document.getElementById('krishnaInput');
+  const messages = document.getElementById('krishnaMessages');
+  let loading = false;
+
+  function addMsg(text, sender, isVoice) {
+    const row = document.createElement('div');
+    row.className = 'msg-row ' + (sender === 'user' ? 'msg-user' : 'msg-ai');
+    const bubble = document.createElement('div');
+    bubble.className = 'msg-bubble';
+    bubble.innerHTML = text;
+    const time = document.createElement('div');
+    time.className = 'msg-time';
+    time.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    bubble.appendChild(time);
+    row.appendChild(bubble);
+    messages.appendChild(row);
+    messages.scrollTop = messages.scrollHeight;
+    if (isVoice) speakTelugu(text);
+  }
+
+  function showTyping() {
+    const row = document.createElement('div');
+    row.className = 'msg-row msg-ai';
+    row.id = 'typingRow';
+    row.innerHTML = '<div class="msg-bubble"><span class="typing-anim"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></span> <span style="margin-left:8px;">AI is thinking...</span></div>';
+    messages.appendChild(row);
+    messages.scrollTop = messages.scrollHeight;
+  }
+  function removeTyping() {
+    const t = document.getElementById('typingRow');
+    if (t) t.remove();
+  }
+
+  form.onsubmit = async e => {
+    e.preventDefault();
+    if (loading) return;
+    const text = input.value.trim();
+    if (!text) return;
+    addMsg(text, 'user');
+    input.value = '';
+    loading = true;
+    showTyping();
+    try {
+      const res = await fetch(`${API_URL}/ai/ask`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, type: 'krishna' })
+      });
+      if (!res.ok) throw new Error('API error');
+      const data = await res.json();
+      removeTyping();
+      addMsg(data.reply, 'ai', true);
+    } catch (e) {
+      removeTyping();
+      addMsg('<span style="color:#f44">AI error. Please try again.</span>', 'ai');
+    } finally {
+      loading = false;
+    }
+  };
+
+  function speakTelugu(text) {
+    if (!window.speechSynthesis) return;
+    const speech = new SpeechSynthesisUtterance(text.replace(/<[^>]+>/g, ''));
+    speech.lang = 'te-IN';
+    speech.rate = 0.9;
+    speech.pitch = 1;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(speech);
+  }
+});
