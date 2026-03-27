@@ -5,25 +5,85 @@ const path = require('path');
 
 const app = express();
 
+// Global middleware MUST be before routes
+app.use(cors());
+app.use(express.json());
+
 // AI CHAT API (Production)
 app.post('/chat', async (req, res) => {
-  const { message } = req.body;
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: message }]
-      })
-    });
-    const data = await response.json();
-    res.json({ reply: data.choices[0].message.content });
+    console.log('REQUEST RECEIVED:', req.body);
+    if (!req.body.message) {
+      // Generate report from raw body
+      const userData = req.body;
+      const { goal, name, class: cls, age, skills } = userData;
+      const prompt = `Generate a detailed 10-section career roadmap report based on:
+
+Name: ${name}
+Goal: ${goal}
+Class: ${cls}
+Age: ${age}
+Skills: ${skills}
+
+The report must include:
+1. Introduction
+2. Current Assessment
+3. Career Path Overview
+4. Step-by-Step Roadmap
+5. Skills to Develop
+6. Learning Resources
+7. Daily Plan
+8. Timeline
+9. Challenges & Solutions
+10. Final Motivation
+
+Format as structured text with clear section headers.`;
+
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+      const data = await response.json();
+      const reportText = data.choices?.[0]?.message?.content;
+      return res.json({ report: reportText });
+    } else {
+      // Normal chat
+      const { message } = req.body;
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'user', content: message }]
+        })
+      });
+      console.log('OPENAI RESPONSE STATUS (chat):', response.status);
+      if (!response.ok) {
+        const txt = await response.text().catch(() => '');
+        console.error('OPENAI ERROR (chat):', txt);
+        return res.status(502).json({ error: 'AI provider error' });
+      }
+      const data = await response.json();
+      const content = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+      if (!content) {
+        console.error('OPENAI MISSING CONTENT (chat):', data);
+        return res.status(502).json({ error: 'Empty AI response' });
+      }
+      res.json({ reply: content });
+    }
   } catch (error) {
-    res.status(500).json({ reply: 'AI server error' });
+    console.error('SERVER ERROR /chat:', error);
+    res.status(500).json({ error: 'AI server error' });
   }
 });
 
@@ -35,9 +95,6 @@ app.get('/', (req, res) => {
 // In-memory stores
 let roadmapStore = {};
 let topicStore = {};
-
-app.use(cors());
-app.use(express.json());
 
 // Static frontend
 app.use(express.static(path.join(__dirname, '../frontend')));

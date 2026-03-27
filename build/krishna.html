@@ -1,0 +1,1093 @@
+  <style>
+    .mentor-modal-bg { position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(30,20,60,0.92);z-index:3000;display:none;align-items:center;justify-content:center; }
+    .mentor-modal { background:#fffbe6;color:#232526;max-width:420px;width:95vw;max-height:90vh;overflow-y:auto;border-radius:18px;box-shadow:0 8px 40px #7c3aed44;padding:36px 32px 28px 32px;position:relative;display:flex;flex-direction:column;align-items:center; }
+    .mentor-modal h2 { color:#7c3aed;font-size:1.4rem;margin-bottom:18px; }
+    .mentor-modal label { font-weight:700;color:#7c3aed;margin-bottom:8px;display:block; }
+    .mentor-modal input, .mentor-modal select { width:100%;padding:10px 14px;margin-bottom:18px;border-radius:10px;border:1.5px solid #d6c2ff;font-size:1.08rem; }
+    .mentor-modal .mentor-btn { background:linear-gradient(135deg,#7c3aed,#e879a0);color:#fff;padding:12px 28px;border:none;border-radius:10px;font-size:1.1rem;font-weight:700;cursor:pointer;margin-top:8px; }
+    .mentor-modal .mentor-btn:hover { background:linear-gradient(135deg,#e879a0,#7c3aed); }
+    .mentor-modal .mentor-close { position:absolute;top:18px;right:18px;font-size:1.5rem;background:none;border:none;color:#7c3aed;cursor:pointer; }
+    .mentor-modal .mentor-step { margin-bottom:18px;text-align:center; }
+    .mentor-modal .mentor-confirm { margin-top:18px; }
+    .mentor-modal .mentor-roadmap { background:#f8c8dc22;padding:18px 14px;border-radius:12px;margin:18px 0; }
+    .mentor-modal .mentor-books { background:#d6c2ff22;padding:14px 12px;border-radius:12px;margin:12px 0; }
+    .mentor-modal .mentor-timetable { background:#e3c7a622;padding:14px 12px;border-radius:12px;margin:12px 0; }
+    .mentor-modal .mentor-streak { font-size:1.1rem;color:#7c3aed;font-weight:700;margin:10px 0; }
+    .mentor-modal .mentor-credits { font-size:1.1rem;color:#e879a0;font-weight:700;margin:10px 0; }
+  </style>
+  <div class="mentor-modal-bg" id="mentorModalBg">
+    <div class="mentor-modal" id="mentorModal">
+      <button class="mentor-close" onclick="closeMentorModal()">&times;</button>
+      <div id="mentorModalContent"></div>
+    </div>
+  </div>
+  <script src="krishna.js"></script>
+  <script>
+    // Guided AI Mentor Journey
+    function openMentorModal() {
+      document.getElementById('mentorModalBg').style.display = 'flex';
+      showMentorStep(0);
+    }
+    function closeMentorModal() {
+      document.getElementById('mentorModalBg').style.display = 'none';
+    }
+    // Show first step on load for demo
+    window.addEventListener('DOMContentLoaded',()=>{
+      setTimeout(openMentorModal, 600);
+    });
+  </script>
+<!DOCTYPE html>
+<html lang="te">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>శ్రీ కృష్ణ జ్ఞాన పోర్టల్</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body {
+      background: linear-gradient(135deg, #18181b 0%, #232526 100%);
+      color: #ffd700;
+      font-family: 'Noto Sans Telugu', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 0;
+      margin: 0;
+    }
+    .krishna-header {
+      text-align: center;
+      margin-top: 48px;
+      margin-bottom: 18px;
+      text-shadow: 0 0 16px #ffd70099, 0 0 2px #fff;
+    }
+    .krishna-title {
+      font-size: 2.2rem;
+      font-weight: 900;
+      color: #ffd700;
+      letter-spacing: 1.5px;
+      margin-bottom: 6px;
+      filter: drop-shadow(0 2px 8px #ffd70055);
+    }
+    .krishna-sub {
+      font-size: 1.1rem;
+      color: #fffbe6;
+      font-weight: 600;
+      letter-spacing: 1.2px;
+      margin-bottom: 0;
+      text-shadow: 0 0 8px #ffd70044;
+    }
+    .flute-controls {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      margin: 18px 0 32px 0;
+      background: rgba(255,215,0,0.08);
+      border-radius: 16px;
+      padding: 12px 24px;
+      box-shadow: 0 2px 16px #ffd70022;
+    }
+    .flute-btn {
+      background: #ffd700;
+      color: #18181b;
+      border: none;
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      font-size: 1.5rem;
+      cursor: pointer;
+      box-shadow: 0 2px 8px #ffd70044;
+      transition: background 0.2s;
+    }
+    .flute-btn:hover { background: #fffbe6; }
+    .sloka-section {
+      background: rgba(255,215,0,0.07);
+      border-radius: 18px;
+      padding: 24px 32px;
+      margin-bottom: 32px;
+      box-shadow: 0 2px 16px #ffd70022;
+      text-align: center;
+      max-width: 480px;
+      width: 100%;
+      animation: fadeIn 1.2s;
+    }
+    .sloka-text {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #ffd700;
+      margin-bottom: 12px;
+      text-shadow: 0 0 8px #ffd70055;
+    }
+    .sloka-btn {
+      background: #ffd700;
+      color: #18181b;
+      border: none;
+      border-radius: 12px;
+      padding: 8px 22px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 8px;
+      box-shadow: 0 2px 8px #ffd70044;
+      transition: background 0.2s;
+    }
+    .sloka-btn:hover { background: #fffbe6; }
+    .krishna-chat {
+      background: rgba(255,215,0,0.06);
+      border-radius: 18px;
+      padding: 32px 32px 24px 32px;
+      box-shadow: 0 2px 16px #ffd70022;
+      max-width: 540px;
+      width: 100%;
+      margin-bottom: 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      animation: fadeIn 1.5s;
+    }
+    .chat-messages {
+      width: 100%;
+      min-height: 120px;
+      max-height: 260px;
+      overflow-y: auto;
+      margin-bottom: 18px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 12px;
+      padding: 16px 12px;
+      box-shadow: 0 2px 8px #ffd70022;
+      font-size: 1.08rem;
+      color: #fffbe6;
+      transition: background 0.2s;
+    }
+    .chat-input-row {
+      display: flex;
+      width: 100%;
+      gap: 10px;
+      align-items: center;
+    }
+    .chat-input {
+      flex: 1;
+      border-radius: 10px;
+      border: 1.5px solid #ffd70099;
+      padding: 10px 16px;
+      font-size: 1.08rem;
+      background: #232526;
+      color: #ffd700;
+      outline: none;
+      box-shadow: 0 2px 8px #ffd70022;
+      transition: border 0.2s;
+    }
+    .chat-input:focus { border: 2px solid #ffd700; }
+    .ask-btn {
+      background: #ffd700;
+      color: #18181b;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 24px;
+      font-size: 1.08rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 2px 8px #ffd70044;
+      transition: background 0.2s;
+    }
+    .ask-btn:hover { background: #fffbe6; }
+    .msg-row { display: flex; align-items: flex-end; margin-bottom: 10px; }
+    .msg-user { justify-content: flex-end; }
+    .msg-ai { justify-content: flex-start; }
+    .msg-bubble {
+      background: rgba(255,255,255,0.08);
+      color: #ffd700;
+      border-radius: 14px;
+      padding: 10px 18px;
+      max-width: 80%;
+      box-shadow: 0 2px 8px #ffd70022;
+      font-size: 1.08rem;
+      position: relative;
+      animation: fadeIn 0.7s;
+    }
+    .msg-time {
+      font-size: 0.8rem;
+      color: #fffbe6;
+      margin-top: 4px;
+      text-align: right;
+      opacity: 0.7;
+    }
+    .typing-anim {
+      display: inline-block;
+      width: 32px;
+      height: 18px;
+      vertical-align: middle;
+    }
+    .typing-dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      margin: 0 2px;
+      background: #ffd700;
+      border-radius: 50%;
+      animation: blink 1.2s infinite both;
+    }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes blink { 0%, 80%, 100% { opacity: 0.2; } 40% { opacity: 1; } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: none; } }
+    .flute-audio { display: none; }
+  </style>
+</head>
+<body>
+  <div class="krishna-header">
+    <div class="krishna-title">శ్రీ కృష్ణ జ్ఞాన పోర్టల్</div>
+    <div class="krishna-sub">శాంతి • జ్ఞానం • మార్గదర్శనం</div>
+  </div>
+
+  <div class="flute-controls">
+    <button class="flute-btn" id="flutePlayPause">⏯️</button>
+    <span>Flute Music</span>
+    <input type="range" id="fluteVolume" min="0" max="1" step="0.01" value="0.8" style="width:120px">
+  </div>
+    <div class="container">
+      <h1 class="krishna-title">Krishna Divine Mode</h1>
+      <div style="margin-bottom:24px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+        <button id="krishnaModeBtn" class="sloka-btn" onclick="startKrishnaMode()">🕉 Krishna Mode</button>
+        <button id="musicBtn" class="sloka-btn" onclick="toggleMusic()">🎵 Music</button>
+        <span id="musicStatus" style="margin-left:12px;font-size:1.1rem;color:#ffd700;vertical-align:middle;">🎵 Flute Playing...</span>
+      </div>
+      <div>
+        <button id="slokaBtn" class="sloka-btn" onclick="playRandomSloka()">🎧 Listen Sloka</button>
+        <span id="slokaStatus" style="margin-left:12px;font-size:1.1rem;color:#ffd700;vertical-align:middle;"></span>
+      </div>
+    </div>
+    <audio id="fluteMusic" loop>
+      <source src="/audio/flute.mp3" type="audio/mpeg">
+    </audio>
+    <script src="krishna.js"></script>
+
+  <div class="krishna-chat">
+    <div class="chat-messages" id="krishnaMessages"></div>
+    <form class="chat-input-row" id="krishnaForm">
+      <input class="chat-input" id="krishnaInput" placeholder="కృష్ణుడిని అడగండి..." autocomplete="off">
+      <button class="ask-btn" type="submit">Ask</button>
+    </form>
+  </div>
+
+  <script src="krishna.js"></script>
+</body>
+</html>
+    .fav-item .fav-ans { font-size: 0.82rem; color: #c0b8d8; line-height: 1.5; }
+    .fav-item .fav-del { float: right; background: none; border: none; color: #5a5878; cursor: pointer; font-size: 0.8rem; }
+    .empty-state { text-align: center; color: #4a4468; font-size: 0.84rem; padding: 30px 0; }
+    #chat::-webkit-scrollbar, .side-panel::-webkit-scrollbar { width: 4px; }
+    #chat::-webkit-scrollbar-thumb, .side-panel::-webkit-scrollbar-thumb { background: #2e2a50; border-radius: 4px; }
+    @media (max-width: 600px) { header h1 { font-size: 1.15rem; } .bubble { font-size: 0.83rem; } #send-btn { padding: 8px 13px; } }
+  </style>
+</head>
+<body>
+<header>
+  <div class="header-glow"></div>
+  <div class="avatar-header">🪷</div>
+  <h1>AA AI Mentor</h1>
+  <p>Your Personal Guide to Inner Clarity</p>
+  <div class="divider"></div>
+</header>
+
+<!-- MODE SELECTOR -->
+<div style="width: 100%; max-width: 780px; display: flex; gap: 8px; padding: 12px 16px; background: rgba(255,255,255,0.02); border-bottom: 1px solid #2e2a50; overflow-x: auto;">
+  <button class="mode-btn active" data-type="chat" onclick="setMode('chat')" style="padding: 7px 14px; border-radius: 16px; border: 1px solid rgba(245,200,66,0.3); background: rgba(245,200,66,0.15); color: #f5c842; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.2s;">💬 Chat</button>
+  <button class="mode-btn" data-type="goal" onclick="setMode('goal')" style="padding: 7px 14px; border-radius: 16px; border: 1px solid rgba(245,200,66,0.2); background: rgba(245,200,66,0.07); color: #c8b870; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.2s;">🎯 Goal</button>
+  <button class="mode-btn" data-type="daily" onclick="setMode('daily')" style="padding: 7px 14px; border-radius: 16px; border: 1px solid rgba(245,200,66,0.2); background: rgba(245,200,66,0.07); color: #c8b870; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.2s;">🌅 Daily</button>
+  <button class="mode-btn" data-type="task" onclick="setMode('task')" style="padding: 7px 14px; border-radius: 16px; border: 1px solid rgba(245,200,66,0.2); background: rgba(245,200,66,0.07); color: #c8b870; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.2s;">✅ Tasks</button>
+  <button class="mode-btn" data-type="career" onclick="setMode('career')" style="padding: 7px 14px; border-radius: 16px; border: 1px solid rgba(245,200,66,0.2); background: rgba(245,200,66,0.07); color: #c8b870; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.2s;">🚀 Career</button>
+  <button class="mode-btn" data-type="books" onclick="setMode('books')" style="padding: 7px 14px; border-radius: 16px; border: 1px solid rgba(168,85,247,0.2); background: rgba(168,85,247,0.07); color: #c8b870; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.2s;">📚 Books</button>
+  <button class="mode-btn" data-type="exam" onclick="setMode('exam')" style="padding: 7px 14px; border-radius: 16px; border: 1px solid rgba(251,146,60,0.2); background: rgba(251,146,60,0.07); color: #c8b870; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.2s;">📝 Exams</button>
+  <button class="mode-btn" data-type="learn" onclick="setMode('learn')" style="padding: 7px 14px; border-radius: 16px; border: 1px solid rgba(34,197,94,0.2); background: rgba(34,197,94,0.07); color: #c8b870; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.2s;">🎓 Learn</button>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('chat',this)">&#x1F4AC; Chat</button>
+  <button class="tab-btn" onclick="switchTab('history',this)">&#x1F550; History</button>
+  <button class="tab-btn" onclick="switchTab('favorites',this)">&#x2B50; Favorites</button>
+</div>
+<div class="panel active" id="panel-chat">
+  <div class="daily-wisdom" id="daily-wisdom">
+    <div class="dw-label">&#x1F305; Today's Krishna Wisdom</div>
+    <div class="dw-verse" id="dw-verse">Loading...</div>
+    <div class="dw-ref" id="dw-ref"></div>
+    <div class="dw-meaning" id="dw-meaning"></div>
+  </div>
+
+  <!-- Daily Morals Story -->
+  <div id="dharma-story" style="margin:12px 16px 0;background:linear-gradient(135deg,rgba(124,58,237,0.15),rgba(232,121,160,0.08));border:1px solid rgba(167,139,250,0.3);border-radius:14px;padding:16px 18px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <div style="font-size:0.68rem;color:#a78bfa;text-transform:uppercase;letter-spacing:1px;font-weight:700;">&#x1F525; Today's Morals Story</div>
+      <button id="refresh-btn" onclick="refreshWisdom()" style="background:rgba(214,194,255,0.1);border:1px solid rgba(214,194,255,0.2);color:#d6c2ff;padding:4px 12px;border-radius:16px;font-size:0.72rem;cursor:pointer;transition:all 0.2s;">&#x1F504; Refresh Wisdom</button>
+    </div>
+    <div class="ds-title" style="font-size:0.88rem;font-weight:700;color:#f5c842;margin-bottom:6px;"></div>
+    <div class="ds-story" style="font-size:0.82rem;color:#c8c0e0;line-height:1.65;margin-bottom:8px;font-style:italic;"></div>
+    <div style="display:flex;align-items:flex-start;gap:6px;">
+      <span style="color:#f5c842;font-size:0.78rem;">&#x1F4D6;</span>
+      <div class="ds-lesson" style="font-size:0.78rem;color:#a78bfa;font-weight:600;"></div>
+    </div>
+  </div>
+
+  <!-- GAMIFICATION WIDGET -->
+  <div id="gamification-widget" class="gamification-widget" style="display:none;">
+    <div class="progression-header">
+      <div class="level-badge" id="level-badge">1</div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:8px;">
+        <div class="stat-box" style="flex:1;">
+          <div class="stat-value" id="streak-value">0</div>
+          <div class="stat-label">🔥 Streak</div>
+        </div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value" id="level-value">1</div>
+        <div class="stat-label">⭐ Level</div>
+      </div>
+    </div>
+    <div class="xp-progress-section">
+      <div class="xp-label">
+        <span>📊 Experience</span>
+        <span id="xp-text">0/100 XP</span>
+      </div>
+      <div class="xp-bar-container">
+        <div class="xp-bar-fill" id="xp-bar" style="width:0%;"></div>
+      </div>
+    </div>
+    <div id="motivation-message" style="display:none;" class="motivation-message"></div>
+    <div id="unlock-info" style="display:none;" class="unlock-progress"></div>
+    <button class="certificate-btn" id="certificate-btn" onclick="showCertificateModal()" style="display:none;">
+      🏆 View Certificate
+    </button>
+  </div>
+
+  <div class="categories">
+    <button class="cat-btn" onclick="askCategory('How to handle stress and anxiety?')">&#x1F630; Stress</button>
+    <button class="cat-btn" onclick="askCategory('How to make the right career decision?')">&#x1F4BC; Career</button>
+    <button class="cat-btn" onclick="askCategory('How to build strong daily discipline?')">&#x1F525; Discipline</button>
+    <button class="cat-btn" onclick="askCategory('How to overcome fear?')">&#x1F628; Fear</button>
+    <button class="cat-btn" onclick="askCategory('How to improve focus and concentration?')">&#x1F3AF; Focus</button>
+  </div>
+  <div id="chat">
+    <div class="welcome-card" id="welcome-card">
+      <div class="om">&#x1F549;&#xFE0F;</div>
+      <h2>Hare Krishna 🙏</h2>
+      <p>Ask anything. I will guide you.<br>Speak from your heart — wisdom awaits.</p>
+      <div class="suggestions">
+        <button class="suggestion-btn" onclick="askSuggestion(this)">How to handle stress?</button>
+        <button class="suggestion-btn" onclick="askSuggestion(this)">What is my duty?</button>
+        <button class="suggestion-btn" onclick="askSuggestion(this)">How to stay focused?</button>
+        <button class="suggestion-btn" onclick="askSuggestion(this)">How to overcome fear?</button>
+      </div>
+    </div>
+    <div id="daily-tasks-container"></div>
+    
+    <!-- PHASE 3: BOOK LIBRARY -->
+    <div class="books-section" id="books-section" style="display:none;">
+      <div class="section-header">
+        <div class="section-title">📚 Recommended Books & PDFs</div>
+        <div class="section-actions">
+          <button class="action-btn" onclick="document.getElementById('pdf-upload').click()">📤 Upload PDF</button>
+          <input type="file" id="pdf-upload" style="display:none;" accept=".pdf" onchange="LEARNING.handlePdfUpload(this.files[0])">
+        </div>
+      </div>
+      <div id="books-message" class="message-box"></div>
+      <div id="books-list-container"></div>
+    </div>
+    
+    <!-- PHASE 3: EXAM MODE -->
+    <div class="exam-section" id="exam-section" style="display:none;">
+      <div class="section-header">
+        <div class="section-title">📝 Practice Exams & Assessments</div>
+      </div>
+      <div id="exam-message" class="message-box"></div>
+      <div class="exam-setup" id="exam-setup">
+        <div class="exam-input-group">
+          <label class="exam-label">📖 Subject (e.g., Python, History, Biology)</label>
+          <input type="text" id="exam-subject" class="exam-input" placeholder="Enter subject name">
+        </div>
+        <div class="exam-input-group">
+          <label class="exam-label">🎯 Topic (e.g., Lists, World War II, Photosynthesis)</label>
+          <input type="text" id="exam-topic" class="exam-input" placeholder="Enter specific topic">
+        </div>
+        <div class="exam-input-group">
+          <label class="exam-label">⚡ Difficulty Level</label>
+          <select id="exam-difficulty" class="exam-select">
+            <option value="Easy">Easy - Basic concepts</option>
+            <option value="Medium" selected>Medium - Intermediate</option>
+            <option value="Hard">Hard - Advanced & application</option>
+          </select>
+        </div>
+        <button class="exam-start-btn" onclick="LEARNING.startExam(document.getElementById('exam-subject').value, document.getElementById('exam-topic').value, document.getElementById('exam-difficulty').value)">🚀 Generate Exam</button>
+      </div>
+      <div id="exam-questions-container"></div>
+    </div>
+    
+    <!-- PHASE 3: SMART LEARNING MODE -->
+    <div class="learning-section" id="learning-section" style="display:none;">
+      <div class="section-header">
+        <div class="section-title">🎓 Smart Learning - Learn Any Topic</div>
+      </div>
+      <div id="learn-message" class="message-box"></div>
+      <div class="learn-input-group">
+        <label class="learn-label">📖 What do you want to learn?</label>
+        <input type="text" id="learn-topic" class="learn-input" placeholder="Enter any topic (e.g., Photosynthesis, Machine Learning, Ancient Rome)" autocomplete="off">
+        <button class="learn-start-btn" onclick="LEARNING.learnTopic(document.getElementById('learn-topic').value)">🚀 Teach Me</button>
+      </div>
+      <div id="learn-content-container" style="margin-top:12px;text-align:center;color:#888;padding:20px;">📖 Ready to learn something new!</div>
+    </div>
+  </div>
+  <div id="input-area">
+    <div id="input-bar">
+      <input id="question" type="text" placeholder="Ask your mentor anything..." autocomplete="off" />
+      <button id="send-btn">Ask &#x2736;</button>
+    </div>
+  </div>
+</div>
+<div class="panel" id="panel-history">
+  <div class="side-panel"><div class="panel-title">Your Past Questions</div><div id="history-list"></div></div>
+</div>
+<div class="panel" id="panel-favorites">
+  <div class="side-panel"><div class="panel-title">Saved Wisdom</div><div id="favorites-list"></div></div>
+</div>
+
+<!-- CERTIFICATE MODAL -->
+<div class="certificate-modal" id="certificate-modal">
+  <div class="certificate-content">
+    <div class="certificate-header">🏆</div>
+    <div class="certificate-title" id="cert-title">Certificate of Discipline</div>
+    <div class="certificate-text">Awarded to</div>
+    <div class="certificate-name" id="cert-name">Seeker</div>
+    <div class="certificate-text">For achieving</div>
+    <div class="certificate-text" style="color:#f5c842;font-size:1.1rem;" id="cert-level">Level 10</div>
+    <div class="certificate-text" style="margin-top:20px;font-style:italic;">
+      "Through consistent discipline and devoted practice,<br>you have transcended ordinary growth."
+    </div>
+    <div class="certificate-level" id="cert-stats">Total XP: 0 | Earned: <span id="cert-date">Today</span></div>
+    <div class="certificate-buttons">
+      <button class="btn-print" onclick="printCertificate()">🖨️ Print</button>
+      <button class="btn-close" onclick="closeCertificateModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Mode system
+let currentType = 'chat';
+const MODE_CONFIG = {
+  chat: {
+    placeholder: "Ask your mentor anything...",
+    suggestions: ["How to handle stress?", "What is my duty?", "How to stay focused?", "How to overcome fear?"]
+  },
+  goal: {
+    placeholder: "What are your career goals?",
+    suggestions: ["I want to be a software engineer", "How to transition to tech?", "What skills do I need?", "Build my career roadmap"]
+  },
+  daily: {
+    placeholder: "What do you need motivation for today?",
+    suggestions: ["Give me morning motivation", "How to stay disciplined?", "Build confident mindset", "Overcome procrastination"]
+  },
+  task: {
+    placeholder: "What tasks do you need help organizing?",
+    suggestions: ["Plan my week", "Break down my project", "Create action plan", "10-item to-do list"]
+  },
+  career: {
+    placeholder: "Ask about career paths and guidance...",
+    suggestions: ["Data scientist path", "How to lead teams?", "Startup journey guide", "Skill development plan"]
+  },
+  books: {
+    placeholder: "Manage your book library...",
+    suggestions: ["Upload PDF", "Browse books", "Search books", "Download books"]
+  },
+  exam: {
+    placeholder: "Test your knowledge...",
+    suggestions: ["Start exam", "Python basics", "History quiz", "Biology test"]
+  },
+  learn: {
+    placeholder: "Learn something new...",
+    suggestions: ["Machine Learning", "Photosynthesis", "World History", "Python Programming"]
+  }
+};
+
+function setMode(type) {
+  currentType = type;
+  const config = MODE_CONFIG[type];
+  
+  // Update button styling with color-specific handling
+  document.querySelectorAll(".mode-btn").forEach(function(btn) {
+    const btnType = btn.dataset.type;
+    const isActive = btnType === type;
+    
+    if (isActive) {
+      // Active state colors based on mode
+      if (btnType === 'books') {
+        btn.style.borderColor = "rgba(168,85,247,0.5)";
+        btn.style.background = "rgba(168,85,247,0.2)";
+        btn.style.color = "#c4b5fd";
+      } else if (btnType === 'exam') {
+        btn.style.borderColor = "rgba(251,146,60,0.5)";
+        btn.style.background = "rgba(251,146,60,0.2)";
+        btn.style.color = "#fed7aa";
+      } else if (btnType === 'learn') {
+        btn.style.borderColor = "rgba(34,197,94,0.5)";
+        btn.style.background = "rgba(34,197,94,0.2)";
+        btn.style.color = "#86efac";
+      } else {
+        btn.style.borderColor = "rgba(245,200,66,0.5)";
+        btn.style.background = "rgba(245,200,66,0.2)";
+        btn.style.color = "#f5c842";
+      }
+    } else {
+      // Inactive state
+      btn.style.borderColor = "rgba(245,200,66,0.2)";
+      btn.style.background = "rgba(245,200,66,0.07)";
+      btn.style.color = "#c8b870";
+    }
+  });
+  
+  // Update placeholder - handle Phase 3 modes specially
+  const question = document.getElementById("question");
+  if (question && config) {
+    question.placeholder = config.placeholder;
+  }
+  
+  // Update suggestion buttons - handle Phase 3 modes specially
+  const suggestions = document.querySelectorAll(".suggestion-btn");
+  suggestions.forEach(function(btn, i) {
+    if (config && i < config.suggestions.length) {
+      btn.textContent = config.suggestions[i];
+      btn.style.display = "block";
+    } else {
+      btn.style.display = "none";
+    }
+  });
+  
+  // Handle Phase 3 modes
+  const phase3Sections = ['books', 'exam', 'learn'];
+  
+  if (phase3Sections.includes(type)) {
+    // Hide phase 1 chat area and show phase 3 section
+    document.getElementById('chat').style.display = 'none';
+    document.getElementById('input-area').style.display = 'none';
+    
+    if (type === 'books') document.getElementById('books-section').style.display = 'block';
+    if (type === 'exam') document.getElementById('exam-section').style.display = 'block';
+    if (type === 'learn') document.getElementById('learning-section').style.display = 'block';
+  } else {
+    // Show phase 1 chat area and hide phase 3 sections
+    document.getElementById('chat').style.display = 'flex';
+    document.getElementById('input-area').style.display = 'block';
+    document.getElementById('books-section').style.display = 'none';
+    document.getElementById('exam-section').style.display = 'none';
+    document.getElementById('learning-section').style.display = 'none';
+  }
+  
+  console.log("Mode changed to:", type);
+}
+
+const DAILY_VERSES = [
+  { verse: "You have a right to perform your prescribed duties, but you are not entitled to the fruits of your actions.", ref: "Bhagavad Gita 2.47", meaning: "Act fully and with dedication, but release attachment to outcomes. This is the secret to inner freedom." },
+  { verse: "The soul is never born nor dies at any time. It is unborn, eternal, ever-existing, and primeval.", ref: "Bhagavad Gita 2.20", meaning: "You are not your body or your circumstances. Your true self is beyond birth and death." },
+  { verse: "Better is ones own dharma, though imperfectly performed, than the dharma of another well performed.", ref: "Bhagavad Gita 3.35", meaning: "Walk your own path with sincerity. Copying another journey will never fulfill your soul." },
+  { verse: "A person can rise through the efforts of their own mind, or draw themselves down. The mind is both friend and enemy.", ref: "Bhagavad Gita 6.5", meaning: "Train your mind and it becomes your greatest strength. Neglect it and it becomes your greatest obstacle." },
+  { verse: "As a lamp in a windless place does not flicker, so the disciplined mind of a yogi remains steady.", ref: "Bhagavad Gita 6.19", meaning: "Stillness is not emptiness. It is the highest form of strength. A calm mind sees clearly what a restless mind cannot." },
+  { verse: "Whatever happened, happened for the good. Whatever is happening, is happening for the good.", ref: "Bhagavad Gita (traditional)", meaning: "Trust the process of life. Every challenge carries a lesson, every loss creates space for something greater." },
+  { verse: "Fear not what is not real. What is real always was and cannot be destroyed.", ref: "Bhagavad Gita 2.16", meaning: "Most of what we fear exists only in the mind. Ground yourself in what is real." },
+  { verse: "Set your heart upon your work but never its reward.", ref: "Bhagavad Gita 2.47", meaning: "When you work for the love of the work itself, you enter a state of flow where excellence becomes natural." },
+  { verse: "The wise grieve neither for the living nor for the dead.", ref: "Bhagavad Gita 2.11", meaning: "Grief comes from attachment to what changes. Wisdom sees the unchanging truth beneath all appearances." },
+  { verse: "Through selfless service, you will always be fruitful and find the fulfillment of your desires.", ref: "Bhagavad Gita 3.10", meaning: "When you serve others without ego, you align with the deepest current of life." }
+];
+
+function loadDailyWisdom() {
+  const today = new Date().toDateString();
+  const stored = localStorage.getItem("krishna_daily");
+  let entry;
+  if (stored) { const p = JSON.parse(stored); if (p.date === today) entry = p.verse; }
+  if (!entry) {
+    entry = DAILY_VERSES[Math.floor(Math.random() * DAILY_VERSES.length)];
+    localStorage.setItem("krishna_daily", JSON.stringify({ date: today, verse: entry }));
+  }
+  document.getElementById("dw-verse").textContent = '"' + entry.verse + '"';
+  document.getElementById("dw-ref").textContent = "— " + entry.ref;
+  document.getElementById("dw-meaning").textContent = entry.meaning;
+}
+
+function switchTab(name, btn) {
+  document.querySelectorAll(".panel").forEach(function(p){ p.classList.remove("active"); });
+  document.querySelectorAll(".tab-btn").forEach(function(b){ b.classList.remove("active"); });
+  document.getElementById("panel-" + name).classList.add("active");
+  btn.classList.add("active");
+  if (name === "history") renderHistory();
+  if (name === "favorites") renderFavorites();
+}
+
+function getHistory() { return JSON.parse(localStorage.getItem("krishna_history") || "[]"); }
+function saveHistory(q) {
+  const h = getHistory();
+  h.unshift({ q: q, time: new Date().toLocaleString() });
+  if (h.length > 30) h.pop();
+  localStorage.setItem("krishna_history", JSON.stringify(h));
+}
+function getFavorites() { return JSON.parse(localStorage.getItem("krishna_favorites") || "[]"); }
+function saveFavorite(q, ans) {
+  const favs = getFavorites();
+  favs.unshift({ q: q, ans: ans.substring(0, 500), id: Date.now() });
+  if (favs.length > 20) favs.pop();
+  localStorage.setItem("krishna_favorites", JSON.stringify(favs));
+}
+function deleteFavorite(id) {
+  const favs = getFavorites().filter(function(f){ return f.id !== id; });
+  localStorage.setItem("krishna_favorites", JSON.stringify(favs));
+  renderFavorites();
+}
+function esc(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function renderHistory() {
+  const list = document.getElementById("history-list");
+  const h = getHistory();
+  if (!h.length) { list.innerHTML = '<div class="empty-state">No questions yet.<br>Start a conversation.</div>'; return; }
+  list.innerHTML = h.map(function(item){
+    return '<div class="history-item" onclick="reuseQuestion(this.dataset.q)" data-q="' + esc(item.q) + '"><div class="q-text">' + esc(item.q) + '</div><div class="q-time">' + item.time + '</div></div>';
+  }).join("");
+}
+function renderFavorites() {
+  const list = document.getElementById("favorites-list");
+  const favs = getFavorites();
+  if (!favs.length) { list.innerHTML = '<div class="empty-state">No saved wisdom yet.<br>Star a response to save it.</div>'; return; }
+  list.innerHTML = favs.map(function(f){
+    return '<div class="fav-item"><button class="fav-del" onclick="deleteFavorite(' + f.id + ')">&#x2715;</button><div class="fav-q">Q: ' + esc(f.q) + '</div><div class="fav-ans">' + esc(f.ans) + (f.ans.length >= 500 ? "..." : "") + '</div></div>';
+  }).join("");
+}
+function reuseQuestion(q) {
+  document.querySelectorAll(".tab-btn")[0].click();
+  setTimeout(function(){ send(q); }, 50);
+}
+function getToken() { return localStorage.getItem("token") || ""; }
+function scrollBottom() { const c = document.getElementById("chat"); c.scrollTop = c.scrollHeight; }
+function removeWelcome() { const w = document.getElementById("welcome-card"); if (w) w.remove(); }
+function playBell() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(528, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(264, ctx.currentTime + 1.2);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.4);
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 1.4);
+  } catch(e) {}
+}
+function appendUser(text) {
+  removeWelcome();
+  const chat = document.getElementById("chat");
+  const row = document.createElement("div");
+  row.className = "msg-row user";
+  row.innerHTML = '<div class="bubble-wrap"><div class="sender-name">You</div><div class="bubble">' + esc(text) + '</div></div><div class="msg-avatar">&#x1F9D1;</div>';
+  chat.appendChild(row); scrollBottom();
+}
+function showTyping() {
+  const chat = document.getElementById("chat");
+  const row = document.createElement("div");
+  row.className = "msg-row krishna"; row.id = "typing-row";
+  row.innerHTML = '<div class="msg-avatar">&#x1FAB7;</div><div class="bubble-wrap"><div class="sender-name">AA AI Mentor</div><div class="bubble" style="display:flex;align-items:center;gap:8px;"><div class="typing-bubble"><span></span><span></span><span></span></div><span style="font-size:0.78rem;color:#8878b0;">AA AI Mentor is thinking...</span></div></div>';
+  chat.appendChild(row); scrollBottom();
+}
+function hideTyping() { const el = document.getElementById("typing-row"); if (el) el.remove(); }
+function parseResponse(raw) {
+  const defs = [
+    { key:"empathy",     em:"\u{1F49B}", label:"\u{1F49B} Empathy" },
+    { key:"clarity",     em:"\u{1F50D}", label:"\u{1F50D} Clarity" },
+    { key:"guidance",    em:"\u{1F31F}", label:"\u{1F31F} Guidance" },
+    { key:"action",      em:"\u26A1",    label:"\u26A1 Action Steps" },
+    { key:"principle",   em:"\u{1F3DB}", label:"\u{1F3DB} Principle" },
+    { key:"wisdom",      em:"\u2728",    label:"\u2728 Wisdom" },
+    { key:"empowerment", em:"\u{1F525}", label:"\u{1F525} Empowerment" }
+  ];
+  const sections = [];
+  for (let i = 0; i < defs.length; i++) {
+    const p = defs[i];
+    const nextEmojis = defs.slice(i+1).map(function(d){ return d.em; });
+    try {
+      const escaped = nextEmojis.map(function(e){ return e.replace(/[-[\]{}()*+?.,^$|#\s]/g,"\\$&"); });
+      const lookahead = escaped.length ? "(?=" + escaped.join("|") + "|$)" : "(?=$)";
+      const emEsc = p.em.replace(/[-[\]{}()*+?.,^$|#\s]/g,"\\$&");
+      const re = new RegExp(emEsc + "[^\\n]*\\n([\\s\\S]*?)" + lookahead);
+      const m = raw.match(re);
+      if (m && m[1].trim()) sections.push({ key: p.key, label: p.label, body: m[1].trim() });
+    } catch(e) {}
+  }
+  return sections.length > 0 ? sections : null;
+}
+function typeText(el, text, speed) {
+  speed = speed || 11;
+  return new Promise(function(resolve) {
+    let i = 0; el.textContent = "";
+    function next() { if (i < text.length) { el.textContent += text[i++]; scrollBottom(); setTimeout(next, speed); } else resolve(); }
+    next();
+  });
+}
+async function appendKrishna(raw, question) {
+  const chat = document.getElementById("chat");
+  const sections = parseResponse(raw);
+  const row = document.createElement("div");
+  row.className = "msg-row krishna";
+  const plainText = sections ? sections.map(function(s){ return s.label + ": " + s.body; }).join(" | ") : raw;
+  if (!sections) {
+    row.innerHTML = '<div class="msg-avatar">&#x1FAB7;</div><div class="bubble-wrap"><div class="sender-name">AA AI Mentor</div><div class="bubble" style="position:relative;"><button class="star-btn" title="Save">&#x2B50;</button><div id="type-target"></div></div></div>';
+    chat.appendChild(row); scrollBottom();
+    await typeText(row.querySelector("#type-target"), raw);
+  } else {
+    const blockHtml = sections.map(function(s,i){
+      return '<div class="w-section' + (s.key==="wisdom"?" is-wisdom":"") + (s.key==="empowerment"?" is-empowerment":"") + '"><div class="w-title">' + esc(s.label) + '</div><div class="w-body" id="ws-' + i + '"></div></div>';
+    }).join("");
+    row.innerHTML = '<div class="msg-avatar">&#x1FAB7;</div><div class="bubble-wrap"><div class="sender-name">AA AI Mentor</div><div class="bubble" style="position:relative;"><button class="star-btn" title="Save">&#x2B50;</button><div class="wisdom-block">' + blockHtml + '</div></div></div>';
+    chat.appendChild(row); scrollBottom();
+    for (let i = 0; i < sections.length; i++) { await typeText(row.querySelector("#ws-" + i), sections[i].body, 10); }
+  }
+  const starBtn = row.querySelector(".star-btn");
+  starBtn.addEventListener("click", function() { saveFavorite(question, plainText); starBtn.textContent = "\u2605"; starBtn.classList.add("starred"); starBtn.title = "Saved!"; });
+  playBell();
+}
+function appendError(msg) {
+  const chat = document.getElementById("chat");
+  const row = document.createElement("div");
+  row.className = "msg-row krishna";
+  row.innerHTML = '<div class="msg-avatar">&#x1FAB7;</div><div class="bubble-wrap"><div class="sender-name">AA AI Mentor</div><div class="bubble" style="color:#e05050;">' + esc(msg) + '</div></div>';
+  chat.appendChild(row); scrollBottom();
+}
+
+// ✅ GLOBAL FLAG TO PREVENT DUPLICATE REQUESTS
+let sendInProgress = false;
+
+async function send(question) {
+  question = (question || "").trim(); 
+  if (!question) return;
+  
+  // ✅ PREVENT DUPLICATE CALLS
+  if (sendInProgress) {
+    console.warn("⚠️ Request already in progress, ignoring duplicate send");
+    return;
+  }
+  
+  const input = document.getElementById("question"), btn = document.getElementById("send-btn");
+  input.value = ""; 
+  btn.disabled = true;
+  sendInProgress = true;
+  
+  appendUser(question); 
+  saveHistory(question); 
+  showTyping();
+  
+  console.log("🚀 SINGLE API CALL | message='" + question.substring(0, 40) + "...' | type=" + currentType);
+  
+  try {
+    // ✅ SINGLE FETCH ONLY - NO RETRY/FALLBACK
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    
+    const res = await fetch("/api/ai/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: question, type: currentType }),
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    
+    hideTyping();
+    
+    if (!res.ok) {
+      console.error("❌ API ERROR: " + res.status);
+      const err = await res.json().catch(function(){ return {}; });
+      appendError("Your mentor could not respond. " + (err.message || "Please try again."));
+    } else {
+      const data = await res.json();
+      const reply = data.reply || data.response || "";
+      
+      if (reply) {
+        console.log("✅ SINGLE RESPONSE RECEIVED (" + reply.length + " chars)");
+        await appendKrishna(reply, question);
+      } else {
+        console.warn("⚠️ Empty response from API");
+        appendError("No response received. Please try again.");
+      }
+    }
+  } catch(e) {
+    console.error("❌ API ERROR: " + e.message);
+    hideTyping();
+    appendError("Could not reach the server. Please check your connection.");
+  } finally {
+    // ✅ ALWAYS RESET FLAGS
+    sendInProgress = false;
+    btn.disabled = false; 
+    input.focus();
+  }
+}
+function askSuggestion(el) { send(el.textContent); }
+function askCategory(q) { send(q); }
+
+// Initialize mode system and listeners
+document.addEventListener('DOMContentLoaded', function() {
+  setMode('chat');
+  loadDailyWisdom();
+  loadDailyStory();
+  document.getElementById("send-btn").addEventListener("click", function(){ send(document.getElementById("question").value); });
+  document.getElementById("question").addEventListener("keydown", function(e){ if(e.key==="Enter"&&!e.shiftKey) send(this.value); });
+  // Handle prefill from books page
+  const prefill = localStorage.getItem('krishna_prefill');
+  if (prefill) { localStorage.removeItem('krishna_prefill'); setTimeout(function(){ send(prefill); }, 600); }
+});
+
+const DHARMA_STORIES = [
+  { title: "Arjuna's Doubt", story: "Arjuna stood at the battlefield of Kurukshetra, bow trembling in his hands. Seeing his own kinsmen arrayed against him, he collapsed in grief. Krishna spoke: 'Yield not to unmanliness. It does not become you. Shake off your faint-heartedness and arise.'", lesson: "Duty does not wait for perfect conditions. Rise and act." },
+  { title: "The Eternal Soul", story: "Krishna revealed to Arjuna the secret of the soul: 'The soul is never born nor dies. Weapons cannot cut it, fire cannot burn it, water cannot wet it, wind cannot dry it.' Arjuna's fear of death dissolved in that moment.", lesson: "You are not the body. You are the eternal witness within." },
+  { title: "Karma Yoga", story: "Arjuna asked: 'If knowledge is greater than action, why do you urge me to fight?' Krishna answered: 'No one can remain without action even for a moment. Act, but surrender the fruits to Me. This is the secret of liberation.'", lesson: "Work without attachment is the highest form of worship." },
+  { title: "The Steady Mind", story: "Krishna described the man of steady wisdom: 'One who is not disturbed even by the threefold miseries, who is not elated when there is happiness, and who is free from attachment, fear, and anger — such a person is called a sage of steady mind.'", lesson: "Equanimity in all conditions is the mark of true wisdom." },
+  { title: "Surrender to the Divine", story: "At the end of all teachings, Krishna gave Arjuna the highest instruction: 'Abandon all varieties of religion and just surrender unto Me. I shall deliver you from all sinful reactions. Do not fear.' Arjuna's confusion vanished completely.", lesson: "Total surrender to the Divine is the ultimate path to peace." },
+  { title: "The Field and the Knower", story: "Krishna explained: 'This body is called the field. One who knows this body is called the knower of the field. I am the knower in all fields.' Arjuna understood that the Divine is present in every living being.", lesson: "See the Divine in all — this is the vision of true wisdom." },
+  { title: "Three Modes of Nature", story: "Krishna taught that all of creation is governed by three qualities: goodness, passion, and ignorance. 'Rise above these three modes and be free from birth, death, old age, and their distresses — and enjoy the nectar of immortality.'", lesson: "Transcend your conditioning. You are greater than your habits." },
+  { title: "The Imperishable Brahman", story: "Arjuna asked to see Krishna's universal form. Krishna revealed it — infinite, blazing, containing all worlds. Arjuna trembled and prayed: 'Please be gracious and show me again your gentle human form.' Krishna smiled and returned.", lesson: "The infinite is always accessible through love and devotion." }
+];
+
+function loadDailyStory() {
+  const today = new Date().toDateString();
+  const stored = localStorage.getItem('krishna_story');
+  let entry;
+  if (stored) { const p = JSON.parse(stored); if (p.date === today) entry = p.story; }
+  if (!entry) {
+    entry = DHARMA_STORIES[Math.floor(Math.random() * DHARMA_STORIES.length)];
+    localStorage.setItem('krishna_story', JSON.stringify({ date: today, story: entry }));
+  }
+  const el = document.getElementById('dharma-story');
+  if (el) {
+    el.querySelector('.ds-title').textContent = entry.title;
+    el.querySelector('.ds-story').textContent = entry.story;
+    el.querySelector('.ds-lesson').textContent = entry.lesson;
+  }
+}
+
+function refreshWisdom() {
+  const btn = document.getElementById('refresh-btn');
+  if (btn) { btn.textContent = '&#x1F504; Refreshing...'; btn.disabled = true; }
+  // Clear today's cache to force new random pick
+  localStorage.removeItem('krishna_daily');
+  localStorage.removeItem('krishna_story');
+  loadDailyWisdom();
+  loadDailyStory();
+  setTimeout(function() {
+    if (btn) { btn.textContent = '&#x1F504; Refresh Wisdom'; btn.disabled = false; }
+  }, 500);
+}
+
+// ===== DAILY TASKS TRACKER =====
+
+const DAILY_TASKS = [
+  { id: 1, name: "Morning Meditation", desc: "15 min guided meditation", xp: 10 },
+  { id: 2, name: "Read Sacred Text", desc: "Read Bhagavad Gita or similar", xp: 10 },
+  { id: 3, name: "Mindful Exercise", desc: "Yoga, Running, or Gym", xp: 10 },
+  { id: 4, name: "Practice Discipline", desc: "Complete primary goal task", xp: 10 },
+  { id: 5, name: "Help Others", desc: "Volunteer or assist someone", xp: 10 },
+  { id: 6, name: "Evening Reflection", desc: "Journal or reflect on the day", xp: 10 }
+];
+
+function initDailyTasks() {
+  const today = new Date().toDateString();
+  const stored = localStorage.getItem('daily_tasks_' + today);
+  if (!stored) {
+    const tasks = DAILY_TASKS.map(function(t) { return Object.assign({}, t, { completed: false }); });
+    localStorage.setItem('daily_tasks_' + today, JSON.stringify(tasks));
+  }
+}
+
+function getDailyTasks() {
+  const today = new Date().toDateString();
+  return JSON.parse(localStorage.getItem('daily_tasks_' + today) || '[]');
+}
+
+function saveDailyTasks(tasks) {
+  const today = new Date().toDateString();
+  localStorage.setItem('daily_tasks_' + today, JSON.stringify(tasks));
+}
+
+function toggleTask(taskId) {
+  const tasks = getDailyTasks();
+  const task = tasks.find(function(t) { return t.id === taskId; });
+  if (task) {
+    task.completed = !task.completed;
+    saveDailyTasks(tasks);
+    if (task.completed) {
+      GAMIFICATION.addXP(task.xp, task.name);
+      showGamificationMessage('✅ ' + task.name + ' | +' + task.xp + ' XP');
+    }
+    renderDailyTasks();
+    updateGamificationWidget();
+  }
+}
+
+function completeAllDailyTasks_UI() {
+  const tasks = getDailyTasks();
+  const allCompleted = tasks.every(function(t) { return t.completed; });
+  if (allCompleted) {
+    GAMIFICATION.addXP(50, 'Daily Challenge Bonus');
+    GAMIFICATION.updateStreak(100, 100);
+    showGamificationMessage('🎉 Daily Challenge Complete! +50 XP Bonus!');
+    updateGamificationWidget();
+  }
+}
+
+function renderDailyTasks() {
+  const tasks = getDailyTasks();
+  const completed = tasks.filter(function(t) { return t.completed; }).length;
+  const total = tasks.length;
+  
+  let html = '<div class="gamification-widget" style="margin:14px 0;">';
+  html += '<div class="tasks-header">📋 Today\'s Tasks (' + completed + '/' + total + ')</div>';
+  
+  tasks.forEach(function(task) {
+    html += '<div class="task-item" style="display:flex;align-items:center;padding:12px;background:rgba(0,0,0,0.2);border-radius:8px;margin-bottom:10px;gap:12px;">';
+    html += '<div class="task-checkbox' + (task.completed ? ' completed' : '') + '" onclick="toggleTask(' + task.id + ')" style="width:24px;height:24px;border:2px solid #8878b0;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:' + (task.completed ? '#f5c842' : 'transparent') + ';color:' + (task.completed ? '#0a0a1a' : 'transparent') + ';font-weight:bold;transition:all 0.2s;">' + (task.completed ? '✓' : '') + '</div>';
+    html += '<div style="flex:1;display:flex;flex-direction:column;gap:4px;">';
+    html += '<div style="font-size:0.9rem;color:' + (task.completed ? '#8878b0;text-decoration:line-through' : '#e8e0d0') + ';">' + task.name + '</div>';
+    html += '<div style="font-size:0.75rem;color:#8878b0;">' + task.desc + '</div>';
+    html += '</div>';
+    html += '<div style="font-size:0.8rem;font-weight:700;color:#f5c842;white-space:nowrap;">+' + task.xp + ' XP</div>';
+    html += '</div>';
+  });
+  
+  html += '<div style="display:flex;justify-content:space-between;padding:10px 12px;background:rgba(245,200,66,0.05);border-radius:8px;margin-top:12px;font-size:0.85rem;color:#c8c0e0;">';
+  html += '<span>Completed: ' + completed + '/' + total + '</span>';
+  html += '<span>XP Earned: ' + (completed * 10) + '/' + (total * 10) + '</span>';
+  html += '</div>';
+  
+  if (completed === total && total > 0) {
+    html += '<button onclick="completeAllDailyTasks_UI()" style="width:100%;padding:12px;margin-top:12px;background:linear-gradient(135deg,#f5c842,#ffd700);border:none;border-radius:8px;color:#0a0a1a;font-weight:700;cursor:pointer;transition:all 0.3s;" onmouseover="this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'0 6px 15px rgba(245,200,66,0.4)\';" onmouseout="this.style.transform=\'translateY(0)\';this.style.boxShadow=\'none\';">🎉 Complete Day & Earn Bonus</button>';
+  }
+  
+  html += '</div>';
+  
+  const container = document.getElementById('daily-tasks-container');
+  if (container) {
+    container.innerHTML = html;
+  }
+}
+
+// ===== GAMIFICATION FUNCTIONS =====
+
+function updateGamificationWidget() {
+  const prog = GAMIFICATION.getProgressData();
+  
+  // Update stats
+  document.getElementById('streak-value').textContent = prog.streak;
+  document.getElementById('level-value').textContent = prog.level;
+  document.getElementById('level-badge').textContent = prog.level;
+  
+  // Update XP bar
+  const xpPercent = prog.percentage;
+  document.getElementById('xp-bar').style.width = xpPercent + '%';
+  document.getElementById('xp-text').textContent = prog.current + '/' + prog.needed + ' XP';
+  
+  // Show certificate button if eligible
+  if (prog.canEarnCertificate) {
+    document.getElementById('certificate-btn').style.display = 'flex';
+  }
+  
+  // Show gamification widget
+  document.getElementById('gamification-widget').style.display = 'flex';
+}
+
+function showGamificationMessage(message) {
+  if (!message) return;
+  const msgEl = document.getElementById('motivation-message');
+  msgEl.textContent = message;
+  msgEl.style.display = 'block';
+  setTimeout(function() {
+    msgEl.style.display = 'none';
+  }, 5000);
+}
+
+function completeTask(taskName, xpAmount) {
+  const result = GAMIFICATION.addXP(xpAmount || 10, taskName);
+  updateGamificationWidget();
+  
+  if (result.leveledUp) {
+    showGamificationMessage(result.message);
+  }
+}
+
+function completeAllDailyTasks() {
+  // When user completes ALL tasks for the day
+  const result = GAMIFICATION.updateStreak(100, 100); // Full completion
+  
+  if (result.streakContinued || result.streakStarted) {
+    completeTask('Daily Challenge', 50);
+    showGamificationMessage(result.message);
+  } else if (result.streakWarning) {
+    showGamificationMessage(result.message);
+  } else if (result.streakReset) {
+    showGamificationMessage(result.message);
+  }
+  
+  updateGamificationWidget();
+}
+
+function showCertificateModal() {
+  const prog = GAMIFICATION.get();
+  if (prog.level >= 10) {
+    const cert = GAMIFICATION.generateCertificate(localStorage.getItem('userName') || 'Seeker', 'Personal Growth');
+    document.getElementById('cert-level').textContent = 'Level ' + prog.level;
+    document.getElementById('cert-stats').textContent = 'Total XP: ' + prog.totalXpGained + ' | Earned: ' + new Date().toLocaleDateString();
+    document.getElementById('certificate-modal').classList.add('active');
+  }
+}
+
+function closeCertificateModal() {
+  document.getElementById('certificate-modal').classList.remove('active');
+}
+
+function printCertificate() {
+  const modal = document.getElementById('certificate-modal');
+  const printWindow = window.open('', '', 'height=600,width=800');
+  printWindow.document.write('<html><head><title>Certificate</title>');
+  printWindow.document.write('<style>');
+  printWindow.document.write('body { font-family: Georgia, serif; text-align: center; background: white; padding: 40px; }');
+  printWindow.document.write('h1 { font-size: 3em; color: #8b7500; margin: 20px 0; }');
+  printWindow.document.write('h2 { font-size: 2em; color: #f5c842; }');
+  printWindow.document.write('p { font-size: 1.1em; line-height: 1.8; }');
+  printWindow.document.write('.signature { margin-top: 40px; border-top: 2px solid #333; width: 200px; margin-left: auto; margin-right: auto; padding-top: 10px; }');
+  printWindow.document.write('</style>');
+  printWindow.document.write('</head><body>');
+  printWindow.document.write('<h1>🏆 Certificate of Achievement</h1>');
+  printWindow.document.write('<p>This is to certify that</p>');
+  printWindow.document.write('<h2>' + (localStorage.getItem('userName') || 'Seeker') + '</h2>');
+  printWindow.document.write('<p>has demonstrated exceptional discipline and commitment</p>');
+  printWindow.document.write('<p>and has achieved <strong>Level ' + GAMIFICATION.get().level + '</strong></p>');
+  printWindow.document.write('<p>in the Krishna AI Mentor System</p>');
+  printWindow.document.write('<p style="margin-top:30px;font-style:italic;">"Through consistent practice and devoted action, you transcend ordinary growth."</p>');
+  printWindow.document.write('<div class="signature">Awarded on ' + new Date().toLocaleDateString() + '</div>');
+  printWindow.document.write('</body></html>');
+  printWindow.document.close();
+  printWindow.print();
+}
+
+// Initialize gamification when page loads
+window.addEventListener('DOMContentLoaded', function() {
+  initDailyTasks();
+  renderDailyTasks();
+  setTimeout(function() {
+    updateGamificationWidget();
+  }, 500);
+  
+  // Initialize Phase 3 Learning System
+  if (typeof LEARNING !== 'undefined') {
+    LEARNING.initBooks();
+    LEARNING.renderBookLibrary();
+  }
+});
+</script>
+<script src="gamification.js"></script>
+<script src="learning.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

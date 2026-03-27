@@ -1,55 +1,236 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Career Roadmap - Dream Wave</title>
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Career Roadmap - Dream Wave</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .page-wrap { max-width: 900px; margin: 90px auto 60px; padding: 0 20px; }
+    .page-title { font-size: 2rem; font-weight: 800; color: #fff; margin-bottom: 6px; }
+    .page-sub { color: rgba(255,255,255,0.5); margin-bottom: 30px; }
+    .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 28px; margin-bottom: 24px; }
+    .glass h3 { color: #e2d9f3; font-size: 1rem; font-weight: 700; margin-bottom: 16px; }
+    .gen-row { display: flex; gap: 10px; }
+    .gen-row input { flex: 1; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; color: #fff; padding: 13px 16px; font-size: 0.95rem; outline: none; }
+    .gen-row input::placeholder { color: rgba(255,255,255,0.3); }
+    .gen-row input:focus { border-color: #a78bfa; }
+    .btn-gen { padding: 13px 24px; background: linear-gradient(135deg, #7c3aed, #a78bfa); color: white; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: opacity 0.2s; }
+    .btn-gen:hover { opacity: 0.85; }
+    .btn-gen:disabled { opacity: 0.5; cursor: not-allowed; }
+    .spinner-wrap { text-align: center; padding: 40px; display: none; }
+    .spinner { width: 40px; height: 40px; border: 4px solid rgba(167,139,250,0.2); border-top-color: #a78bfa; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner-wrap p { color: #a78bfa; font-weight: 600; font-size: 0.9rem; }
+    .phases { display: flex; flex-direction: column; gap: 16px; }
+    .phase-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 20px; position: relative; overflow: hidden; }
+    .phase-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: linear-gradient(135deg, #7c3aed, #a78bfa); }
+    .phase-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .phase-num { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #7c3aed, #a78bfa); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.85rem; flex-shrink: 0; }
+    .phase-title { color: #e2d9f3; font-weight: 700; font-size: 1rem; }
+    .phase-duration { color: rgba(255,255,255,0.4); font-size: 0.8rem; margin-left: auto; }
+    .phase-desc { color: rgba(255,255,255,0.65); font-size: 0.88rem; line-height: 1.6; margin-bottom: 12px; }
+    .phase-skills { display: flex; flex-wrap: wrap; gap: 6px; }
+    .skill-tag { background: rgba(167,139,250,0.12); color: #a78bfa; padding: 4px 10px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; }
+    .empty-state { text-align: center; padding: 60px 20px; color: rgba(255,255,255,0.35); }
+    .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+    .roadmap-goal { color: #a78bfa; font-size: 0.9rem; font-weight: 600; margin-bottom: 16px; }
+    .save-btn { background: rgba(110,231,183,0.15); color: #6ee7b7; border: 1px solid rgba(110,231,183,0.3); padding: 9px 18px; border-radius: 10px; font-weight: 600; cursor: pointer; font-size: 0.88rem; margin-top: 16px; transition: all 0.2s; }
+    .save-btn:hover { background: rgba(110,231,183,0.25); }
+  </style>
 </head>
 <body>
-    <nav class="navbar">
-        <div class="container">
-            <a href="dashboard.html" class="nav-brand">🌊 Dream Wave</a>
-            <div class="nav-links">
-                <a href="dashboard.html">Dashboard</a>
-                <a href="ai-assistant.html">AI Assistant</a>
-                <a href="community.html">Community</a>
-                <button onclick="logout()" class="btn-secondary">Logout</button>
-            </div>
-        </div>
-    </nav>
+  <nav class="navbar">
+    <div class="container">
+      <a href="dashboard.html" class="nav-brand">🌊 Dream Wave</a>
+      <div class="nav-links">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="krishna.html">Krishna</a>
+        <a href="career-roadmap.html" class="active">Roadmap</a>
+        <a href="community.html">Community</a>
+        <button onclick="logout()" class="btn-secondary">Logout</button>
+      </div>
+    </div>
+  </nav>
 
-    <div class="roadmap-container">
-        <div class="container">
-            <h1>Your Career Roadmap</h1>
-            <p>Generate a personalized career roadmap by talking to your AI assistant about your ambitions.</p>
-            
-            <div class="roadmap-card">
-                <h3>How to Generate Your Roadmap</h3>
-                <ol>
-                    <li>Go to the AI Assistant</li>
-                    <li>Tell the AI about your career interests</li>
-                    <li>Confirm your career ambition</li>
-                    <li>AI will generate a detailed roadmap including:
-                        <ul>
-                            <li>Career overview and meaning</li>
-                            <li>Required subjects and skills</li>
-                            <li>Recommended colleges and institutions</li>
-                            <li>Entrance exams and minimum scores</li>
-                            <li>Technical skills needed</li>
-                            <li>Salary ranges and earning potential</li>
-                            <li>Success stories and strategies</li>
-                            <li>Challenges and how to overcome them</li>
-                        </ul>
-                    </li>
-                    <li>Download your roadmap as PDF</li>
-                </ol>
-                <a href="ai-assistant.html" class="btn-primary">Start with AI Assistant</a>
-            </div>
-        </div>
+  <div class="page-wrap">
+    <div class="page-title">🗺️ Career Roadmap</div>
+    <p class="page-sub">Generate a structured learning roadmap for your career goal</p>
+
+    <div class="glass">
+      <h3>✨ Generate Your Roadmap</h3>
+      <div class="gen-row">
+        <input type="text" id="goalInput" placeholder="e.g. Full Stack Developer, Data Scientist, UI/UX Designer...">
+        <button class="btn-gen" onclick="generateRoadmap()" id="genBtn">Generate</button>
+      </div>
     </div>
 
-    <script src="app.js"></script>
-    <script>checkAuth();</script>
+    <div class="spinner-wrap" id="spinnerWrap">
+      <div class="spinner"></div>
+      <p>Generating your personalized roadmap...</p>
+    </div>
+
+    <div id="roadmapOutput"></div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script>
+    checkAuth();
+    // ✅ PREVENT DUPLICATE ROADMAP GENERATION
+    let roadmapInProgress = false;
+
+    loadSavedRoadmap();
+
+    async function loadSavedRoadmap() {
+      try {
+        const res = await fetch(API_URL + '/roadmap', {
+          headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.phases && data.phases.length) renderRoadmap(data.goal, data.phases, false);
+        }
+      } catch (e) {}
+    }
+
+    async function generateRoadmap() {
+      const goal = document.getElementById('goalInput').value.trim();
+      if (!goal) { alert('Please enter a career goal'); return; }
+      
+      // ✅ PREVENT DUPLICATE CALLS
+      if (roadmapInProgress) {
+        console.warn('⚠️ Roadmap generation already in progress');
+        return;
+      }
+      
+      roadmapInProgress = true;
+      const btn = document.getElementById('genBtn');
+      btn.disabled = true; btn.textContent = 'Generating...';
+      document.getElementById('spinnerWrap').style.display = 'block';
+      document.getElementById('roadmapOutput').innerHTML = '';
+
+      console.log('🚀 SINGLE API CALL: generateRoadmap');
+
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+        const res = await fetch('/api/ai/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: `Generate a structured career roadmap for: "${goal}".
+Format as exactly 4 phases: Beginner, Intermediate, Advanced, Expert.
+For each phase provide: title, duration (e.g. "3 months"), description (2 sentences), and 5 key skills.
+Use this exact format for each phase:
+PHASE: [title]
+DURATION: [duration]
+DESCRIPTION: [description]
+SKILLS: [skill1, skill2, skill3, skill4, skill5]`,
+            type: 'career'
+          }),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!res.ok) {
+          console.error('❌ API ERROR: ' + res.status);
+          document.getElementById('roadmapOutput').innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>Failed to generate roadmap. Try again.</p></div>';
+          return;
+        }
+
+        const data = await res.json();
+        const reply = data.reply || data.response || '';
+        
+        if (!reply) {
+          console.warn('⚠️ Empty response from API');
+          document.getElementById('roadmapOutput').innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>Failed to generate roadmap. Try again.</p></div>';
+          return;
+        }
+
+        console.log('✅ SINGLE RESPONSE RECEIVED (' + reply.length + ' chars)');
+        const phases = parseRoadmap(reply);
+        renderRoadmap(goal, phases, true);
+
+      } catch (err) {
+        console.error('❌ Error generating roadmap:', err.message);
+        document.getElementById('roadmapOutput').innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>Error connecting to server.</p></div>';
+      } finally {
+        // ✅ ALWAYS RESET FLAGS
+        document.getElementById('spinnerWrap').style.display = 'none';
+        roadmapInProgress = false;
+        btn.disabled = false; 
+        btn.textContent = 'Generate';
+      }
+    }
+
+    function parseRoadmap(text) {
+      const phases = [];
+      const blocks = text.split(/PHASE:/i).filter(b => b.trim());
+      blocks.forEach(block => {
+        const titleMatch = block.match(/^(.+)/);
+        const durationMatch = block.match(/DURATION:\s*(.+)/i);
+        const descMatch = block.match(/DESCRIPTION:\s*(.+)/i);
+        const skillsMatch = block.match(/SKILLS:\s*(.+)/i);
+        if (titleMatch) {
+          phases.push({
+            title: titleMatch[1].trim(),
+            duration: durationMatch ? durationMatch[1].trim() : '3 months',
+            description: descMatch ? descMatch[1].trim() : '',
+            skills: skillsMatch ? skillsMatch[1].split(',').map(s => s.trim()).filter(Boolean) : []
+          });
+        }
+      });
+      // fallback if parsing fails
+      if (!phases.length) {
+        return [
+          { title: 'Beginner', duration: '0–3 months', description: 'Build foundational knowledge and core concepts.', skills: ['Basics', 'Fundamentals', 'Tools Setup', 'First Projects', 'Community'] },
+          { title: 'Intermediate', duration: '3–9 months', description: 'Deepen skills and work on real projects.', skills: ['Advanced Concepts', 'Projects', 'Problem Solving', 'Collaboration', 'Portfolio'] },
+          { title: 'Advanced', duration: '9–18 months', description: 'Master complex topics and specialize.', skills: ['Specialization', 'System Design', 'Leadership', 'Open Source', 'Mentoring'] },
+          { title: 'Expert', duration: '18+ months', description: 'Lead teams and contribute to the industry.', skills: ['Architecture', 'Strategy', 'Innovation', 'Speaking', 'Publishing'] }
+        ];
+      }
+      return phases;
+    }
+
+    function renderRoadmap(goal, phases, showSave) {
+      const output = document.getElementById('roadmapOutput');
+      output.innerHTML = `
+        <div class="glass">
+          <div class="roadmap-goal">🎯 Goal: ${goal}</div>
+          <div class="phases">
+            ${phases.map((p, i) => `
+              <div class="phase-card">
+                <div class="phase-header">
+                  <div class="phase-num">${i + 1}</div>
+                  <div class="phase-title">${p.title}</div>
+                  <div class="phase-duration">⏱ ${p.duration}</div>
+                </div>
+                ${p.description ? `<div class="phase-desc">${p.description}</div>` : ''}
+                <div class="phase-skills">
+                  ${(p.skills || []).map(s => `<span class="skill-tag">${s}</span>`).join('')}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+          ${showSave ? `<button class="save-btn" onclick="saveRoadmap('${goal.replace(/'/g,"\\'")}', ${JSON.stringify(phases).replace(/"/g,'&quot;')})">💾 Save Roadmap</button>` : ''}
+        </div>
+      `;
+    }
+
+    async function saveRoadmap(goal, phases) {
+      try {
+        const res = await fetch(API_URL + '/roadmap', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+          body: JSON.stringify({ goal, phases })
+        });
+        if (res.ok) alert('Roadmap saved!');
+        else alert('Failed to save roadmap');
+      } catch (err) { alert('Error saving roadmap'); }
+    }
+  </script>
 </body>
 </html>

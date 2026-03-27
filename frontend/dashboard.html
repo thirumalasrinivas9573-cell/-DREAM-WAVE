@@ -24,7 +24,9 @@
       <div class="feature-desc">Generate a professional, 10-page academic R&D report for Dream Wave.</div>
       <button class="btn-primary" onclick="openReportModal()">Generate 4-Year R&D Report</button>
     </div>
+  <script src="config.js"></script>
   <script src="report-generator.js"></script>
+  <script>
     // R&D Report Modal Logic
     async function openReportModal() {
       const author = (getUser().name || 'Student').replace(/[^a-zA-Z0-9 ]/g,'').trim() || 'Student';

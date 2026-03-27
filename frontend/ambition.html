@@ -76,252 +76,114 @@
     <div class="messages" id="messages"></div>
     <div class="chips" id="chips"></div>
     <div class="input-row" id="inputRow">
-      <input type="text" class="chat-input" id="chatInput" placeholder="Type your answer..." autocomplete="off" />
-      <button class="send-btn" id="sendBtn" onclick="handleSend()">&#10148;</button>
+      <input id="userInput" class="chat-input" placeholder="Type your answer..." autocomplete="off" />
+      <button onclick="sendMessage()">Send</button>
     </div>
   </div>
 </div>
 <script src="config.js"></script>
+<script type="module">
+  import API_URL from './config.js';
+  window.API_URL = API_URL;
+  console.log('API_URL loaded for ambition:', window.API_URL);
+  // Optional: expose for other scripts
+  window.__CONFIG_READY__ = true;
+  
+  // Attach Enter key handler after DOM ready
+  const el = document.getElementById('userInput');
+  if (el) {
+    el.addEventListener('keypress', function(e) { if (e.key === 'Enter') sendMessage(); });
+  }
+</script>
 <script src="app.js"></script>
 <script>
+console.log('JS LOADED SUCCESSFULLY');
 checkAuth();
 var token = function() { return localStorage.getItem('token'); };
 
 // ✅ PREVENT DUPLICATE API CALLS
 let ambitionReportInProgress = false;
 
-var state = { step: 0, goal: '', age: '', education: '', skills: '', hoursPerDay: '', wantsReport: false };
-var STEPS = [
-  { key: 'goal', ask: "Hey there! I am Krishna.\n\nWhat is your dream career goal?", placeholder: 'e.g. Software Engineer, Doctor, YouTuber...' },
-  { key: 'age', ask: function(s) { return "That is a great goal! Let us plan your journey to become a " + s.goal + "!\n\nFirst - what is your age?"; }, placeholder: 'e.g. 18' },
-  { key: 'education', ask: "What is your current education level?", placeholder: 'e.g. 12th grade, B.Tech, Graduate...', chips: ['School (10th)', '12th Grade', 'Undergraduate', 'Graduate', 'Self-taught'] },
-  { key: 'skills', ask: "What skills do you already have? (even basic ones count!)", placeholder: 'e.g. Python basics, communication, drawing...', chips: ['No skills yet', 'Basic computer skills', 'Some coding', 'Communication', 'Design basics'] },
-  { key: 'hoursPerDay', ask: "How many hours can you dedicate to learning every day?", placeholder: 'e.g. 2', chips: ['1 hour', '2 hours', '3 hours', '4+ hours'] }
-];
-async function getAIResponse(key, val) {
-  const prompts = {
-    goal: `User just shared their goal: "${val}". Respond encouragingly as Krishna, acknowledge it, and ask for their age.`,
-    age: `User said their age is ${val}. Respond positively as Krishna and ask for their education level.`,
-    education: `User said their education is "${val}". Respond supportively as Krishna and ask for their current skills.`,
-    skills: `User said their skills are "${val}". Respond motivatingly as Krishna and ask how many hours per day they can dedicate.`,
-    hoursPerDay: `User said they can dedicate ${val} hours per day. Respond enthusiastically as Krishna, summarize their profile briefly, and prepare for roadmap generation.`
-  };
-  const prompt = prompts[key];
-  if (!prompt) return 'Great!';
+let step = 0;
+let userData = {};
+
+function addMessage(sender, text) {
+  const msgDiv = document.createElement('div');
+  msgDiv.className = 'msg ' + (sender === 'AI' ? 'ai' : 'user');
+  msgDiv.innerHTML = '<div class="msg-av">' + (sender === 'AI' ? 'AI' : 'You') + '</div><div class="msg-bub">' + text.replace(/\n/g, '<br>') + '</div>';
+  document.getElementById('messages').appendChild(msgDiv);
+  document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+}
+
+function sendMessage() {
+  console.log('BUTTON CLICKED');
+  console.log('BUTTON WORKING');
+  const input = document.getElementById('userInput').value;
+  if (!input) return;
+  addMessage('user', input);
+  handleUserInput(input);
+  document.getElementById('userInput').value = '';
+}
+
+function handleUserInput(input) {
+  console.log("STEP:", step);
+  console.log("USER DATA:", userData);
+
+  if (step === 0) {
+    userData.goal = input;
+    addMessage("AI", "Great! What is your name?");
+    step++;
+  } else if (step === 1) {
+    userData.name = input;
+    addMessage("AI", "Which class and age?");
+    step++;
+  } else if (step === 2) {
+    userData.classAge = input;
+    addMessage("AI", "What skills do you have?");
+    step++;
+  } else if (step === 3) {
+    userData.skills = input;
+    addMessage("AI", "Generating your report...");
+    callBackend(userData);
+    step++;
+  }
+}
+
+async function callBackend(data) {
+  console.log("CALLING BACKEND...", data);
   try {
-    const res = await fetch(API_URL + '/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: prompt })
+    const res = await fetch(API_URL + "/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(data)
     });
-    const data = await res.json();
-    return data.reply || 'Good choice!';
-  } catch (e) {
-    console.error(e);
-    alert("Server not responding. Please try again later.");
-    return 'Good choice!';
-  }
-}
-var msgBox = document.getElementById('messages');
-var inputEl = document.getElementById('chatInput');
-var sendBtn = document.getElementById('sendBtn');
-var chipsEl = document.getElementById('chips');
-var inputRow = document.getElementById('inputRow');
-function scrollBottom() { msgBox.scrollTop = msgBox.scrollHeight; }
-function addMsg(text, type, isHtml) {
-  type = type || 'ai'; isHtml = isHtml || false;
-  var div = document.createElement('div');
-  div.className = 'msg ' + type;
-  var av = type === 'ai' ? 'AI' : 'You';
-  div.innerHTML = '<div class="msg-av">' + av + '</div><div class="msg-bub">' + (isHtml ? text : text.replace(/\n/g, '<br>')) + '</div>';
-  msgBox.appendChild(div); scrollBottom(); return div;
-}
-function addTyping() {
-  var div = document.createElement('div');
-  div.className = 'msg ai'; div.id = 'typing';
-  div.innerHTML = '<div class="msg-av">AI</div><div class="msg-bub"><div class="typing-dots"><span></span><span></span><span></span></div></div>';
-  msgBox.appendChild(div); scrollBottom();
-}
-function removeTyping() { var t = document.getElementById('typing'); if (t) t.remove(); }
-function setChips(options) {
-  chipsEl.innerHTML = '';
-  if (!options || !options.length) return;
-  options.forEach(function(opt) {
-    var btn = document.createElement('button');
-    btn.className = 'chip'; btn.textContent = opt;
-    btn.onclick = function() { inputEl.value = opt; handleSend(); };
-    chipsEl.appendChild(btn);
-  });
-}
-function clearChips() { chipsEl.innerHTML = ''; }
-function updateDots(step) {
-  for (var i = 0; i < 5; i++) {
-    var d = document.getElementById('dot' + i);
-    if (!d) continue;
-    d.className = 'dot' + (i < step ? ' done' : i === step ? ' active' : '');
-  }
-}
-function setInputVisible(v) { inputRow.style.display = v ? 'flex' : 'none'; }
-function delay(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
-async function aiSay(text, isHtml) {
-  isHtml = isHtml || false;
-  addTyping();
-  await delay(700 + Math.min(text.length * 8, 1200));
-  removeTyping();
-  addMsg(text, 'ai', isHtml);
-}
-async function init() {
-  var urlParams = new URLSearchParams(window.location.search);
-  var goalParam = urlParams.get('goal');
-  if (goalParam) { state.goal = decodeURIComponent(goalParam).replace(/-/g, ' '); }
-  try {
-    const existing = JSON.parse(localStorage.getItem('user') || '{}');
-    if (existing.goal) {
-      document.getElementById('alreadyBanner').style.display = 'flex';
-      document.getElementById('existingGoal').textContent = existing.goal;
-      if (!state.goal) state.goal = existing.goal;
-    }
-  } catch (e) {}
-  await delay(400);
-  if (state.goal) {
-    await aiSay('Hey there! I am Krishna.\n\nI see you are interested in: ' + state.goal + '\n\nLet us set this as your goal and plan your journey!');
-    await delay(300); await startStep(1);
-  } else { await startStep(0); }
-}
-async function startStep(stepIndex) {
-  updateDots(stepIndex); state.step = stepIndex;
-  if (stepIndex >= STEPS.length) { await askReport(); return; }
-  var step = STEPS[stepIndex];
-  var question = typeof step.ask === 'function' ? step.ask(state) : step.ask;
-  await aiSay(question);
-  inputEl.placeholder = step.placeholder || 'Type your answer...';
-  inputEl.value = ''; inputEl.focus();
-  setChips(step.chips || []);
-  setInputVisible(true); sendBtn.disabled = false;
-}
-async function handleSend() {
-  var val = inputEl.value.trim(); if (!val) return;
-  clearChips(); addMsg(val, 'user');
-  inputEl.value = ''; sendBtn.disabled = true; setInputVisible(false);
-  var step = STEPS[state.step];
-  if (step) state[step.key] = val;
-  await delay(300);
-  if (step) {
-    await aiSay(await getAIResponse(step.key, val));
-    await delay(300);
-  }
-  await startStep(state.step + 1);
-}
-async function askReport() {
-  updateDots(4);
-  await aiSay('Perfect! Here is what I know about you:\n\nGoal: ' + state.goal + '\nAge: ' + state.age + '\nEducation: ' + state.education + '\nSkills: ' + state.skills + '\nDaily hours: ' + state.hoursPerDay);
-  await delay(400);
-  await aiSay('Do you want me to generate a complete Career Roadmap and R&D Report for your goal?');
-  setChips(['Yes, generate my report!', 'No, skip for now']);
-  setInputVisible(false);
-  chipsEl.querySelectorAll('.chip').forEach(function(btn) {
-    btn.onclick = async function() {
-      var choice = btn.textContent; clearChips(); addMsg(choice, 'user');
-      state.wantsReport = choice.startsWith('Yes');
-      await delay(300); await askConfirm();
-    };
-  });
-}
-async function askConfirm() {
-  if (state.wantsReport) await aiSay('Generating your personalized report... This may take a moment');
-  
-  // ✅ PREVENT DUPLICATE CALLS
-  if (ambitionReportInProgress) {
-    console.warn('⚠️ Report generation already in progress');
-    return;
-  }
-  
-  ambitionReportInProgress = true;
-  var reportText = null;
-  
-  console.log('🚀 SINGLE API CALL: askConfirm');
-  
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
-    
-    var res = await fetch(API_URL + '/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: `Generate a detailed career roadmap report for the goal: ${state.goal}. Include these 10 sections: 1. Introduction, 2. Current Assessment, 3. Motivation, 4. Step-by-step roadmap, 5. Skills to Develop, 6. Timeline, 7. Resources Needed, 8. Potential Challenges, 9. Success Metrics, 10. Conclusion. Make it comprehensive and actionable. User details: Age: ${state.age}, Education: ${state.education}, Skills: ${state.skills}, Daily hours: ${state.hoursPerDay}`
-      }),
-      signal: controller.signal
-    });
-    
-    clearTimeout(timeoutId);
-    
-    if (!res.ok) {
-      console.error('❌ API ERROR: ' + res.status);
+
+    const resp = await res.json();
+    console.log("BACKEND RESPONSE:", resp);
+
+    if (!resp.report) {
+      alert("AI not responding. Check backend.");
       return;
     }
-    
-    var data = await res.json();
-    if (data.reply) {
-      reportText = data.reply;
-      console.log('✅ SINGLE RESPONSE RECEIVED (' + reportText.length + ' chars)');
-    } else {
-      console.warn('⚠️ Empty response from API');
-    }
-  } catch (e) { 
-    console.error('❌ AI request error:', e.message);
-    alert("Server not responding. Please try again later.");
-  } finally {
-    // ✅ ALWAYS RESET FLAG
-    ambitionReportInProgress = false;
+
+    // store report
+    localStorage.setItem("reportData", resp.report);
+    console.log("STORED REPORT");
+
+    // redirect to report page
+    window.location.href = "report.html";
+  } catch (err) {
+    console.error("API ERROR:", err);
+    alert("Backend error");
   }
-  
-  if (reportText) {
-    addMsg('<div style="font-weight:700;margin-bottom:8px;color:#a78bfa">Your Career R&D Report</div><div class="report-card">' + reportText.replace(/\n/g,'<br>') + '</div>', 'ai', true);
-    scrollBottom(); await delay(600);
-  }
-  await aiSay('Do you want to fix this goal as your main ambition?\n\n"' + state.goal + '"\n\nOnce confirmed, Krishna will generate daily tasks for you.');
-  setChips(['Yes, lock my goal!', 'No, let me change it']);
-  setInputVisible(false);
-  chipsEl.querySelectorAll('.chip').forEach(function(btn) {
-    btn.onclick = async function() {
-      var choice = btn.textContent; clearChips(); addMsg(choice, 'user');
-      await delay(300);
-      if (choice.startsWith('Yes')) {
-        await lockAndFinish();
-      } else {
-        await aiSay('No problem! What would you like your goal to be instead?');
-        state.step = 0; inputEl.placeholder = 'Enter your new goal...';
-        inputEl.value = ''; setInputVisible(true); sendBtn.disabled = false; inputEl.focus();
-        sendBtn.onclick = async function() {
-          var val = inputEl.value.trim(); if (!val) return;
-          clearChips(); addMsg(val, 'user'); state.goal = val;
-          inputEl.value = ''; sendBtn.disabled = true; setInputVisible(false);
-          sendBtn.onclick = handleSend;
-          await delay(300); await askReport();
-        };
-      }
-    };
-  });
 }
-async function lockAndFinish() {
-  try {
-    var u = JSON.parse(localStorage.getItem('user') || '{}');
-    u.goal = state.goal; u.ambition = state.goal;
-    localStorage.setItem('user', JSON.stringify(u));
-  } catch (e) {}
-  updateDots(5);
-  await aiSay('Goal locked! Welcome to your Krishna-guided journey.\n\nI will generate your daily tasks, timetable, and guide you every step of the way.\n\nRedirecting to your dashboard...');
-  try {
-    localStorage.setItem('dashboard_tasks_fallback', JSON.stringify([
-      { _id: 'fallback-1', title: 'Start small', difficulty: 'easy', points: 10, status: 'pending' },
-      { _id: 'fallback-2', title: 'Take one focused action', difficulty: 'easy', points: 10, status: 'pending' }
-    ]));
-  } catch (e) {}
-  await delay(2200);
-  window.location.href = '/dashboard';
+
+function init() {
+  addMessage("AI", "Hey there! I am Krishna.\n\nWhat is your dream career goal?");
 }
-inputEl.addEventListener('keypress', function(e) { if (e.key === 'Enter') handleSend(); });
+
 init();
 </script>
 </body>

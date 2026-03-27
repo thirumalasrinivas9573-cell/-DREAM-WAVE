@@ -5,6 +5,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Profile - Dream Wave</title>
   <link rel="stylesheet" href="styles.css">
+  <style>
+    .profile-container { padding: 100px 0 60px; position: relative; z-index: 1; }
+    .edit-btn { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 8px 18px; border-radius: var(--radius-sm); cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: all 0.2s; }
+    .edit-btn:hover { background: rgba(255,255,255,0.25); }
+    .profile-tabs { display: flex; gap: 4px; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 4px; margin-bottom: 24px; width: fit-content; }
+    .profile-tab { padding: 8px 20px; border-radius: 8px; border: none; background: transparent; color: var(--text-muted); font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .profile-tab.active { background: rgba(124,58,237,0.2); color: var(--accent); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .reel-upload-area { border: 2px dashed rgba(124,58,237,0.3); border-radius: var(--radius); padding: 40px; text-align: center; cursor: pointer; transition: all 0.2s; }
+    .reel-upload-area:hover { border-color: var(--primary); background: rgba(124,58,237,0.05); }
+    .reel-upload-area .upload-icon { font-size: 3rem; margin-bottom: 12px; }
+    .reel-upload-area p { color: var(--text-muted); font-size: 0.9rem; }
+    .my-reels-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-top: 20px; }
+    .my-reel-thumb { background: var(--card-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); overflow: hidden; aspect-ratio: 9/16; position: relative; cursor: pointer; }
+    .my-reel-thumb video { width: 100%; height: 100%; object-fit: cover; }
+    .edit-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+    .edit-modal.open { display: flex; }
+    .edit-modal-box { background: var(--dark-3); border: 1px solid var(--glass-border); border-radius: var(--radius-lg); padding: 36px; width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
+    .edit-modal-box h3 { font-size: 1.2rem; font-weight: 700; margin-bottom: 24px; }
+    .modal-close { float: right; background: none; border: none; color: var(--text-muted); font-size: 1.4rem; cursor: pointer; }
+  </style>
 </head>
 <body>
   <nav class="navbar">
@@ -12,7 +34,7 @@
       <a href="dashboard.html" class="nav-brand">🌊 Dream Wave</a>
       <div class="nav-links">
         <a href="dashboard.html">Dashboard</a>
-        <a href="ai-assistant.html">AI Assistant</a>
+        <a href="krishna.html">Krishna</a>
         <a href="community.html">Community</a>
         <button onclick="logout()" class="btn-secondary">Logout</button>
       </div>
@@ -21,40 +43,185 @@
 
   <div class="profile-container">
     <div class="container">
-      <div class="profile-header">
-        <div class="profile-avatar">👤</div>
-        <div class="profile-info">
-          <h1 id="profileName"></h1>
-          <p id="profileEmail"></p>
-          <span class="subscription-badge" id="subscriptionBadge"></span>
-        </div>
-      </div>
 
-      <div class="profile-grid">
-        <div class="profile-card">
-          <h3>About</h3>
-          <div class="profile-details">
-            <p><strong>Education:</strong> <span id="education">Not set</span></p>
-            <p><strong>Career Goals:</strong> <span id="careerGoals">Not set</span></p>
-            <p><strong>Learning Mode:</strong> <span id="learningMode"></span></p>
+      <!-- Header -->
+      <div class="profile-header">
+        <div class="profile-avatar" id="profileAvatar">👤</div>
+        <div class="profile-info" style="flex:1">
+          <h1 id="profileName">Loading...</h1>
+          <!-- AA ID display -->
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;">
+            <span id="aaIdDisplay" onclick="openAaIdModal()" title="Click to change AA ID"
+              style="display:inline-flex;align-items:center;gap:6px;background:rgba(124,58,237,0.18);border:1px solid rgba(167,139,250,0.4);color:#c4b5fd;padding:5px 16px;border-radius:50px;font-size:0.9rem;font-weight:700;letter-spacing:0.4px;cursor:pointer;transition:all 0.2s;">
+              🪪 @<span id="aaIdText">—</span> <span style="font-size:0.7rem;opacity:0.6;">✏️</span>
+            </span>
+            <span id="noAaIdBadge" style="display:none;background:rgba(248,113,113,0.12);border:1px solid rgba(248,113,113,0.35);color:#f87171;padding:5px 16px;border-radius:50px;font-size:0.82rem;font-weight:700;cursor:pointer;display:none;align-items:center;gap:6px;" onclick="openAaIdModal()">
+              ⚠️ Set your AA ID — used for login
+            </span>
+          </div>
+          <p id="profileEmail" style="color:rgba(255,255,255,0.5);font-size:0.85rem;margin-top:6px;"></p>
+          <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:8px;">
+            <span class="subscription-badge" id="subscriptionBadge">Free</span>
+            <span id="ambitionBadge" style="display:none; background:rgba(255,255,255,0.15); padding:4px 12px; border-radius:50px; font-size:0.75rem; font-weight:700;">🎯 <span id="ambitionText"></span></span>
           </div>
         </div>
+        <button class="edit-btn" onclick="openEditModal()">✏️ Edit Profile</button>
+      </div>
 
-        <div class="profile-card">
-          <h3>Skills</h3>
-          <div id="skillsList" class="skills-list"></div>
+      <!-- Stats Row -->
+      <div class="stats-row" style="margin-bottom: 28px;">
+        <div class="stat-card">
+          <div class="stat-num" id="profileCredits">0</div>
+          <div class="stat-label">💰 Credits</div>
         </div>
-
-        <div class="profile-card">
-          <h3>Certificates</h3>
-          <div id="certificatesList"></div>
+        <div class="stat-card">
+          <div class="stat-num" id="profileLevel">1</div>
+          <div class="stat-label">🧠 Level</div>
         </div>
-
-        <div class="profile-card">
-          <h3>Projects</h3>
-          <div id="projectsList"></div>
+        <div class="stat-card">
+          <div class="stat-num" id="profileStreak">0</div>
+          <div class="stat-label">🔥 Streak</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="profileTasks">0</div>
+          <div class="stat-label">✅ Tasks Done</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="profileComrades">0</div>
+          <div class="stat-label">🤝 Comrades</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="profileBadges">0</div>
+          <div class="stat-label">🏅 Badges</div>
         </div>
       </div>
+
+      <!-- Tabs -->
+      <div class="profile-tabs">
+        <button class="profile-tab active" onclick="switchTab('overview')">Overview</button>
+        <button class="profile-tab" onclick="switchTab('achievements')">Achievements</button>
+        <button class="profile-tab" onclick="switchTab('reels')">My Reels</button>
+      </div>
+
+      <!-- Overview Tab -->
+      <div class="tab-panel active" id="tab-overview">
+        <div class="profile-grid">
+          <div class="profile-card">
+            <h3>About</h3>
+            <div class="profile-details">
+              <p><strong>Education:</strong> <span id="education">Not set</span></p>
+              <p><strong>Career Goal:</strong> <span id="careerGoals">Not set</span></p>
+              <p><strong>Age:</strong> <span id="profileAge">Not set</span></p>
+              <p><strong>Study Hours/Day:</strong> <span id="profileHours">Not set</span></p>
+              <p><strong>Learning Mode:</strong> <span id="learningMode">Reading</span></p>
+              <p><strong>Member Since:</strong> <span id="memberSince">—</span></p>
+            </div>
+          </div>
+          <div class="profile-card">
+            <h3>Skills</h3>
+            <div id="skillsList" class="skills-list">
+              <span style="color: var(--text-dim); font-size: 0.85rem;">No skills added yet</span>
+            </div>
+          </div>
+          <div class="profile-card">
+            <h3>Certificates</h3>
+            <div id="certificatesList">
+              <span style="color: var(--text-dim); font-size: 0.85rem;">Complete tasks to earn certificates</span>
+            </div>
+          </div>
+          <div class="profile-card">
+            <h3>Projects</h3>
+            <div id="projectsList">
+              <span style="color: var(--text-dim); font-size: 0.85rem;">No projects added yet</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Achievements Tab -->
+      <div class="tab-panel" id="tab-achievements">
+        <div class="profile-grid">
+          <div class="profile-card" style="grid-column: 1 / -1;">
+            <h3>Badges & Achievements</h3>
+            <div id="badgesList" style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px;">
+              <span style="color: var(--text-dim); font-size: 0.85rem;">Complete milestones to earn badges</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reels Tab -->
+      <div class="tab-panel" id="tab-reels">
+        <div class="upload-card">
+          <h3>📤 Upload a Reel</h3>
+          <div class="upload-form">
+            <input type="text" id="reelTitle" placeholder="Reel title...">
+            <textarea id="reelDesc" placeholder="Description..." rows="2"></textarea>
+            <input type="text" id="reelTag" placeholder="Tag (e.g. motivation, coding)">
+            <input type="file" id="reelFile" accept="video/*">
+            <button class="upload-btn" onclick="uploadReel()">📤 Upload Reel</button>
+          </div>
+        </div>
+        <div class="my-reels-grid" id="myReelsGrid">
+          <div style="color: var(--text-dim); font-size: 0.85rem; grid-column: 1/-1; text-align: center; padding: 40px 0;">No reels uploaded yet</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- AA ID Modal -->
+  <div class="edit-modal" id="aaIdModal">
+    <div class="edit-modal-box" style="max-width:420px">
+      <button class="modal-close" onclick="closeAaIdModal()">×</button>
+      <h3>🪪 Your AA ID</h3>
+      <p style="color:rgba(255,255,255,0.45);font-size:0.85rem;margin-bottom:20px;">Your unique handle — used to <strong style="color:#c4b5fd">login</strong> and be found by others. Once set, you can login with <strong style="color:#c4b5fd">@yourhandle + password</strong> instead of email.</p>
+      <div class="form-group">
+        <label>AA ID</label>
+        <div style="position:relative">
+          <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#a78bfa;font-weight:700;font-size:1rem;pointer-events:none">@</span>
+          <input type="text" id="aaIdInput" placeholder="yourhandle" maxlength="20"
+            style="padding-left:32px;width:100%;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.13);border-radius:12px;color:#fff;padding-top:12px;padding-bottom:12px;font-size:0.92rem;outline:none;box-sizing:border-box;"
+            oninput="checkAaIdLive(this.value)">
+        </div>
+        <div id="aaIdCheckStatus" style="font-size:0.78rem;margin-top:6px;height:18px;"></div>
+        <div style="color:rgba(255,255,255,0.3);font-size:0.75rem;margin-top:4px;">3–20 chars · letters, numbers, _ or .</div>
+      </div>
+      <div id="aaIdModalError" style="color:#f87171;font-size:0.83rem;margin-bottom:12px;display:none;padding:8px 12px;background:rgba(248,113,113,0.1);border-radius:8px;border:1px solid rgba(248,113,113,0.3);"></div>
+      <button class="btn-primary btn-full" onclick="saveAaId()" id="saveAaIdBtn">Save AA ID</button>
+    </div>
+  </div>
+
+  <!-- Edit Modal -->
+  <div class="edit-modal" id="editModal">
+    <div class="edit-modal-box">
+      <button class="modal-close" onclick="closeEditModal()">×</button>
+      <h3>Edit Profile</h3>
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" id="editName" placeholder="Your name">
+      </div>
+      <div class="form-group">
+        <label>Education</label>
+        <input type="text" id="editEducation" placeholder="e.g. B.Tech Computer Science">
+      </div>
+      <div class="form-group">
+        <label>Career Goals</label>
+        <input type="text" id="editCareerGoals" placeholder="e.g. Become a Software Engineer">
+      </div>
+      <div class="form-group">
+        <label>Skills (comma separated)</label>
+        <input type="text" id="editSkills" placeholder="e.g. Python, React, SQL">
+      </div>
+      <div class="form-group">
+        <label>Learning Mode</label>
+        <select id="editLearningMode">
+          <option value="reading">Reading</option>
+          <option value="voice">Voice</option>
+          <option value="visual">Visual</option>
+        </select>
+      </div>
+      <button class="btn-primary btn-full" onclick="saveProfile()">Save Changes</button>
     </div>
   </div>
 
@@ -62,49 +229,223 @@
   <script src="app.js"></script>
   <script>
     checkAuth();
-    loadProfile();
+    const token = () => localStorage.getItem('token');
+    let profileData = {};
+    let aaIdAvailable = false;
+    let aaIdCheckTimer = null;
 
     async function loadProfile() {
-      const params = new URLSearchParams(window.location.search);
-      const username = params.get('username');
-
-      if (!username) {
-        document.querySelector('.profile-container').innerHTML = '<p style="text-align:center;padding:40px;color:red">No username provided</p>';
-        return;
-      }
-
       try {
-        const res = await fetch(API_URL + '/profile/' + username);
+        const res = await fetch(`${API_URL}/auth/me`, {
+          headers: { 'Authorization': `Bearer ${token()}` }
+        });
+        if (!res.ok) return;
         const user = await res.json();
+        profileData = user;
 
-        if (!res.ok) {
-          document.querySelector('.profile-container').innerHTML = '<p style="text-align:center;padding:40px;color:red">User not found</p>';
-          return;
-        }
-
-        document.getElementById('profileName').textContent = user.name;
-        document.getElementById('profileEmail').textContent = user.email;
-        document.getElementById('subscriptionBadge').textContent = user.subscription.toUpperCase();
+        document.getElementById('profileName').textContent = user.name || 'User';
+        document.getElementById('profileEmail').textContent = user.email || '';
+        document.getElementById('subscriptionBadge').textContent = (user.subscription || 'free').toUpperCase();
+        document.getElementById('profileCredits').textContent = user.points || 0;
+        document.getElementById('profileLevel').textContent = user.level || Math.max(1, Math.floor((user.points || 0) / 100) + 1);
+        document.getElementById('profileStreak').textContent = user.streak || 0;
+        document.getElementById('profileBadges').textContent = (user.badges || []).length;
         document.getElementById('education').textContent = user.education || 'Not set';
         document.getElementById('careerGoals').textContent = user.careerGoals || 'Not set';
-        document.getElementById('learningMode').textContent = user.learningMode;
+        document.getElementById('profileAge').textContent = user.age || 'Not set';
+        document.getElementById('profileHours').textContent = user.hoursPerDay ? user.hoursPerDay + ' hrs' : 'Not set';
+        document.getElementById('learningMode').textContent = user.learningMode || 'Reading';
+        if (user.createdAt) document.getElementById('memberSince').textContent = new Date(user.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'long' });
 
-        document.getElementById('skillsList').innerHTML = user.skills && user.skills.length
-          ? user.skills.map(function(s) { return '<span class="skill-tag">' + s + '</span>'; }).join('')
-          : '<p>No skills added yet</p>';
+        // Load comrades count
+        try {
+          const cr = await fetch(`${API_URL}/comrades/mine`, { headers: { 'Authorization': `Bearer ${token()}` } });
+          if (cr.ok) { const comrades = await cr.json(); document.getElementById('profileComrades').textContent = comrades.length || 0; }
+        } catch (e) {}
 
-        document.getElementById('certificatesList').innerHTML = user.certificates && user.certificates.length
-          ? user.certificates.map(function(c) { return '<div class="cert-item">🏆 ' + c.title + '</div>'; }).join('')
-          : '<p>No certificates yet</p>';
+        // AA ID display
+        if (user.aaId) {
+          document.getElementById('aaIdText').textContent = user.aaId;
+          document.getElementById('aaIdDisplay').style.display = 'inline-flex';
+          document.getElementById('noAaIdBadge').style.display = 'none';
+          document.getElementById('aaIdInput').value = user.aaId;
+        } else {
+          document.getElementById('aaIdDisplay').style.display = 'none';
+          document.getElementById('noAaIdBadge').style.display = 'inline-flex';
+        }
 
-        document.getElementById('projectsList').innerHTML = user.projects && user.projects.length
-          ? user.projects.map(function(p) { return '<div class="project-item"><strong>' + p.title + '</strong><p>' + p.description + '</p></div>'; }).join('')
-          : '<p>No projects yet</p>';
+        if (user.ambition) {
+          document.getElementById('ambitionBadge').style.display = 'inline-block';
+          document.getElementById('ambitionText').textContent = user.ambition;
+        }
 
-      } catch (err) {
-        document.querySelector('.profile-container').innerHTML = '<p style="text-align:center;padding:40px;color:red">Error loading profile</p>';
+        let totalTasks = 0;
+        if (user.progress) {
+          Object.values(user.progress).forEach(p => { totalTasks += (p.completedTasks || []).length; });
+        }
+        document.getElementById('profileTasks').textContent = totalTasks;
+
+        if (user.skills && user.skills.length > 0) {
+          document.getElementById('skillsList').innerHTML = user.skills.map(s => `<span class="skill-tag">${s}</span>`).join('');
+        }
+
+        if (user.badges && user.badges.length > 0) {
+          document.getElementById('badgesList').innerHTML = user.badges.map(b => `
+            <div style="background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.25);border-radius:var(--radius-sm);padding:12px 18px;display:flex;align-items:center;gap:10px;">
+              <span style="font-size:1.4rem;">🏅</span>
+              <span style="font-size:0.88rem;font-weight:600;color:var(--accent);">${b}</span>
+            </div>`).join('');
+        }
+
+        const certs = [];
+        if (user.progress) {
+          Object.entries(user.progress).forEach(([careerId, p]) => {
+            const count = (p.completedTasks || []).length;
+            if (count >= 10) certs.push({ title: 'Beginner Certificate', career: careerId });
+            if (count >= 50) certs.push({ title: 'Intermediate Certificate', career: careerId });
+            if (count >= 100) certs.push({ title: 'Master Certificate', career: careerId });
+          });
+        }
+        if (certs.length > 0) {
+          document.getElementById('certificatesList').innerHTML = certs.map(c => `
+            <div class="cert-item">
+              <div class="cert-title">🎓 ${c.title}</div>
+              <div class="cert-date">${c.career}</div>
+            </div>`).join('');
+        }
+
+        document.getElementById('editName').value = user.name || '';
+        document.getElementById('editEducation').value = user.education || '';
+        document.getElementById('editCareerGoals').value = user.careerGoals || '';
+        document.getElementById('editSkills').value = (user.skills || []).join(', ');
+        document.getElementById('editLearningMode').value = user.learningMode || 'reading';
+
+      } catch (e) { console.error('Profile load error:', e); }
+    }
+
+    // ── AA ID Modal ──
+    function openAaIdModal() { document.getElementById('aaIdModal').classList.add('open'); }
+    function closeAaIdModal() { document.getElementById('aaIdModal').classList.remove('open'); }
+
+    function checkAaIdLive(val) {
+      const status = document.getElementById('aaIdCheckStatus');
+      const clean = val.trim().toLowerCase();
+      aaIdAvailable = false;
+      if (!clean || clean.length < 3) { status.textContent = ''; return; }
+      if (!/^[a-z0-9_.]{3,20}$/.test(clean)) {
+        status.textContent = 'Invalid characters'; status.style.color = '#f87171'; return;
+      }
+      // If same as current, mark available
+      if (clean === (profileData.aaId || '').toLowerCase()) {
+        status.textContent = '✓ This is your current AA ID'; status.style.color = '#a78bfa'; aaIdAvailable = true; return;
+      }
+      clearTimeout(aaIdCheckTimer);
+      status.textContent = 'Checking...'; status.style.color = 'rgba(255,255,255,0.4)';
+      aaIdCheckTimer = setTimeout(async () => {
+        try {
+          const r = await fetch(API_URL + '/auth/check-aaid/' + clean);
+          const d = await r.json();
+          if (d.available) {
+            status.textContent = '✓ @' + clean + ' is available'; status.style.color = '#6ee7b7'; aaIdAvailable = true;
+          } else {
+            status.textContent = '✗ @' + clean + ' is taken'; status.style.color = '#f87171'; aaIdAvailable = false;
+          }
+        } catch (e) { status.textContent = ''; }
+      }, 500);
+    }
+
+    async function saveAaId() {
+      const aaId = document.getElementById('aaIdInput').value.trim().toLowerCase();
+      const errDiv = document.getElementById('aaIdModalError');
+      const btn = document.getElementById('saveAaIdBtn');
+      errDiv.style.display = 'none';
+
+      if (!aaId) { errDiv.textContent = 'Please enter an AA ID'; errDiv.style.display = 'block'; return; }
+      if (!aaIdAvailable) { errDiv.textContent = 'Please choose a valid, available AA ID'; errDiv.style.display = 'block'; return; }
+
+      btn.disabled = true; btn.textContent = 'Saving...';
+      try {
+        const res = await fetch(API_URL + '/profile/update-aaid', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token() },
+          body: JSON.stringify({ aaId })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          closeAaIdModal();
+          document.getElementById('aaIdText').textContent = data.aaId;
+          document.getElementById('aaIdDisplay').style.display = 'inline-flex';
+          document.getElementById('noAaIdBadge').style.display = 'none';
+          profileData.aaId = data.aaId;
+          // Update stored user
+          const stored = JSON.parse(localStorage.getItem('user') || '{}');
+          stored.aaId = data.aaId;
+          localStorage.setItem('user', JSON.stringify(stored));
+        } else {
+          errDiv.textContent = data.message || 'Failed to update AA ID';
+          errDiv.style.display = 'block';
+        }
+      } catch (e) {
+        errDiv.textContent = 'Error connecting to server';
+        errDiv.style.display = 'block';
+      } finally {
+        btn.disabled = false; btn.textContent = 'Save AA ID';
       }
     }
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.profile-tab').forEach(t => t.classList.remove('active'));
+      document.getElementById('tab-' + tab).classList.add('active');
+      event.target.classList.add('active');
+    }
+
+    function openEditModal() { document.getElementById('editModal').classList.add('open'); }
+    function closeEditModal() { document.getElementById('editModal').classList.remove('open'); }
+
+    async function saveProfile() {
+      const updates = {
+        name: document.getElementById('editName').value.trim(),
+        education: document.getElementById('editEducation').value.trim(),
+        careerGoals: document.getElementById('editCareerGoals').value.trim(),
+        skills: document.getElementById('editSkills').value.split(',').map(s => s.trim()).filter(Boolean),
+        learningMode: document.getElementById('editLearningMode').value
+      };
+      try {
+        const res = await fetch(`${API_URL}/profile/update`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token()}` },
+          body: JSON.stringify(updates)
+        });
+        if (res.ok) { closeEditModal(); loadProfile(); }
+      } catch (e) { console.error('Save error:', e); }
+    }
+
+    async function uploadReel() {
+      const file = document.getElementById('reelFile').files[0];
+      const title = document.getElementById('reelTitle').value.trim();
+      if (!file || !title) { alert('Please add a title and select a video file'); return; }
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const res = await fetch(`${API_URL}/reels/upload`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token()}` },
+            body: JSON.stringify({ title, description: document.getElementById('reelDesc').value, tag: document.getElementById('reelTag').value, videoData: e.target.result })
+          });
+          if (res.ok) {
+            alert('Reel uploaded!');
+            document.getElementById('reelTitle').value = '';
+            document.getElementById('reelDesc').value = '';
+            document.getElementById('reelTag').value = '';
+            document.getElementById('reelFile').value = '';
+          }
+        } catch (err) { console.error('Upload error:', err); }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    loadProfile();
   </script>
 </body>
 </html>
