@@ -4,25 +4,37 @@ function randomFrom(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-function generateReportContent(author) {
-  // Dynamic, high-quality, 10-page equivalent report
-  const today = new Date().toLocaleDateString();
-  const orgs = [
-    'Dream Wave Research Lab',
-    'AI Innovation Center',
-    'NextGen Tech Institute',
-    'Visionary Minds Foundation',
-    'Global AI Solutions'
-  ];
-  const organization = randomFrom(orgs);
-  const titles = [
-    'Dream Wave AI System: Revolutionizing Personalized Learning',
-    'Dream Wave: An Intelligent Platform for Next-Gen Education',
-    'Dream Wave AI: Bridging Ambition and Achievement',
-    'Dream Wave: Adaptive AI for Holistic Student Growth',
-    'Dream Wave: Empowering Learners with Artificial Intelligence'
-  ];
-  const title = randomFrom(titles);
+async function generateReportContent(author) {
+  try {
+    const prompt = `Generate a comprehensive 10-page R&D report on Dream Wave AI System. Include sections: Abstract, Introduction, Problem Statement, Objectives, Literature Review, Methodology, System Architecture, Implementation, Results & Analysis, Future Scope, Conclusion. Make it detailed, professional, and realistic. Format as structured text with headings.`;
+
+    const response = await fetch(API_URL + "/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: prompt })
+    });
+
+    if (!response.ok) throw new Error("AI API error");
+
+    const data = await response.json();
+    const reportText = data.reply || "Report generation failed.";
+
+    // Parse and format the report
+    const today = new Date().toLocaleDateString();
+    const orgs = ['Dream Wave Research Lab', 'AI Innovation Center', 'NextGen Tech Institute'];
+    const organization = randomFrom(orgs);
+    const titles = ['Dream Wave AI System: Revolutionizing Personalized Learning'];
+    const title = randomFrom(titles);
+
+    return [
+      `# Cover Page\n\n**${title}**\n\nAuthor: ${author}\nDate: ${today}\nOrganization: ${organization}\n\n---`,
+      `# Report Content\n\n${reportText}`
+    ];
+  } catch (error) {
+    console.error("Report generation error:", error);
+    return [`# Error\n\nFailed to generate report. Please try again.`];
+  }
+}
 
   // Each section is a long, realistic, human-like string
   const abstract = `The Dream Wave AI System is a comprehensive platform designed to transform the educational landscape by integrating advanced artificial intelligence with personalized learning methodologies. This report presents a detailed account of the system's conception, development, and deployment over a four-year R&D cycle. The work addresses the challenges of scalable personalization, adaptive content delivery, and holistic student engagement. Through a blend of literature review, technical innovation, and rigorous analysis, Dream Wave demonstrates the potential to redefine how students interact with knowledge and achieve their ambitions.`;

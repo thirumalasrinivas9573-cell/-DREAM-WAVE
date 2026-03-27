@@ -30,7 +30,7 @@ window.saveMentorGoal = function() {
   localStorage.setItem('mentorJourney', JSON.stringify(state));
   showMentorStep(1);
 };
-const API_URL = "https://your-render-url.onrender.com";
+const API_URL = "https://your-backend-name.onrender.com";
 document.addEventListener('DOMContentLoaded', () => {
   const flute = document.getElementById("fluteMusic");
   const musicBtn = document.getElementById("musicBtn");
@@ -39,9 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const slokaStatus = document.getElementById("slokaStatus");
 
   const slokas = [
-    "/audio/sloka1.mp3",
-    "/audio/sloka2.mp3",
-    "/audio/sloka3.mp3"
+    "/assets/sloka.mp3"
   ];
   let played = [];
   let currentSlokaAudio = null;
@@ -80,15 +78,10 @@ document.addEventListener('DOMContentLoaded', () => {
       currentSlokaAudio.pause();
       currentSlokaAudio.currentTime = 0;
     }
-    if (played.length === slokas.length) {
-      played = [];
-    }
-    const remaining = slokas.filter(s => !played.includes(s));
-    const random = remaining[Math.floor(Math.random() * remaining.length)];
-    played.push(random);
-    currentSlokaAudio = new Audio(random);
+    currentSlokaAudio = new Audio("/assets/sloka.mp3");
     currentSlokaAudio.volume = 1.0;
-    currentSlokaAudio.play();
+    currentSlokaAudio.currentTime = 0;
+    currentSlokaAudio.play().catch(err => console.log(err));
     slokaStatus.textContent = "🔊 Playing Sloka...";
     slokaBtn.classList.add('glow');
     setTimeout(() => slokaBtn.classList.remove('glow'), 600);

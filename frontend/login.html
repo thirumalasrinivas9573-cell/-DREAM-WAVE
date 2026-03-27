@@ -93,43 +93,33 @@
     }
 
     async function handleLogin(e) {
-      e.preventDefault();
+      if (e) e.preventDefault();
       const password = document.getElementById('password').value;
       const btn = document.getElementById('submitBtn');
       const errorDiv = document.getElementById('errorMessage');
-
       let identifier = '';
       if (loginMode === 'email') {
         identifier = document.getElementById('emailInput').value.trim();
         if (!identifier) { showError('Please enter your email'); return; }
       } else {
-        identifier = document.getElementById('aaidInput').value.trim().replace(/^@/, '').toLowerCase();
+        identifier = document.getElementById('aaidInput').value.trim().replace(/^@/, '').toLowerCase() + '@aaai.app';
         if (!identifier) { showError('Please enter your AA ID'); return; }
       }
-
       if (!password) { showError('Please enter your password'); return; }
-
       errorDiv.style.display = 'none';
       btn.disabled = true;
       btn.textContent = 'Signing in...';
-
       try {
-        const res = await fetch(API_URL + '/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: identifier, password })
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          // Demo mode: set dummy token/user
-          localStorage.setItem('token', 'demo-token');
-          localStorage.setItem('user', JSON.stringify({ email: identifier }));
-          window.location.href = '/dashboard.html';
-        } else {
-          showError(data.message || 'Login failed. Check your credentials.');
-        }
+        // Firebase Auth login
+        const { signInWithEmailAndPassword } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
+        const { auth } = await import('./firebase.js');
+        await signInWithEmailAndPassword(auth, identifier, password);
+        const user = auth.currentUser;
+        localStorage.setItem('user', JSON.stringify({ email: user.email, uid: user.uid }));
+        alert('Login Success ✅');
+        window.location.href = '/ambition.html';
       } catch (err) {
-        showError('Cannot connect to server. Please try again.');
+        showError(err.message);
       } finally {
         btn.disabled = false;
         btn.textContent = 'Sign In';

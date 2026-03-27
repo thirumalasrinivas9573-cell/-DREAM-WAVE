@@ -5,15 +5,7 @@ const path = require('path');
 
 const app = express();
 
-// DEMO LOGIN (Step 2)
-app.post('/login', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Login successful (Demo Mode)'
-  });
-});
-
-// AI CHAT API (Step 3)
+// AI CHAT API (Production)
 app.post('/chat', async (req, res) => {
   const { message } = req.body;
   try {
@@ -35,7 +27,7 @@ app.post('/chat', async (req, res) => {
   }
 });
 
-// HEALTH CHECK (Step 4)
+// HEALTH CHECK (Production)
 app.get('/', (req, res) => {
   res.send('Server running successfully');
 });

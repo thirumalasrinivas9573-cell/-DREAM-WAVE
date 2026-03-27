@@ -1,4 +1,4 @@
-const API_URL = "https://your-render-url.onrender.com";
+const API_URL = "https://your-backend-name.onrender.com";
 function getToken() { return localStorage.getItem('token') || ''; }
 function scrollBottom() { const c = document.getElementById('chat'); c.scrollTop = c.scrollHeight; }
 function removeWelcome() { const w = document.getElementById('welcome-card'); if (w) w.remove(); }

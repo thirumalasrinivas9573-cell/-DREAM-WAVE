@@ -216,17 +216,11 @@ async function askConfirm() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
     
-    var res = await fetch('/api/ai/ask', {
+    var res = await fetch(API_URL + '/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        message: `Create a concise career roadmap report for:
-Goal: ${state.goal}
-Age: ${state.age}
-Education: ${state.education}
-Skills: ${state.skills}
-Daily hours: ${state.hoursPerDay}`,
-        type: 'goal'
+        message: `Generate a detailed career roadmap report for the goal: ${state.goal}. Include these 10 sections: 1. Introduction, 2. Current Assessment, 3. Motivation, 4. Step-by-step roadmap, 5. Skills to Develop, 6. Timeline, 7. Resources Needed, 8. Potential Challenges, 9. Success Metrics, 10. Conclusion. Make it comprehensive and actionable. User details: Age: ${state.age}, Education: ${state.education}, Skills: ${state.skills}, Daily hours: ${state.hoursPerDay}`
       }),
       signal: controller.signal
     });

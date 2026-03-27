@@ -26,9 +26,9 @@
     </div>
   <script src="report-generator.js"></script>
     // R&D Report Modal Logic
-    function openReportModal() {
+    async function openReportModal() {
       const author = (getUser().name || 'Student').replace(/[^a-zA-Z0-9 ]/g,'').trim() || 'Student';
-      const reportArr = DreamWaveReport.generateReportContent(author);
+      const reportArr = await DreamWaveReport.generateReportContent(author);
       document.getElementById('reportContent').innerHTML = DreamWaveReport.renderReport(reportArr);
       document.getElementById('reportModalBg').style.display = 'flex';
       document.getElementById('downloadReportBtn').onclick = function() {
