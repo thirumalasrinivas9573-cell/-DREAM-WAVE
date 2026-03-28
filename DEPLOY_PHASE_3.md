@@ -1,3 +1,10 @@
+## Render Backend Settings (Hotfix)
+
+- Root Directory: `backend`
+- Start Command: `node server.js`
+
+Ensure `backend/server.js` and `backend/package.json` exist. Then redeploy.
+
 # 🚀 PHASE 3 - DEPLOYMENT GUIDE
 
 **Status**: Ready to Deploy  
