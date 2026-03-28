@@ -36,6 +36,13 @@
   </style>
 </head>
 <body>
+  <script>
+    // Auto-redirect if already logged in (single key: "user")
+    const u = localStorage.getItem('user');
+    if (u) {
+      window.location.href = 'ambition.html';
+    }
+  </script>
   <div class="auth-wrap">
     <div class="auth-logo"><a href="index.html">🌊 Dream<span>Wave</span></a></div>
     <div class="glass-card">
@@ -115,9 +122,9 @@
         const { auth } = await import('./firebase.js');
         await signInWithEmailAndPassword(auth, identifier, password);
         const user = auth.currentUser;
-        localStorage.setItem('user', JSON.stringify({ email: user.email, uid: user.uid }));
-        alert('Login Success ✅');
-        window.location.href = '/ambition.html';
+        // Save single key only
+        localStorage.setItem('user', JSON.stringify({ email: user.email }));
+        window.location.href = 'ambition.html';
       } catch (err) {
         showError(err.message);
       } finally {

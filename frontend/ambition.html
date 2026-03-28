@@ -1,4 +1,11 @@
 <!DOCTYPE html>
+<script>
+  // Single guard: require session
+  const u = localStorage.getItem('user');
+  if (!u) {
+    window.location.href = 'login.html';
+  }
+</script>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -98,7 +105,7 @@
 <script src="app.js"></script>
 <script>
 console.log('JS LOADED SUCCESSFULLY');
-checkAuth();
+// Removed legacy checkAuth; using localStorage guard only
 var token = function() { return localStorage.getItem('token'); };
 
 // ✅ PREVENT DUPLICATE API CALLS

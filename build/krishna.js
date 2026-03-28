@@ -38,10 +38,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const slokaBtn = document.getElementById("slokaBtn");
   const slokaStatus = document.getElementById("slokaStatus");
 
-  const slokas = [
-    "/audio/sloka.mp3"
-  ];
-  let played = [];
   let currentSlokaAudio = null;
 
   window.onload = () => {
@@ -73,26 +69,34 @@ document.addEventListener('DOMContentLoaded', () => {
     musicStatus.textContent = "🎵 Flute Playing...";
   }
 
-  function playRandomSloka() {
+  function stopFlute() {
+    if (!flute.paused) {
+      flute.pause();
+      flute.currentTime = 0;
+    }
+  }
+
+  function playSloka(src, label) {
     if (currentSlokaAudio) {
       currentSlokaAudio.pause();
       currentSlokaAudio.currentTime = 0;
     }
-    currentSlokaAudio = new Audio("/audio/sloka.mp3");
+    stopFlute();
+    currentSlokaAudio = new Audio(src);
     currentSlokaAudio.volume = 1.0;
     currentSlokaAudio.currentTime = 0;
     currentSlokaAudio.play().catch(err => console.log(err));
-    slokaStatus.textContent = "🔊 Playing Sloka...";
-    slokaBtn.classList.add('glow');
-    setTimeout(() => slokaBtn.classList.remove('glow'), 600);
-    currentSlokaAudio.onended = () => {
-      slokaStatus.textContent = "";
-    };
+    if (slokaStatus) slokaStatus.textContent = `🔊 Playing ${label}...`;
+    currentSlokaAudio.onended = () => { if (slokaStatus) slokaStatus.textContent = ""; };
   }
+
+  function playSloka1() { playSloka("audio/sloka1.mp3", "Sloka 1"); }
+  function playSloka2() { playSloka("audio/sloka2.mp3", "Sloka 2"); }
 
   // expose controls to global for inline onclick
   window.toggleMusic = toggleMusic;
-  window.playRandomSloka = playRandomSloka;
+  window.playSloka1 = playSloka1;
+  window.playSloka2 = playSloka2;
   window.startKrishnaMode = startKrishnaMode;
 
   // Krishna chat

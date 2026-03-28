@@ -36,6 +36,13 @@
   </style>
 </head>
 <body>
+  <script>
+    // Top: auto redirect if already logged in
+    const u = localStorage.getItem('user');
+    if (u) {
+      window.location.href = 'ambition.html';
+    }
+  </script>
   <div class="auth-wrap">
     <div class="auth-logo"><a href="index.html">🌊 Dream<span>Wave</span></a></div>
     <div class="glass-card">
@@ -100,24 +107,36 @@
       let identifier = '';
       if (loginMode === 'email') {
         identifier = document.getElementById('emailInput').value.trim();
-        if (!identifier) { showError('Please enter your email'); return; }
+        if (!identifier) {
+          showError('Please enter your email');
+          return;
+        }
       } else {
         identifier = document.getElementById('aaidInput').value.trim().replace(/^@/, '').toLowerCase() + '@aaai.app';
-        if (!identifier) { showError('Please enter your AA ID'); return; }
+        if (!identifier) {
+          showError('Please enter your AA ID');
+          return;
+        }
       }
-      if (!password) { showError('Please enter your password'); return; }
+      if (!password) {
+        showError('Please enter your password');
+        return;
+      }
       errorDiv.style.display = 'none';
       btn.disabled = true;
       btn.textContent = 'Signing in...';
+
       try {
         // Firebase Auth login
         const { signInWithEmailAndPassword } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
         const { auth } = await import('./firebase.js');
         await signInWithEmailAndPassword(auth, identifier, password);
         const user = auth.currentUser;
-        localStorage.setItem('user', JSON.stringify({ email: user.email, uid: user.uid }));
-        alert('Login Success ✅');
-        window.location.href = '/ambition.html';
+
+        // Save user with a single localStorage key
+        localStorage.setItem('user', JSON.stringify({ email: user.email }));
+
+        window.location.href = 'ambition.html';
       } catch (err) {
         showError(err.message);
       } finally {
