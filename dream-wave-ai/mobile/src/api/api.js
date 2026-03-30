@@ -2,7 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ── Change this to your Render backend URL after deploying ──
-export const BASE_URL = 'https://dream-wave-ai-backend.onrender.com';
+export const BASE_URL = 'https://dream-wave-3.onrender.com';
 // For local dev: 'http://192.168.x.x:5000'  (use your machine's LAN IP, not localhost)
 
 const api = axios.create({ baseURL: `${BASE_URL}/api` });
