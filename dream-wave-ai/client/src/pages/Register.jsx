@@ -23,7 +23,8 @@ export default function Register() {
       saveAuth(data.token, data.user);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed');
+      console.error('Register error:', err.response?.data || err.message);
+      setError(err.response?.data?.message || 'Registration failed. Check your connection and try again.');
     } finally { setLoading(false); }
   };
 

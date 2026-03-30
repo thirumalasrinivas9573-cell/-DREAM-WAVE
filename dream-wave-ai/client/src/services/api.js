@@ -1,10 +1,13 @@
 import axios from 'axios';
 
-// In production: set VITE_API_URL to your Render backend URL
-// e.g. https://dream-wave-ai-backend.onrender.com
-const BASE_URL = import.meta.env.VITE_API_URL
-  ? `${import.meta.env.VITE_API_URL}/api`
-  : '/api';  // dev: Vite proxy handles /api → localhost:5001
+const VITE_API_URL = import.meta.env.VITE_API_URL;
+
+// Debug — remove after confirming it works
+console.log('API URL:', VITE_API_URL || '(using Vite proxy /api)');
+
+// If VITE_API_URL is set → use it directly (production + dev pointing at Render)
+// Otherwise fall back to /api which Vite proxies to localhost:5000
+const BASE_URL = VITE_API_URL ? `${VITE_API_URL}/api` : '/api';
 
 const api = axios.create({ baseURL: BASE_URL });
 
@@ -23,7 +26,6 @@ api.interceptors.response.use(
       localStorage.removeItem('token');
       window.location.href = '/login';
     }
-    // Attach a readable message for AI quota errors
     if (err.response?.status === 503) {
       err.userMessage = err.response.data?.message || 'AI service temporarily unavailable. Please try again later.';
     }
@@ -69,11 +71,11 @@ export const askDailyLife = (message, category) => api.post('/daily-life', { mes
 export const askMentor = (message) => api.post('/mentor', { message });
 
 // ── Community ──
-export const createPost      = (content, type)  => api.post('/community/post', { content, type });
-export const getFeed         = ()               => api.get('/community/feed');
-export const likePost        = (id)             => api.put(`/community/like/${id}`);
-export const addComment      = (id, text)       => api.post(`/community/comment/${id}`, { text });
-export const connectUser     = (aaId)           => api.post('/community/connect', { aaId });
-export const getConnections  = ()               => api.get('/community/connections');
+export const createPost     = (content, type) => api.post('/community/post', { content, type });
+export const getFeed        = ()              => api.get('/community/feed');
+export const likePost       = (id)            => api.put(`/community/like/${id}`);
+export const addComment     = (id, text)      => api.post(`/community/comment/${id}`, { text });
+export const connectUser    = (aaId)          => api.post('/community/connect', { aaId });
+export const getConnections = ()              => api.get('/community/connections');
 
 export default api;
