@@ -110,8 +110,13 @@ npm run dev
 ```
 
 The application will be available at:
-- Frontend: `http://localhost:3000`
+- Frontend: `http://localhost:5173`
 - Backend API: `http://localhost:5000`
+
+### 4. Connectivity Check
+
+- Backend test route: `GET /api/test` returns `{ message: "Backend working" }`
+- In the UI, a floating badge shows backend status: "Backend Connected ✅" or "Backend Not Connected ❌".
 
 ## 🔧 Development Commands
 
@@ -142,6 +147,20 @@ npm preview    # Preview production build
    - Set build command: `cd client && npm install && npm run build`
    - Set publish directory: `client/dist`
    - Add environment variable: `VITE_API_URL=your_backend_url`
+
+## ✅ Local Checklist
+
+- Backend starts without errors on port 5000
+- MongoDB connects (check console log). If it fails, a readable error is logged and server continues.
+- Frontend runs on port 5173
+- Visiting the app shows "Backend Connected ✅"
+
+## 🧰 Troubleshooting
+
+- MODULE_NOT_FOUND: Run `npm install` inside both `server/` and `client/`.
+- MongoDB ECONNREFUSED: Verify `MONGODB_URL`, password correctness, and IP access (0.0.0.0/0) in Atlas.
+- Env not loading: Ensure `.env` file exists under `server/` (not `.env.example`).
+- CORS issues: Update `CLIENT_URL` in `server/.env` to match your frontend URL.
 
 ## 📊 API Endpoints
 

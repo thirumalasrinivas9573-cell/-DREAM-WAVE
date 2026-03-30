@@ -22,6 +22,11 @@ exports.ask = async (req, res) => {
     });
     res.json({ reply: completion.choices[0].message.content.trim() });
   } catch (err) {
-    res.status(500).json({ message: 'Mentor response failed' });
+    const isQuota = err?.status === 429 || err?.code === 'insufficient_quota';
+    res.status(500).json({
+      message: isQuota
+        ? 'AI quota exceeded. Please try again later.'
+        : 'Mentor response failed'
+    });
   }
 };

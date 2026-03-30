@@ -21,6 +21,11 @@ Return ONLY JSON:
     res.json({ books: data.books || [], goal });
   } catch (err) {
     console.error('Books error:', err.message);
-    res.status(500).json({ message: 'Books fetch failed' });
+    const isQuota = err?.status === 429 || err?.code === 'insufficient_quota';
+    res.status(isQuota ? 503 : 500).json({
+      message: isQuota
+        ? 'AI service temporarily unavailable. Please try again later.'
+        : 'Books fetch failed'
+    });
   }
 };

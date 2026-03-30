@@ -23,6 +23,10 @@ api.interceptors.response.use(
       localStorage.removeItem('token');
       window.location.href = '/login';
     }
+    // Attach a readable message for AI quota errors
+    if (err.response?.status === 503) {
+      err.userMessage = err.response.data?.message || 'AI service temporarily unavailable. Please try again later.';
+    }
     return Promise.reject(err);
   }
 );

@@ -8,8 +8,10 @@ const userSchema = new mongoose.Schema({
   aaId:      { type: String, unique: true },   // auto-generated e.g. AA123456
   avatar:    { type: String, default: '' },
   goal:      { type: String, default: '' },
+  bio:       { type: String, default: '' },
   credits:   { type: Number, default: 0 },
   streak:    { type: Number, default: 0 },
+  level:     { type: Number, default: 1 },
   createdAt: { type: Date, default: Date.now }
 });
 

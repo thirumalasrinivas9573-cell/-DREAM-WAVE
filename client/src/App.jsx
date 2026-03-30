@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from './context/AuthContext'
@@ -17,6 +17,35 @@ import Mentor from './pages/Mentor'
 import Community from './pages/Community'
 import Profile from './pages/Profile'
 import LoadingSpinner from './components/LoadingSpinner'
+import { testAPI } from './services/api'
+
+function BackendStatus() {
+  const [status, setStatus] = useState('checking')
+
+  useEffect(() => {
+    let mounted = true
+    testAPI
+      .ping()
+      .then(() => {
+        if (mounted) setStatus('ok')
+      })
+      .catch(() => {
+        if (mounted) setStatus('fail')
+      })
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  const label = status === 'ok' ? 'Backend Connected ✅' : status === 'fail' ? 'Backend Not Connected ❌' : 'Checking backend…'
+  const bg = status === 'ok' ? 'bg-green-600' : status === 'fail' ? 'bg-red-600' : 'bg-gray-600'
+
+  return (
+    <div className={`fixed bottom-4 right-4 text-white text-sm px-3 py-2 rounded shadow ${bg}`}>
+      {label}
+    </div>
+  )
+}
 
 function App() {
   const { user, loading } = useAuth()
@@ -28,6 +57,7 @@ function App() {
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50">
+        <BackendStatus />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
@@ -43,6 +73,7 @@ function App() {
       <div className="flex">
         <Sidebar />
         <main className="flex-1 p-6 ml-64 mt-16">
+          <BackendStatus />
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

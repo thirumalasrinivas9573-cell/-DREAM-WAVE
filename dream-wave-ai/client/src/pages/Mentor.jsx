@@ -54,7 +54,7 @@ export default function Mentor() {
             <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
               className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               {m.role === 'ai' && (
-                <div className="flex items-end gap-2 max-w-[88%]">
+                <div className="flex items-end gap-2 max-w-[88%] bubble-in-left">
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-base flex-shrink-0 mb-0.5">🪷</div>
                   <div className="bg-gradient-to-br from-amber-950/40 to-orange-950/30 border border-amber-500/20 rounded-2xl rounded-bl-sm px-4 py-3 text-sm text-amber-50/90 leading-relaxed whitespace-pre-wrap">
                     {m.text}
@@ -72,7 +72,9 @@ export default function Mentor() {
             <div className="flex items-end gap-2">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">🪷</div>
               <div className="bg-amber-950/40 border border-amber-500/20 rounded-2xl rounded-bl-sm px-4 py-3 flex gap-1.5">
-                {[0,150,300].map(d => <span key={d} className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: d+'ms' }} />)}
+                <span className="typing-dot" style={{ background: 'rgba(245,158,11,0.8)' }} />
+                <span className="typing-dot" style={{ background: 'rgba(245,158,11,0.8)' }} />
+                <span className="typing-dot" style={{ background: 'rgba(245,158,11,0.8)' }} />
               </div>
             </div>
           </div>

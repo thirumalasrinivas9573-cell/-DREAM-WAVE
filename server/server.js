@@ -32,7 +32,7 @@ app.use(limiter);
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true
 }));
 
@@ -53,7 +53,7 @@ const connectDB = async () => {
     console.log(`MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
     console.error('MongoDB connection error:', error.message);
-    process.exit(1);
+    console.error('Continuing without DB connection. API will be limited.');
   }
 };
 
@@ -62,6 +62,11 @@ connectDB();
 // Health check route
 app.get('/health', (req, res) => {
   res.status(200).json({ message: 'Server running', status: 'OK' });
+});
+
+// Test route
+app.get('/api/test', (req, res) => {
+  res.status(200).json({ message: 'Backend working' });
 });
 
 // API routes

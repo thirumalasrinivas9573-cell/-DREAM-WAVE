@@ -81,7 +81,9 @@ export default function DailyLife() {
             <div className="flex items-end gap-2">
               <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center text-sm">{current.icon}</div>
               <div className="glass rounded-2xl rounded-bl-sm px-4 py-3 flex gap-1.5">
-                {[0,150,300].map(d => <span key={d} className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: d+'ms' }} />)}
+                <span className="typing-dot" />
+                <span className="typing-dot" />
+                <span className="typing-dot" />
               </div>
             </div>
           </div>

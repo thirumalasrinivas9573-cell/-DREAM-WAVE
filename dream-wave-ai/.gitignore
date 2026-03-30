@@ -1,7 +1,20 @@
 node_modules/
-.env
-*.log
 .DS_Store
+*.log
+
+# Server secrets — never commit
+server/.env
+
+# Client local env — never commit
+client/.env
+client/.env.local
+
+# client/.env.production IS committed (contains only public VITE_API_URL)
+
+# Build output
 dist/
 build/
+client/dist/
+
+# Generated PDFs
 server/reports/*.pdf

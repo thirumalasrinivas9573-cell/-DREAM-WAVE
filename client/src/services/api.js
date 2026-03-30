@@ -1,6 +1,10 @@
 import axios from 'axios'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+// In development, prefer relative /api so Vite proxy applies.
+// In production builds, set VITE_API_URL to your backend origin.
+const API_BASE_URL = import.meta.env.PROD && import.meta.env.VITE_API_URL
+  ? import.meta.env.VITE_API_URL
+  : ''
 
 // Create axios instance
 const api = axios.create({
@@ -104,6 +108,11 @@ export const profileAPI = {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
   generateCertificate: (data) => api.post('/api/profile/certificate', data)
+}
+
+// Connectivity test API
+export const testAPI = {
+  ping: () => api.get('/api/test')
 }
 
 export default api

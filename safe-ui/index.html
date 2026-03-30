@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Safe UI – Backend Tester</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; background:#0b1220; color:#e6edf3; margin:0; padding:24px; }
+    .card { max-width: 720px; margin: 0 auto; background:#0f172a; border:1px solid #1f2a44; border-radius:12px; padding:24px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+    h1 { margin-top: 0; font-size: 22px; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; margin:12px 0 20px; }
+    button { background:#2563eb; color:white; border:none; padding:10px 14px; border-radius:8px; cursor:pointer; font-weight:600; }
+    button:disabled { opacity:.6; cursor:progress; }
+    .status { padding:10px 12px; border-radius:8px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; white-space: pre-wrap; }
+    .success { background: #052e16; color: #86efac; border:1px solid #166534; }
+    .error { background: #3f1d1d; color: #fecaca; border:1px solid #7f1d1d; }
+    .info { background: #0b253a; color: #93c5fd; border:1px solid #1d4ed8; }
+    label { display:block; font-size:12px; opacity:.8; margin-top:10px; }
+    input { width:100%; padding:10px; border-radius:8px; background:#0b1220; border:1px solid #1f2a44; color:#e6edf3; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Safe UI – Backend Tester</h1>
+    <p>Use this page even if your React app is down. It calls the backend directly.</p>
+
+    <label>Backend Base URL</label>
+    <input id="base" value="http://localhost:5000" />
+
+    <div class="row">
+      <button id="btn-test">Test Backend (/api/test)</button>
+      <button id="btn-health">Health Check (/health)</button>
+    </div>
+
+    <div id="out" class="status info">Idle. Click a button to start…</div>
+  </div>
+
+  <script>
+    const out = document.getElementById('out');
+    const base = document.getElementById('base');
+    const btnTest = document.getElementById('btn-test');
+    const btnHealth = document.getElementById('btn-health');
+
+    async function call(path) {
+      const url = base.value.replace(/\/$/, '') + path;
+      out.className = 'status info';
+      out.textContent = 'Loading ' + url + ' …';
+      btnTest.disabled = true; btnHealth.disabled = true;
+      try {
+        const res = await fetch(url, { method: 'GET' });
+        const isJSON = (res.headers.get('content-type')||'').includes('application/json');
+        const data = isJSON ? await res.json() : await res.text();
+        out.className = 'status success';
+        out.textContent = 'SUCCESS\nURL: ' + url + '\nStatus: ' + res.status + '\nBody:\n' + (isJSON ? JSON.stringify(data, null, 2) : data);
+      } catch (err) {
+        out.className = 'status error';
+        out.textContent = 'ERROR\nURL: ' + url + '\n' + (err && err.message ? err.message : String(err));
+      } finally {
+        btnTest.disabled = false; btnHealth.disabled = false;
+      }
+    }
+
+    btnTest.addEventListener('click', () => call('/api/test'));
+    btnHealth.addEventListener('click', () => call('/health'));
+  </script>
+</body>
+</html>

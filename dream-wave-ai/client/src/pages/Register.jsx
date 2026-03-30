@@ -5,7 +5,7 @@ import { register } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 export default function Register() {
-  const [form, setForm]   = useState({ name: '', email: '', password: '' });
+  const [form, setForm]   = useState({ name: '', email: '', password: '', confirm: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { saveAuth } = useAuth();
@@ -15,9 +15,11 @@ export default function Register() {
 
   const submit = async (e) => {
     e.preventDefault();
-    setError(''); setLoading(true);
+    setError('');
+    if (form.password !== form.confirm) { setError('Passwords do not match'); return; }
+    setLoading(true);
     try {
-      const { data } = await register(form);
+      const { data } = await register({ name: form.name, email: form.email, password: form.password });
       saveAuth(data.token, data.user);
       navigate('/dashboard');
     } catch (err) {
@@ -55,6 +57,11 @@ export default function Register() {
             <label className="text-white/60 text-sm font-medium block mb-1.5">Password</label>
             <input name="password" type="password" value={form.password} onChange={handle}
               className="input-field" placeholder="Min 6 characters" required minLength={6} />
+          </div>
+          <div>
+            <label className="text-white/60 text-sm font-medium block mb-1.5">Confirm Password</label>
+            <input name="confirm" type="password" value={form.confirm} onChange={handle}
+              className="input-field" placeholder="Repeat password" required minLength={6} />
           </div>
 
           {error && <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{error}</p>}

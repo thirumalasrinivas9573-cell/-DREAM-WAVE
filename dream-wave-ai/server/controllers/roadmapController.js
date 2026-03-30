@@ -59,7 +59,12 @@ exports.generate = async (req, res) => {
     res.json({ roadmapId: saved._id, goal: userData.goal, roadmap });
   } catch (err) {
     console.error('Roadmap error:', err.message);
-    res.status(500).json({ message: 'Roadmap generation failed', error: err.message });
+    const isQuota = err?.status === 429 || err?.code === 'insufficient_quota';
+    res.status(isQuota ? 503 : 500).json({
+      message: isQuota
+        ? 'AI service temporarily unavailable. Please try again later.'
+        : 'Roadmap generation failed'
+    });
   }
 };
 

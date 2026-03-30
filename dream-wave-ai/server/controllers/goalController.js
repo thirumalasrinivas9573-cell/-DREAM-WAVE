@@ -102,7 +102,12 @@ exports.continueChat = async (req, res) => {
     });
   } catch (err) {
     console.error('continueChat error:', err.message);
-    res.status(500).json({ message: 'AI response failed' });
+    const isQuota = err?.status === 429 || err?.code === 'insufficient_quota';
+    res.status(isQuota ? 503 : 500).json({
+      message: isQuota
+        ? 'AI service temporarily unavailable. Please try again later.'
+        : 'AI response failed'
+    });
   }
 };
 
