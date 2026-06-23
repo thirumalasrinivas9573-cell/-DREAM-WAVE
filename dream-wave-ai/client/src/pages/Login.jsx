@@ -1,98 +1,101 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { login } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
+import { login as loginApi } from '../services/api';
 
 export default function Login() {
-  const [mode, setMode]   = useState('email'); // 'email' | 'aa'
-  const [form, setForm]   = useState({ email: '', aaId: '', password: '' });
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
   const { saveAuth } = useAuth();
   const navigate = useNavigate();
+  const [form, setForm] = useState({ email: '', password: '' });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handle = (e) => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
-
-  const submit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(''); setLoading(true);
+    if (!form.email || !form.password) return setError('All fields required');
+    setLoading(true); setError('');
     try {
-      let data;
-      if (mode === 'email') {
-        ({ data } = await login({ email: form.email, password: form.password }));
-      } else {
-        ({ data } = await axios.post('/api/auth/login-aa', { aaId: form.aaId, password: form.password }));
-      }
-      saveAuth(data.token, data.user);
+      const res = await loginApi(form);
+      saveAuth(res.data.token, res.data.user);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
-    } finally { setLoading(false); }
+      setError(err.response?.data?.message || err.userMessage || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
+    <div className="min-h-screen flex items-center justify-center p-4"
+      style={{ background: '#0B0F19' }}>
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
-        className="glass rounded-2xl p-8 w-full max-w-md"
+        transition={{ duration: 0.4 }}
+        className="w-full max-w-md"
       >
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="text-4xl mb-3">🌊</div>
-          <h1 className="text-2xl font-black bg-gradient-to-r from-violet-400 to-pink-400 bg-clip-text text-transparent">
-            Dream Wave AI
-          </h1>
-          <p className="text-white/40 text-sm mt-1">Sign in to your account</p>
-        </div>
-
-        {/* Mode toggle */}
-        <div className="flex gap-2 mb-6 p-1 bg-white/5 rounded-xl">
-          <button type="button" onClick={() => setMode('email')}
-            className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${mode==='email' ? 'bg-violet-600 text-white' : 'text-white/40 hover:text-white/70'}`}>
-            Email
-          </button>
-          <button type="button" onClick={() => setMode('aa')}
-            className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${mode==='aa' ? 'bg-violet-600 text-white' : 'text-white/40 hover:text-white/70'}`}>
-            AA ID
-          </button>
-        </div>
-
-        <form onSubmit={submit} className="space-y-4">
-          {mode === 'email' ? (
-            <div>
-              <label className="text-white/60 text-sm font-medium block mb-1.5">Email</label>
-              <input name="email" type="email" value={form.email} onChange={handle}
-                className="input-field" placeholder="you@example.com" required />
-            </div>
-          ) : (
-            <div>
-              <label className="text-white/60 text-sm font-medium block mb-1.5">AA ID</label>
-              <input name="aaId" type="text" value={form.aaId} onChange={handle}
-                className="input-field" placeholder="e.g. AA123456" required />
-            </div>
-          )}
-          <div>
-            <label className="text-white/60 text-sm font-medium block mb-1.5">Password</label>
-            <input name="password" type="password" value={form.password} onChange={handle}
-              className="input-field" placeholder="••••••••" required />
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4"
+            style={{ background: 'linear-gradient(135deg,#1d4ed8,#3b82f6)' }}>
+            🌊
           </div>
+          <h1 className="text-2xl font-bold text-white">Dream Wave AI</h1>
+          <p className="text-sm mt-1" style={{ color: '#64748b' }}>Your AI-powered life operating system</p>
+        </div>
 
-          {error && <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{error}</p>}
+        {/* Card */}
+        <div className="rounded-2xl p-6" style={{ background: '#111827', border: '1px solid rgba(59,130,246,0.15)' }}>
+          <h2 className="text-lg font-bold text-white mb-5">Sign In</h2>
 
-          <button type="submit" disabled={loading} className="btn-primary w-full mt-2">
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
-        </form>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: '#94a3b8' }}>Email</label>
+              <input
+                type="email"
+                className="input-dark"
+                placeholder="you@example.com"
+                value={form.email}
+                onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
+                autoComplete="email"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: '#94a3b8' }}>Password</label>
+              <input
+                type="password"
+                className="input-dark"
+                placeholder="••••••••"
+                value={form.password}
+                onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
+                autoComplete="current-password"
+              />
+            </div>
 
-        <p className="text-center text-white/40 text-sm mt-6">
-          No account?{' '}
-          <Link to="/register" className="text-violet-400 hover:text-violet-300 font-semibold">
-            Create one
-          </Link>
-        </p>
+            {error && (
+              <div className="p-3 rounded-lg text-sm" style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>
+                {error}
+              </div>
+            )}
+
+            <button type="submit" disabled={loading} className="btn-neon w-full py-3">
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full spin" />
+                  Signing in...
+                </span>
+              ) : 'Sign In'}
+            </button>
+          </form>
+
+          <p className="text-center text-sm mt-5" style={{ color: '#64748b' }}>
+            Don't have an account?{' '}
+            <Link to="/register" className="font-medium" style={{ color: '#3b82f6' }}>
+              Create one
+            </Link>
+          </p>
+        </div>
       </motion.div>
     </div>
   );

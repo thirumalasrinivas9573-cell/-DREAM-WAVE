@@ -23,13 +23,17 @@ const SECTION_TITLES = [
 ];
 
 async function generateReportContent(goalData) {
-  const prompt = `You are a professional career research analyst. Generate a detailed, structured career R&D report for the following user.
+  const prompt = `You are a calm, experienced career mentor writing a detailed R&D report for a student.
+Write like a mentor who knows the student — direct, warm, practical, and human.
+Use simple language. Short sentences. No corporate jargon. Use "you" throughout.
 
 User Goal: ${goalData.goal}
 User Background: ${goalData.background || 'Not specified'}
 AI Analysis Summary: ${goalData.summary ? JSON.stringify(goalData.summary) : 'Not available'}
 
-Generate the report with these 13 sections. For each section write 150-250 words of detailed, practical, professional content.
+Generate the report with these 13 sections. For each section write 150-250 words.
+Write like you're explaining to a student face-to-face — clear, structured, and encouraging.
+End each section with one practical action the student can take.
 
 Format each section EXACTLY like this:
 [SECTION: Section Title Here]
@@ -39,7 +43,8 @@ Content here...
 Sections to include:
 ${SECTION_TITLES.map((t, i) => `${i + 1}. ${t}`).join('\n')}
 
-Make the content specific to "${goalData.goal}", practical, data-driven, and actionable. Include real numbers, timelines, and examples where possible.`;
+Make the content specific to "${goalData.goal}". Include real numbers, timelines, and examples.
+End the final section with: "You're on the right track. Keep going. 💪"`;
 
   const completion = await getClient().chat.completions.create({
     model: 'gpt-4o-mini',

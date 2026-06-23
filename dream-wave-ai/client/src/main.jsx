@@ -5,7 +5,7 @@ import App from './App';
 import { AuthProvider } from './context/AuthContext';
 import './index.css';
 
-// Ambient background orbs
+// Ambient orbs for deep black background
 function Orbs() {
   return (
     <>
@@ -17,7 +17,7 @@ function Orbs() {
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <BrowserRouter>
+  <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
     <AuthProvider>
       <Orbs />
       <App />

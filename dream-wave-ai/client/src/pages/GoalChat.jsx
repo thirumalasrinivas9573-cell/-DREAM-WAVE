@@ -1,6 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { startGoalChat, continueGoalChat } from '../services/api';
+import { useNavigate } from 'react-router-dom';
+import { startGoalChat, continueGoalChat, awardPoints } from '../services/api';
+import GoalHistory from '../components/GoalHistory';
+import { PointToast } from '../components/GamificationPanel';
+import { useDemo } from '../demo/DemoContext';
+import { useJourney } from '../context/JourneyContext';
+import DemoGoalChat from '../demo/DemoGoalChat';
 
 // ── Typing effect ──────────────────────────────────────────────────────────
 function TypingMessage({ text, onDone }) {
@@ -68,16 +74,22 @@ function AnalysisCard({ data }) {
 
 // ── Main component ─────────────────────────────────────────────────────────
 export default function GoalChat() {
+  const { isDemo } = useDemo();
+  if (isDemo) return <DemoGoalChat />;
+
+  const { setGoal: setJourneyGoal } = useJourney();
+  const navigate = useNavigate();
+
   const [messages, setMessages]     = useState([]);
   const [sessionId, setSessionId]   = useState(null);
   const [input, setInput]           = useState('');
-  const [typing, setTyping]         = useState(false);
   const [loading, setLoading]       = useState(false);
   const [inputReady, setInputReady] = useState(false);
   const [step, setStep]             = useState(0);
   const [completed, setCompleted]   = useState(false);
   const [summary, setSummary]       = useState(null);
   const [started, setStarted]       = useState(false);
+  const [toast, setToast]           = useState(null);
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -120,6 +132,13 @@ export default function GoalChat() {
       if (data.completed) {
         setCompleted(true);
         if (data.summary) setSummary(data.summary);
+        // Save goal to journey context
+        const goalText = data.summary?.careerSuggestion || data.summary?.recommendedPath || '';
+        if (goalText) setJourneyGoal(goalText);
+        // Award points for completing goal chat
+        awardPoints('goal_created').then(r => {
+          setToast({ points: r.data.pointsAwarded, trigger: 'goal_created' });
+        }).catch(() => {});
       }
     } catch {
       addMessage('assistant', 'AI is thinking... please try again.');
@@ -219,13 +238,39 @@ export default function GoalChat() {
       )}
 
       {completed && (
-        <div className="flex-shrink-0 mt-3 text-center">
-          <p className="text-emerald-400 text-sm font-semibold mb-2">✅ Goal analysis complete! Saved to your profile.</p>
-          <button onClick={() => window.location.reload()} className="text-sm text-violet-400 hover:text-violet-300 underline">
-            Start a new goal chat
-          </button>
+        <div className="flex-shrink-0 mt-3 space-y-3">
+          <p className="text-emerald-400 text-sm font-semibold text-center">✅ Goal analysis complete! Saved to your profile.</p>
+          <div className="flex gap-3 flex-wrap justify-center">
+            <motion.button
+              whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+              onClick={() => navigate('/dashboard/roadmap')}
+              className="px-5 py-2.5 rounded-xl text-sm font-bold text-white"
+              style={{ background: 'linear-gradient(135deg, #7c3aed, #ec4899)', boxShadow: '0 4px 20px rgba(124,58,237,0.35)' }}>
+              🗺️ View Roadmap
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+              onClick={() => navigate('/dashboard/smart-tasks')}
+              className="px-5 py-2.5 rounded-xl text-sm font-bold"
+              style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)', color: '#6ee7b7' }}>
+              🚀 Start Learning
+            </motion.button>
+          </div>
+          <div className="text-center">
+            <button onClick={() => window.location.reload()} className="text-xs text-white/30 hover:text-white/60 underline">
+              Start a new goal chat
+            </button>
+          </div>
         </div>
       )}
+
+      {/* Past goals with edit/delete/status/progress */}
+      <GoalHistory />
+
+      {/* Point toast */}
+      <AnimatePresence>
+        {toast && <PointToast points={toast.points} trigger={toast.trigger} onDone={() => setToast(null)} />}
+      </AnimatePresence>
     </div>
   );
 }

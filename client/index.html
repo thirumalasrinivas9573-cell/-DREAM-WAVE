@@ -1,13 +1,287 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DREAM WAVE AI</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="AA Dream Wave — AI-powered cinematic learning universe. Animated lessons, AI mentor, roadmaps, and career intelligence." />
+  <meta name="theme-color" content="#09090B" />
+  <meta property="og:title"       content="AA Dream Wave" />
+  <meta property="og:description" content="The world's most immersive AI learning platform." />
+  <meta property="og:type"        content="website" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌊</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <title>AA Dream Wave — AI Learning Universe</title>
+
+  <style>
+    /* ── Google Fonts — load before React ─────────────────────── */
+    @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Playfair+Display:wght@900&family=Space+Grotesk:wght@700;800&family=Inter:wght@300;400;800&display=swap');
+
+    /* ── Splash Screen ─────────────────────────────────────────── */
+    #splash {
+      position: fixed; inset: 0; z-index: 99999;
+      background: #050507;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      font-family: 'Inter', -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+    #splash.hide {
+      opacity: 0;
+      transform: scale(1.03);
+      transition: opacity 0.55s ease, transform 0.55s ease;
+      pointer-events: none;
+    }
+
+    #splash-canvas {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+    }
+
+    #splash-content {
+      position: relative; z-index: 2;
+      display: flex; flex-direction: column; align-items: center;
+      gap: 0; user-select: none;
+    }
+
+    /* ── "AA" in huge Bebas Neue — fills screen ──────────────── */
+    #splash-aa {
+      display: flex; align-items: center; gap: -8px;
+      line-height: 0.85;
+      margin-bottom: 4px;
+    }
+    .aa-letter {
+      font-family: 'Bebas Neue', 'Impact', 'Arial Black', sans-serif;
+      font-size: clamp(7rem, 22vw, 14rem);
+      font-weight: 400;
+      color: transparent;
+      background: linear-gradient(160deg,
+        #ffffff 0%,
+        #C084FC 30%,
+        #8B5CF6 60%,
+        #6366F1 100%
+      );
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.02em;
+      display: inline-block;
+      opacity: 0;
+      transform: translateY(60px) scaleY(0.6);
+      filter: drop-shadow(0 0 40px rgba(139,92,246,0.7));
+    }
+    .aa-letter.show {
+      opacity: 1;
+      transform: translateY(0) scaleY(1);
+      transition: opacity 0.5s cubic-bezier(0.22,1,0.36,1),
+                  transform 0.55s cubic-bezier(0.22,1,0.36,1);
+    }
+    #a2 { transition-delay: 0.12s; }
+
+    /* ── "DREAM WAVE" — Space Grotesk bold ──────────────────── */
+    #splash-dream {
+      font-family: 'Space Grotesk', 'Inter', sans-serif;
+      font-size: clamp(1.6rem, 5.5vw, 3.2rem);
+      font-weight: 800;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: #F8FAFC;
+      display: flex; gap: 0;
+      margin-bottom: 14px;
+      margin-top: -6px;
+    }
+    .dw-letter {
+      display: inline-block;
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.22,1,0.36,1);
+    }
+    .dw-letter.show { opacity: 1; transform: translateY(0); }
+    .dw-space { width: 0.45em; display: inline-block; }
+
+    /* ── Divider line ─────────────────────────────────────────── */
+    #splash-line {
+      width: 0; height: 1.5px;
+      background: linear-gradient(90deg, transparent, #8B5CF6, #C084FC, #8B5CF6, transparent);
+      margin: 0 auto 14px;
+      transition: width 0.8s cubic-bezier(0.22,1,0.36,1) 1.2s;
+    }
+    #splash-line.show { width: min(320px, 70vw); }
+
+    /* ── Tagline — thin elegant ───────────────────────────────── */
+    #splash-tag {
+      font-family: 'Inter', sans-serif;
+      font-size: clamp(0.65rem, 1.8vw, 0.82rem);
+      font-weight: 300;
+      color: rgba(248,250,252,0.45);
+      letter-spacing: 0.4em;
+      text-transform: uppercase;
+      opacity: 0;
+      transition: opacity 0.8s ease 1.6s;
+    }
+    #splash-tag.show { opacity: 1; }
+
+    /* ── Loading bar ──────────────────────────────────────────── */
+    #splash-bar {
+      width: min(260px, 60vw); height: 2px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 999px; overflow: hidden;
+      margin-top: 20px;
+    }
+    #splash-bar-fill {
+      height: 100%; width: 0;
+      background: linear-gradient(90deg, #6366F1, #8B5CF6, #C084FC);
+      border-radius: 999px;
+      box-shadow: 0 0 12px rgba(139,92,246,0.9);
+      transition: width 2.2s cubic-bezier(0.4,0,0.2,1) 0.3s;
+    }
+
+    /* ── Radial glow behind AA ───────────────────────────────── */
+    #splash-glow {
+      position: absolute;
+      width: 500px; height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(139,92,246,0.18) 0%, transparent 70%);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.6s ease 0.2s;
+    }
+    #splash-glow.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <!-- Splash screen — shown before React loads -->
+  <div id="splash">
+    <canvas id="splash-canvas"></canvas>
+    <div id="splash-glow"></div>
+    <div id="splash-content">
+      <!-- BIG AA in Bebas Neue -->
+      <div id="splash-aa">
+        <span class="aa-letter" id="a1">A</span>
+        <span class="aa-letter" id="a2">A</span>
+      </div>
+      <!-- DREAM WAVE letter by letter -->
+      <div id="splash-dream"></div>
+      <!-- Thin divider -->
+      <div id="splash-line"></div>
+      <!-- Elegant tagline -->
+      <div id="splash-tag">AI Learning Universe</div>
+      <!-- Progress bar -->
+      <div id="splash-bar"><div id="splash-bar-fill"></div></div>
+    </div>
+  </div>
+
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+
+  <script>
+    (function() {
+      // ── Particle canvas ─────────────────────────────────────────
+      const canvas = document.getElementById('splash-canvas')
+      const ctx = canvas.getContext('2d')
+      let W, H, raf
+
+      const particles = []
+      function resize() {
+        W = canvas.width  = window.innerWidth
+        H = canvas.height = window.innerHeight
+      }
+      resize()
+      window.addEventListener('resize', resize)
+
+      for (let i = 0; i < 55; i++) {
+        particles.push({
+          x: Math.random() * window.innerWidth,
+          y: Math.random() * window.innerHeight,
+          vx: (Math.random() - 0.5) * 0.25,
+          vy: (Math.random() - 0.5) * 0.25,
+          r: Math.random() * 1.8 + 0.4,
+          a: Math.random() * 0.35 + 0.08,
+          col: Math.random() > 0.5 ? '139,92,246' : '99,102,241',
+        })
+      }
+
+      function tick() {
+        ctx.clearRect(0, 0, W, H)
+        particles.forEach(p => {
+          p.x += p.vx; p.y += p.vy
+          if (p.x < 0) p.x = W; if (p.x > W) p.x = 0
+          if (p.y < 0) p.y = H; if (p.y > H) p.y = 0
+          ctx.beginPath()
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
+          ctx.fillStyle = `rgba(${p.col},${p.a})`
+          ctx.fill()
+        })
+        raf = requestAnimationFrame(tick)
+      }
+      tick()
+
+      // ── Build "DREAM WAVE" letter spans ──────────────────────────
+      const dwEl = document.getElementById('splash-dream')
+      'DREAM WAVE'.split('').forEach(ch => {
+        const s = document.createElement('span')
+        s.className = ch === ' ' ? 'dw-space' : 'dw-letter'
+        s.textContent = ch === ' ' ? '' : ch
+        dwEl.appendChild(s)
+      })
+
+      // ── Animation sequence ────────────────────────────────────────
+      const a1      = document.getElementById('a1')
+      const a2      = document.getElementById('a2')
+      const glow    = document.getElementById('splash-glow')
+      const line    = document.getElementById('splash-line')
+      const tag     = document.getElementById('splash-tag')
+      const bar     = document.getElementById('splash-bar-fill')
+      const letters = document.querySelectorAll('.dw-letter')
+
+      // 1. Glow appears immediately
+      setTimeout(() => glow.classList.add('show'), 50)
+
+      // 2. First A slams down (heavy impact feel)
+      setTimeout(() => a1.classList.add('show'), 200)
+
+      // 3. Second A follows
+      setTimeout(() => a2.classList.add('show'), 380)
+
+      // 4. DREAM WAVE letters cascade in
+      letters.forEach((l, i) => {
+        setTimeout(() => l.classList.add('show'), 700 + i * 48)
+      })
+
+      // 5. Thin divider line extends
+      setTimeout(() => line.classList.add('show'), 1250)
+
+      // 6. Tagline fades
+      setTimeout(() => tag.classList.add('show'), 1600)
+
+      // 7. Progress bar fills
+      setTimeout(() => { bar.style.width = '100%' }, 350)
+
+      // ── Hide splash ───────────────────────────────────────────────
+      function hideSplash() {
+        cancelAnimationFrame(raf)
+        const splash = document.getElementById('splash')
+        if (!splash || splash._hiding) return
+        splash._hiding = true
+        splash.classList.add('hide')
+        setTimeout(() => splash && splash.parentNode && splash.parentNode.removeChild(splash), 600)
+      }
+
+      // Minimum 2.6s, then watch for React root
+      let minDone = false
+      setTimeout(() => { minDone = true }, 2600)
+
+      const obs = new MutationObserver(() => {
+        if (minDone && document.getElementById('root').childElementCount > 0) {
+          obs.disconnect()
+          setTimeout(hideSplash, 100)
+        }
+      })
+      obs.observe(document.getElementById('root'), { childList: true, subtree: true })
+
+      // Hard fallback at 4.5s
+      setTimeout(hideSplash, 4500)
+    })()
+  </script>
+</body>
 </html>

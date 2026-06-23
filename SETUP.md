@@ -14,6 +14,7 @@ cd ../client
 npm install
 ```
 
+
 ### Step 2: Environment Configuration
 
 Create `.env` file in `server/` directory:

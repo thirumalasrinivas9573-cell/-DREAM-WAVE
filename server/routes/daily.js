@@ -1,8 +1,9 @@
-const express = require('express');
-const router = express.Router();
-const auth = require('../middleware/auth');
-const { getDailyAdvice } = require('../controllers/dailyController');
+const express = require('express')
+const router  = express.Router()
+const auth    = require('../middleware/auth')
+const { getDailyAdvice } = require('../controllers/dailyController')
 
-router.post('/', auth, getDailyAdvice);
+router.get('/',  auth, getDailyAdvice)   // GET  /api/daily   — used by Dashboard
+router.post('/', auth, getDailyAdvice)   // POST /api/daily   — used by legacy calls
 
-module.exports = router;
+module.exports = router

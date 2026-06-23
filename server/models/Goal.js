@@ -1,43 +1,43 @@
-const mongoose = require('mongoose');
+const mongoose = require('mongoose')
 
 const goalSchema = new mongoose.Schema({
-  user: {
+  userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: true,
+    index: true,
   },
-  goal: {
+  title: {
     type: String,
-    required: true
+    required: true,
+    trim: true,
   },
-  age: {
+  description: {
+    type: String,
+    default: '',
+    trim: true,
+  },
+  category: {
+    type: String,
+    enum: ['Education', 'Career', 'Personal', 'Health', 'Finance'],
+    default: 'Personal',
+  },
+  progress: {
     type: Number,
-    required: true
+    min: 0,
+    max: 100,
+    default: 0,
   },
-  education: {
+  completed: {
+    type: Boolean,
+    default: false,
+  },
+  deadline: {
+    type: Date,
+  },
+  aiPlan: [{
     type: String,
-    required: true
-  },
-  skills: [{
-    type: String
   }],
-  aiResponse: {
-    type: mongoose.Schema.Types.Mixed,
-    default: {}
-  },
-  status: {
-    type: String,
-    enum: ['pending', 'active', 'completed'],
-    default: 'pending'
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
-});
+}, { timestamps: true })
 
-module.exports = mongoose.model('Goal', goalSchema);
+module.exports = mongoose.model('Goal', goalSchema)

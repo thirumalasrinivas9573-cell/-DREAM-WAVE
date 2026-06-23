@@ -1,25 +1,12 @@
 import React from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { useAuth } from './context/AuthContext';
-import Login     from './pages/Login';
-import Register  from './pages/Register';
+import Login    from './pages/Login';
+import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
-import Spinner   from './components/ui/Spinner';
-
-const pageVariants = {
-  initial: { opacity: 0, y: 12 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] } },
-  exit:    { opacity: 0, y: -8, transition: { duration: 0.2 } },
-};
-
-function PageWrapper({ children }) {
-  return (
-    <motion.div variants={pageVariants} initial="initial" animate="animate" exit="exit" style={{ position: 'relative', zIndex: 1 }}>
-      {children}
-    </motion.div>
-  );
-}
+import Spinner  from './components/ui/Spinner';
+import BackendStatus from './components/ui/BackendStatus';
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -35,28 +22,18 @@ function PublicRoute({ children }) {
 
 export default function App() {
   const location = useLocation();
-
   return (
-    <AnimatePresence mode="wait">
-      <Routes location={location} key={location.pathname.split('/')[1]}>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/login" element={
-          <PublicRoute>
-            <PageWrapper><Login /></PageWrapper>
-          </PublicRoute>
-        } />
-        <Route path="/register" element={
-          <PublicRoute>
-            <PageWrapper><Register /></PageWrapper>
-          </PublicRoute>
-        } />
-        <Route path="/dashboard/*" element={
-          <PrivateRoute>
-            <Dashboard />
-          </PrivateRoute>
-        } />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
-      </Routes>
-    </AnimatePresence>
+    <>
+      <BackendStatus />
+      <AnimatePresence mode="wait">
+        <Routes location={location} key={location.pathname.split('/')[1]}>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/login"    element={<PublicRoute><Login /></PublicRoute>} />
+          <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+          <Route path="/dashboard/*" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </AnimatePresence>
+    </>
   );
 }

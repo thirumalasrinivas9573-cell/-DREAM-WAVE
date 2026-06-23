@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { useJourney } from '../context/JourneyContext';
 
 // ── Small reusable components ──────────────────────────────────────────────
 const Badge = ({ text, color = 'violet' }) => {
@@ -34,6 +36,8 @@ export default function Roadmap() {
   const [data, setData]           = useState(null);
   const [error, setError]         = useState('');
   const [activeTab, setActiveTab] = useState('steps');
+  const navigate = useNavigate();
+  const { journey, setGoal: setJourneyGoal } = useJourney();
 
   useEffect(() => {
     api.get('/goal/history').then(r => setSessions(r.data.sessions || [])).catch(() => {});
@@ -46,6 +50,8 @@ export default function Roadmap() {
     try {
       const { data: res } = await api.post('/roadmap/generate', { sessionId: selected });
       setData(res);
+      // Sync goal to journey context
+      if (res.goal && !journey.goal) setJourneyGoal(res.goal);
       api.get('/roadmap/list').then(r => setRoadmaps(r.data.roadmaps || [])).catch(() => {});
     } catch (err) {
       setError(err.response?.data?.message || 'Generation failed. Please try again.');
@@ -136,6 +142,22 @@ export default function Roadmap() {
             <h2 className="text-xl font-black text-white mb-2">{data.goal}</h2>
             <p className="text-white/60 text-sm">{r.currentStage}</p>
             {r.overview && <p className="text-white/50 text-sm mt-2 leading-relaxed">{r.overview}</p>}
+            <div className="flex gap-3 mt-4 flex-wrap">
+              <motion.button
+                whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                onClick={() => navigate('/dashboard/smart-tasks')}
+                className="px-5 py-2 rounded-xl text-sm font-bold text-white"
+                style={{ background: 'linear-gradient(135deg, #7c3aed, #ec4899)', boxShadow: '0 4px 16px rgba(124,58,237,0.35)' }}>
+                🚀 Start Learning
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                onClick={() => navigate('/dashboard/books?topic=' + encodeURIComponent(data.goal))}
+                className="px-5 py-2 rounded-xl text-sm font-semibold"
+                style={{ background: 'rgba(244,63,94,0.12)', border: '1px solid rgba(244,63,94,0.25)', color: '#fda4af' }}>
+                📖 Recommended Books
+              </motion.button>
+            </div>
           </div>
 
           {/* Tabs */}
@@ -168,6 +190,14 @@ export default function Roadmap() {
                           {step.duration && <Badge text={step.duration} color="violet" />}
                         </div>
                         <p className="text-white/60 text-sm leading-relaxed">{step.description}</p>
+                        {/* Start Learning button */}
+                        <motion.button
+                          whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.96 }}
+                          onClick={() => navigate(`/dashboard/smart-tasks?day=${i + 1}&topic=${encodeURIComponent(step.title)}`)}
+                          className="mt-3 text-xs px-3 py-1.5 rounded-lg font-semibold transition-all"
+                          style={{ background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.3)', color: '#c4b5fd' }}>
+                          🚀 Start Learning →
+                        </motion.button>
                       </div>
                     </div>
                   ))}

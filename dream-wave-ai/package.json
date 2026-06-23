@@ -1,12 +1,19 @@
 {
   "name": "dream-wave-ai",
   "version": "1.0.0",
+  "description": "Dream Wave AI - Full Stack Application",
   "scripts": {
-    "server": "node server/server.js",
-    "client": "npm run dev --prefix client",
-    "dev": "concurrently \"npm run server\" \"npm run client\""
+    "dev":         "node start.js",
+    "start":       "node start.js",
+    "server":      "cd server && npm run dev",
+    "client":      "cd client && npm run dev",
+    "install-all": "cd server && npm install && cd ../client && npm install",
+    "build":       "cd client && npm run build"
   },
+  "keywords": ["ai", "learning", "goals", "react", "nodejs"],
+  "author": "Dream Wave AI Team",
+  "license": "MIT",
   "devDependencies": {
-    "concurrently": "^8.2.0"
+    "concurrently": "^9.2.1"
   }
 }

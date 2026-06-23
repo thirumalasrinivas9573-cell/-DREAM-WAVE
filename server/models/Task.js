@@ -1,49 +1,59 @@
-const mongoose = require('mongoose');
+const mongoose = require('mongoose')
 
 const taskSchema = new mongoose.Schema({
-  user: {
+  userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: true,
+    index: true,
+  },
+  goalId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Goal',
+    index: true,
+  },
+  roadmapId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Roadmap',
+    index: true,
+  },
+  day: {
+    type: Number,
+  },
+  type: {
+    type: String,
+    enum: ['learn', 'quiz', 'practice', 'revise'],
   },
   title: {
     type: String,
-    required: true
+    required: true,
+    trim: true,
   },
   description: {
     type: String,
-    required: true
+    trim: true,
+  },
+  estimatedTime: {
+    type: String,
+    trim: true,
+  },
+  priority: {
+    type: String,
+    enum: ['High', 'Medium', 'Low'],
+    default: 'Medium',
   },
   category: {
     type: String,
-    enum: ['quiz', 'learning', 'practice', 'project'],
-    default: 'learning'
-  },
-  difficulty: {
-    type: String,
-    enum: ['easy', 'medium', 'hard'],
-    default: 'medium'
-  },
-  points: {
-    type: Number,
-    default: 10
+    default: 'General',
+    trim: true,
   },
   completed: {
     type: Boolean,
-    default: false
+    default: false,
   },
   completedAt: {
-    type: Date
-  },
-  quiz: {
-    question: String,
-    options: [String],
-    correctAnswer: Number
-  },
-  createdAt: {
     type: Date,
-    default: Date.now
-  }
-});
+  },
+}, { timestamps: true })
 
-module.exports = mongoose.model('Task', taskSchema);
+module.exports = mongoose.model('Task', taskSchema)

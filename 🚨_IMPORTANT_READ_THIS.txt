@@ -1,0 +1,188 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                    🚨 IMPORTANT: NODE.JS NOT DETECTED 🚨                     ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  ⚠️ ISSUE DETECTED                                                           │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  Node.js is either:                                                          │
+│  • Not installed on your system                                             │
+│  • Not added to your system PATH                                            │
+│  • Installed but terminal needs restart                                     │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  ✅ SOLUTION: INSTALL NODE.JS                                                │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  1. Go to: https://nodejs.org/                                               │
+│  2. Download the LTS (Long Term Support) version                             │
+│  3. Run the installer                                                        │
+│  4. ✅ CHECK "Add to PATH" during installation                               │
+│  5. Restart your computer                                                    │
+│  6. Open a NEW terminal/command prompt                                       │
+│  7. Test: node --version                                                     │
+│  8. Test: npm --version                                                      │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  🔍 HOW TO CHECK IF NODE.JS IS INSTALLED                                     │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  Open Command Prompt or PowerShell and run:                                  │
+│                                                                              │
+│  node --version                                                              │
+│  npm --version                                                               │
+│                                                                              │
+│  Expected output:                                                            │
+│  v18.x.x (or v20.x.x)                                                        │
+│  9.x.x (or 10.x.x)                                                           │
+│                                                                              │
+│  If you see "not recognized" error:                                          │
+│  → Node.js is not installed or not in PATH                                   │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  🎯 AFTER INSTALLING NODE.JS                                                 │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  1. Restart your computer (important!)                                       │
+│  2. Open a NEW Command Prompt or PowerShell                                  │
+│  3. Navigate to your project:                                                │
+│     cd "D:\DREAM WAVE\AA Dream Wavve\trailer 3"                              │
+│  4. Run: TEST_SCRIPTS.bat                                                    │
+│  5. Run: INSTALL_DEPENDENCIES.bat                                            │
+│  6. Run: CLEANUP_SCRIPT.bat                                                  │
+│  7. Run: START_APP.bat                                                       │
+│  8. Open: http://localhost:5173                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  📋 MANUAL START (If you have Node.js installed)                             │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  Option 1: Use the batch files                                               │
+│  • Double-click: START_APP.bat                                               │
+│                                                                              │
+│  Option 2: Manual commands                                                   │
+│  • Open Command Prompt in project folder                                     │
+│  • Run: npm run dev                                                          │
+│                                                                              │
+│  Option 3: Start separately                                                  │
+│  Terminal 1 (Backend):                                                       │
+│  • cd server                                                                 │
+│  • npm run dev                                                               │
+│                                                                              │
+│  Terminal 2 (Frontend):                                                      │
+│  • cd client                                                                 │
+│  • npm run dev                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  🔧 TROUBLESHOOTING                                                          │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  Problem: "npm is not recognized"                                            │
+│  Solution:                                                                   │
+│  1. Install Node.js from https://nodejs.org/                                 │
+│  2. Make sure "Add to PATH" is checked                                       │
+│  3. Restart your computer                                                    │
+│  4. Open a NEW terminal                                                      │
+│                                                                              │
+│  Problem: "node is not recognized"                                           │
+│  Solution: Same as above                                                     │
+│                                                                              │
+│  Problem: Already installed but still not working                            │
+│  Solution:                                                                   │
+│  1. Close ALL terminals and command prompts                                  │
+│  2. Restart your computer                                                    │
+│  3. Open a NEW terminal                                                      │
+│  4. Try again                                                                │
+│                                                                              │
+│  Problem: Installed but PATH not set                                         │
+│  Solution:                                                                   │
+│  1. Search "Environment Variables" in Windows                                │
+│  2. Click "Environment Variables" button                                     │
+│  3. Under "System variables", find "Path"                                    │
+│  4. Click "Edit"                                                             │
+│  5. Add: C:\Program Files\nodejs\                                            │
+│  6. Click OK on all windows                                                  │
+│  7. Restart computer                                                         │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  📥 DOWNLOAD NODE.JS                                                         │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  Official Website: https://nodejs.org/                                       │
+│                                                                              │
+│  Recommended Version: LTS (Long Term Support)                                │
+│  • Currently: v20.x.x or v18.x.x                                             │
+│  • Includes npm automatically                                                │
+│                                                                              │
+│  Installation Steps:                                                         │
+│  1. Download the Windows Installer (.msi)                                    │
+│  2. Run the installer                                                        │
+│  3. Accept the license agreement                                             │
+│  4. Choose installation location (default is fine)                           │
+│  5. ✅ IMPORTANT: Check "Add to PATH"                                        │
+│  6. Click "Install"                                                          │
+│  7. Wait for installation to complete                                        │
+│  8. Click "Finish"                                                           │
+│  9. Restart your computer                                                    │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  ✅ VERIFICATION STEPS                                                       │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  After installing Node.js and restarting:                                    │
+│                                                                              │
+│  1. Open Command Prompt (Win + R, type "cmd", press Enter)                  │
+│  2. Type: node --version                                                     │
+│     Expected: v18.x.x or v20.x.x                                             │
+│  3. Type: npm --version                                                      │
+│     Expected: 9.x.x or 10.x.x                                                │
+│  4. If both work, you're ready!                                              │
+│  5. Navigate to project: cd "D:\DREAM WAVE\AA Dream Wavve\trailer 3"        │
+│  6. Run: START_APP.bat                                                       │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  🎯 QUICK START (After Node.js is installed)                                 │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  1. Open Command Prompt                                                      │
+│  2. cd "D:\DREAM WAVE\AA Dream Wavve\trailer 3"                              │
+│  3. Double-click: START_APP.bat                                              │
+│  4. Wait for servers to start                                                │
+│  5. Open browser: http://localhost:5173                                      │
+│  6. Done! ✅                                                                 │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  💡 IMPORTANT NOTES                                                          │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  • Node.js is REQUIRED to run this project                                   │
+│  • npm comes bundled with Node.js                                            │
+│  • You MUST restart your computer after installation                         │
+│  • You MUST open a NEW terminal after installation                           │
+│  • The batch files will work automatically once Node.js is installed         │
+│  • All scripts are ready - just need Node.js!                                │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  📞 NEED HELP?                                                               │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  If you're stuck:                                                            │
+│  1. Make sure you downloaded from https://nodejs.org/                        │
+│  2. Make sure you restarted your computer                                    │
+│  3. Make sure you opened a NEW terminal                                      │
+│  4. Try running: node --version                                              │
+│  5. If still not working, reinstall Node.js                                  │
+│  6. Check "Add to PATH" is selected during installation                      │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+
+                    🎯 NEXT STEP: INSTALL NODE.JS
+
+                    Download from: https://nodejs.org/
+
+                    Then run: START_APP.bat
+
+═══════════════════════════════════════════════════════════════════════════════

@@ -1,173 +1,73 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
-import { Eye, EyeOff, Mail, Lock, Key } from 'lucide-react'
+import NeuralBg from '../components/animations/NeuralBg'
 
-const Login = () => {
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    aaid: ''
-  })
-  const [showPassword, setShowPassword] = useState(false)
-  const [isAAIDLogin, setIsAAIDLogin] = useState(false)
+export default function Login() {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  
   const { login } = useAuth()
   const navigate = useNavigate()
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    })
-  }
-
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setLoading(true)
-
-    const credentials = isAAIDLogin 
-      ? { aaid: formData.aaid }
-      : { email: formData.email, password: formData.password }
-
-    const result = await login(credentials, isAAIDLogin)
-    
-    if (result.success) {
-      navigate('/')
-    }
-    
-    setLoading(false)
+    setError(''); setLoading(true)
+    try {
+      await login(email, password)
+      navigate('/dashboard')
+    } catch (err) {
+      setError(err.response?.data?.message || 'Invalid email or password.')
+    } finally { setLoading(false) }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-secondary-50 p-4">
+    <div className="auth-page" style={{ position: 'relative', overflow: 'hidden' }}>
+      {/* Neural network background */}
+      <div style={{ position: 'fixed', inset: 0, zIndex: 0 }}>
+        <NeuralBg nodeCount={45} color="#8B5CF6" opacity={0.45} />
+      </div>
+
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="w-full max-w-md"
+        className="auth-card"
+        initial={{ opacity: 0, y: 28, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+        style={{ position: 'relative', zIndex: 1 }}
       >
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-r from-primary-600 to-secondary-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <span className="text-white font-bold text-2xl">DW</span>
+        <div className="auth-logo">
+          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }}
+            style={{ fontSize: '3rem', marginBottom: 10, display: 'inline-block' }}>🌊</motion.div>
+          <h1 className="gradient-text-white" style={{ fontSize: '1.75rem', marginBottom: 6 }}>Dream Wave AI</h1>
+          <p style={{ fontSize: '0.875rem' }}>Your AI-powered career intelligence platform</p>
+        </div>
+
+        <div className="card" style={{ background: 'rgba(13,13,23,0.9)', border: '1px solid rgba(139,92,246,0.2)' }}>
+          <h2 style={{ marginBottom: 22, fontSize: '1.25rem' }}>Welcome back</h2>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div className="form-group">
+              <label className="label">Email address</label>
+              <input type="email" className="input" value={email} onChange={e => setEmail(e.target.value)}
+                placeholder="you@example.com" required autoComplete="email" />
             </div>
-            <h2 className="text-3xl font-bold gradient-text mb-2">Welcome Back</h2>
-            <p className="text-gray-600">Sign in to continue your journey</p>
-          </div>
-
-          <div className="flex mb-6">
-            <button
-              onClick={() => setIsAAIDLogin(false)}
-              className={`flex-1 py-2 px-4 rounded-l-lg font-medium transition-colors ${
-                !isAAIDLogin
-                  ? 'bg-gradient-to-r from-primary-600 to-secondary-600 text-white'
-                  : 'bg-gray-100 text-gray-700'
-              }`}
-            >
-              Email Login
-            </button>
-            <button
-              onClick={() => setIsAAIDLogin(true)}
-              className={`flex-1 py-2 px-4 rounded-r-lg font-medium transition-colors ${
-                isAAIDLogin
-                  ? 'bg-gradient-to-r from-primary-600 to-secondary-600 text-white'
-                  : 'bg-gray-100 text-gray-700'
-              }`}
-            >
-              AAID Login
-            </button>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {isAAIDLogin ? (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  AAID
-                </label>
-                <div className="relative">
-                  <Key className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                  <input
-                    type="text"
-                    name="aaid"
-                    value={formData.aaid}
-                    onChange={handleChange}
-                    placeholder="Enter your AAID"
-                    className="input-field pl-10"
-                    required
-                  />
-                </div>
-              </div>
-            ) : (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email
-                  </label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      placeholder="Enter your email"
-                      className="input-field pl-10"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Password
-                  </label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      name="password"
-                      value={formData.password}
-                      onChange={handleChange}
-                      placeholder="Enter your password"
-                      className="input-field pl-10 pr-10"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                    >
-                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Signing in...' : 'Sign In'}
+            <div className="form-group">
+              <label className="label">Password</label>
+              <input type="password" className="input" value={password} onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••" required autoComplete="current-password" />
+            </div>
+            {error && <div className="alert alert-error">{error}</div>}
+            <button type="submit" className="btn btn-primary btn-lg" disabled={loading} style={{ marginTop: 4, width: '100%' }}>
+              {loading ? <><div className="spinner" style={{ borderTopColor: 'white' }} /> Signing in…</> : 'Sign In →'}
             </button>
           </form>
-
-          <div className="mt-6 text-center">
-            <p className="text-gray-600">
-              Don't have an account?{' '}
-              <Link to="/signup" className="font-medium text-primary-600 hover:text-primary-700">
-                Sign up
-              </Link>
-            </p>
-          </div>
+          <p style={{ marginTop: 18, textAlign: 'center', fontSize: '0.845rem', color: 'var(--text-muted)' }}>
+            New to Dream Wave?{' '}
+            <Link to="/signup" style={{ color: 'var(--purple-light)', fontWeight: 600 }}>Create account</Link>
+          </p>
         </div>
       </motion.div>
     </div>
   )
 }
-
-export default Login

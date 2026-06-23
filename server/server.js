@@ -1,138 +1,161 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
+require('dotenv').config()
+const express   = require('express')
+const http      = require('http')
+const { Server} = require('socket.io')
+const mongoose  = require('mongoose')
+const cors      = require('cors')
+const helmet    = require('helmet')
+const rateLimit = require('express-rate-limit')
 
-// Load environment variables
-require('dotenv').config();
+let compression
+try { compression = require('compression') } catch { compression = null }
 
-const authRoutes = require('./routes/auth');
-const goalRoutes = require('./routes/goals');
-const reportRoutes = require('./routes/report');
-const roadmapRoutes = require('./routes/roadmap');
-const booksRoutes = require('./routes/books');
-const taskRoutes = require('./routes/tasks');
-const dailyRoutes = require('./routes/daily');
-const mentorRoutes = require('./routes/mentor');
-const communityRoutes = require('./routes/community');
-const profileRoutes = require('./routes/profile');
+// ── Logger ────────────────────────────────────────────────────────────────────
+const log = {
+  info:  (...a) => console.log (`[${new Date().toISOString()}] INFO `, ...a),
+  warn:  (...a) => console.warn (`[${new Date().toISOString()}] WARN `, ...a),
+  error: (...a) => console.error(`[${new Date().toISOString()}] ERROR`, ...a),
+}
 
-const app = express();
+// ── Routes ────────────────────────────────────────────────────────────────────
+const authRoutes      = require('./routes/auth')
+const aiRoutes        = require('./routes/aiRoutes')
+const aiExtRoutes     = require('./routes/ai')
+const goalRoutes      = require('./routes/goals')
+const taskRoutes      = require('./routes/tasks')
+const communityRoutes = require('./routes/community')
+const paymentRoutes   = require('./routes/payment')
+const adminRoutes     = require('./routes/admin')
+const reportRoutes    = require('./routes/report')
+const roadmapRoutes   = require('./routes/roadmap')
+const booksRoutes     = require('./routes/books')
+const dailyRoutes     = require('./routes/daily')
+const mentorRoutes    = require('./routes/mentor')
+const profileRoutes   = require('./routes/profile')
+const lessonRoutes    = require('./routes/lesson')
 
-// Security middleware
-app.use(helmet());
+const app    = express()
+const server = http.createServer(app)
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
-});
-app.use(limiter);
+// ── CORS origin resolver ──────────────────────────────────────────────────────
+// Accepts: localhost (any port), any *.netlify.app, and CLIENT_URL env var
+const corsOrigin = (origin, callback) => {
+  if (!origin) return callback(null, true) // curl / mobile / server-to-server
+  const ok =
+    !origin ||
+    /^https?:\/\/localhost(:\d+)?$/.test(origin) ||    // localhost dev
+    /^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin) || // 127.0.0.1 dev
+    /\.netlify\.app$/.test(origin) ||                   // any *.netlify.app
+    /\.netlify\.live$/.test(origin) ||                  // netlify deploy previews
+    (process.env.CLIENT_URL && origin === process.env.CLIENT_URL)
 
-// CORS configuration
-app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
-  credentials: true
-}));
+  if (ok) return callback(null, true)
+  log.warn(`CORS blocked: ${origin}`)
+  callback(new Error(`CORS: ${origin} not allowed`))
+}
 
-// Body parser middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+// ── Socket.io ─────────────────────────────────────────────────────────────────
+const io = new Server(server, {
+  cors: { origin: corsOrigin, credentials: true },
+  transports: ['websocket', 'polling'],
+})
+app.set('io', io)
 
-// MongoDB connection with better error handling
-const connectDB = async () => {
+io.on('connection', socket => {
+  log.info(`Socket connected: ${socket.id}`)
+  socket.on('join', userId => { socket.join(`user:${userId}`) })
+  socket.on('disconnect', () => { log.info(`Socket disconnected: ${socket.id}`) })
+})
+
+// ── Middleware ────────────────────────────────────────────────────────────────
+if (compression) app.use(compression())
+app.use(helmet({ crossOriginResourcePolicy: false }))
+app.use(cors({ origin: corsOrigin, credentials: true }))
+
+// Rate limiters
+const authLimiter = rateLimit({ windowMs: 15*60*1000, max: 30,  standardHeaders: true, message: { success: false, message: 'Too many auth attempts.' } })
+const aiLimiter   = rateLimit({ windowMs: 60*1000,    max: 40,  standardHeaders: true, message: { success: false, message: 'AI rate limit. Please wait.' } })
+const apiLimiter  = rateLimit({ windowMs: 15*60*1000, max: 500, standardHeaders: true, message: { success: false, message: 'Too many requests.' } })
+app.use('/api/auth', authLimiter)
+app.use('/api/ai',   aiLimiter)
+app.use('/api',      apiLimiter)
+
+// Stripe webhook needs raw body BEFORE json parser
+app.use('/api/payment/webhook', express.raw({ type: 'application/json' }))
+
+// Body parsers
+app.use(express.json({ limit: '10mb' }))
+app.use(express.urlencoded({ extended: true }))
+
+// Request logger
+app.use((req, _res, next) => { log.info(`${req.method} ${req.path}`); next() })
+
+// ── MongoDB ───────────────────────────────────────────────────────────────────
+const connectDB = async (attempt = 1) => {
+  const url = process.env.MONGODB_URL
+  if (!url) { log.error('MONGODB_URL not set'); return }
   try {
-    const conn = await mongoose.connect(
-      process.env.MONGODB_URL || process.env.MONGO_URI || 'mongodb://localhost:27017/dreamwave', 
-      {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-      }
-    );
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
-  } catch (error) {
-    console.error('MongoDB connection error:', error.message);
-    console.error('Continuing without DB connection. API will be limited.');
+    const conn = await mongoose.connect(url, {
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS:          45000,
+      maxPoolSize:              10,
+    })
+    log.info(`MongoDB connected: ${conn.connection.host}`)
+  } catch (err) {
+    log.error(`MongoDB attempt ${attempt}/3: ${err.message}`)
+    if (attempt < 3) setTimeout(() => connectDB(attempt + 1), 5000)
   }
-};
+}
+connectDB()
 
-connectDB();
+// ── Health ────────────────────────────────────────────────────────────────────
+app.get('/health',    (_req, res) => res.json({ status: 'OK', ts: Date.now(), env: process.env.NODE_ENV }))
+app.get('/api/test',  (_req, res) => res.json({ success: true, message: 'Dream Wave API is running' }))
 
-// Health check route
-app.get('/health', (req, res) => {
-  res.status(200).json({ message: 'Server running', status: 'OK' });
-});
+// ── API Routes ────────────────────────────────────────────────────────────────
+app.use('/api/auth',      authRoutes)
+app.use('/api/ai',        aiRoutes)
+app.use('/api/ai',        aiExtRoutes)
+app.use('/api/goals',     goalRoutes)
+app.use('/api/tasks',     taskRoutes)
+app.use('/api/community', communityRoutes)
+app.use('/api/payment',   paymentRoutes)
+app.use('/api/admin',     adminRoutes)
+app.use('/api/report',    reportRoutes)
+app.use('/api/roadmap',   roadmapRoutes)
+app.use('/api/books',     booksRoutes)
+app.use('/api/daily',     dailyRoutes)
+app.use('/api/mentor',    mentorRoutes)
+app.use('/api/profile',   profileRoutes)
+app.use('/api/lesson',    lessonRoutes)
 
-// Test route
-app.get('/api/test', (req, res) => {
-  res.status(200).json({ message: 'Backend working' });
-});
-
-// API routes
-app.use('/api/auth', authRoutes);
-app.use('/api/goals', goalRoutes);
-app.use('/api/report', reportRoutes);
-app.use('/api/roadmap', roadmapRoutes);
-app.use('/api/books', booksRoutes);
-app.use('/api/tasks', taskRoutes);
-app.use('/api/daily', dailyRoutes);
-app.use('/api/mentor', mentorRoutes);
-app.use('/api/community', communityRoutes);
-app.use('/api/profile', profileRoutes);
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Error:', err.stack);
-  
-  // Mongoose validation error
+// ── Global error handler ──────────────────────────────────────────────────────
+app.use((err, req, res, _next) => {
+  log.error(`${req.method} ${req.path} →`, err.message)
   if (err.name === 'ValidationError') {
-    const message = Object.values(err.errors).map(val => val.message).join(', ');
-    return res.status(400).json({ message });
+    const msg = Object.values(err.errors).map(v => v.message).join(', ')
+    return res.status(400).json({ success: false, message: msg })
   }
-  
-  // Mongoose duplicate key error
-  if (err.code === 11000) {
-    const message = 'Duplicate field value entered';
-    return res.status(400).json({ message });
-  }
-  
-  // JWT errors
-  if (err.name === 'JsonWebTokenError') {
-    return res.status(401).json({ message: 'Invalid token' });
-  }
-  
-  if (err.name === 'TokenExpiredError') {
-    return res.status(401).json({ message: 'Token expired' });
-  }
-  
-  // Default error
-  res.status(err.statusCode || 500).json({ 
-    message: err.message || 'Something went wrong!', 
-    error: process.env.NODE_ENV === 'development' ? err.stack : 'Internal server error'
-  });
-});
+  if (err.code === 11000) return res.status(400).json({ success: false, message: 'Email already registered.' })
+  if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError')
+    return res.status(401).json({ success: false, message: 'Session expired. Please log in again.' })
+  if (err.message?.startsWith('CORS'))
+    return res.status(403).json({ success: false, message: err.message })
+  res.status(err.statusCode || 500).json({
+    success: false,
+    message: err.message || 'Something went wrong',
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+  })
+})
 
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({ message: 'Route not found' });
-});
+// ── 404 ───────────────────────────────────────────────────────────────────────
+app.use('*', (req, res) => res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found` }))
 
-const PORT = process.env.PORT || 5000;
+// ── Start ─────────────────────────────────────────────────────────────────────
+const PORT = parseInt(process.env.PORT || '5001', 10)
+server.listen(PORT, '0.0.0.0', () =>
+  log.info(`Server running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`)
+)
 
-const server = app.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
-});
-
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (err, promise) => {
-  console.log(`Error: ${err.message}`);
-  // Close server & exit process
-  server.close(() => process.exit(1));
-});
-
-// Handle uncaught exceptions
-process.on('uncaughtException', (err) => {
-  console.log(`Error: ${err.message}`);
-  process.exit(1);
-});
+process.on('unhandledRejection', err => log.warn('Unhandled rejection:', err?.message))
+process.on('uncaughtException',  err => { log.error('Uncaught exception:', err?.message); process.exit(1) })

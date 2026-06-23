@@ -1,20 +1,16 @@
-const express = require('express');
-const router = express.Router();
-const auth = require('../middleware/auth');
+const express = require('express')
+const router  = express.Router()
+const auth    = require('../middleware/auth')
 const {
   getPosts,
   createPost,
-  likePost,
-  commentPost,
-  getFriends,
-  addFriend,
-} = require('../controllers/communityController');
+  toggleLike,
+  deletePost,
+} = require('../controllers/communityController')
 
-router.get('/posts', auth, getPosts);
-router.post('/posts', auth, createPost);
-router.post('/posts/:id/like', auth, likePost);
-router.post('/posts/:id/comment', auth, commentPost);
-router.get('/friends', auth, getFriends);
-router.post('/friends/:id', auth, addFriend);
+router.get('/',           auth, getPosts)
+router.post('/',          auth, createPost)
+router.put('/:id/like',   auth, toggleLike)
+router.delete('/:id',     auth, deletePost)
 
-module.exports = router;
+module.exports = router

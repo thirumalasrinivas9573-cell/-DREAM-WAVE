@@ -132,12 +132,49 @@ exports.saveGoal = async (req, res) => {
 // ── GET /api/goal/history ────────────────────────────────────────────────
 exports.getHistory = async (req, res) => {
   try {
-    const sessions = await Goal.find({ userId: req.user._id, completed: true })
+    const sessions = await Goal.find({ userId: req.user._id, completed: true, isDeleted: { $ne: true } })
       .sort({ createdAt: -1 })
       .limit(10)
-      .select('goal summary createdAt step');
+      .select('goal summary createdAt step status progress');
     res.json({ sessions });
   } catch (err) {
     res.status(500).json({ message: 'Error fetching history' });
+  }
+};
+
+// ── PATCH /api/goal/:id ── safe update (status, progress, goal title)
+exports.updateGoal = async (req, res) => {
+  try {
+    const { status, progress, goal } = req.body;
+    const updates = {};
+    if (status   !== undefined) updates.status   = status;
+    if (progress !== undefined) updates.progress = Math.min(100, Math.max(0, Number(progress)));
+    if (goal     !== undefined) updates.goal     = goal.trim().substring(0, 200);
+
+    const session = await Goal.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user._id, isDeleted: false },
+      updates,
+      { new: true }
+    ).select('goal status progress completed createdAt');
+
+    if (!session) return res.status(404).json({ message: 'Goal not found' });
+    res.json({ session });
+  } catch (err) {
+    res.status(500).json({ message: 'Update failed' });
+  }
+};
+
+// ── DELETE /api/goal/:id ── soft delete only
+exports.deleteGoal = async (req, res) => {
+  try {
+    const session = await Goal.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user._id },
+      { isDeleted: true },
+      { new: true }
+    );
+    if (!session) return res.status(404).json({ message: 'Goal not found' });
+    res.json({ message: 'Goal removed' });
+  } catch (err) {
+    res.status(500).json({ message: 'Delete failed' });
   }
 };

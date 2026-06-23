@@ -1,4 +1,52 @@
+# ── Dependencies ───────────────────────────────────────────────────────────────
 node_modules/
+*/node_modules/
+**/node_modules/
+
+# ── Environment files (NEVER commit secrets) ───────────────────────────────────
 .env
+.env.local
+.env.production
+.env.development
+server/.env
+client/.env
+client/.env.local
+*.env
+
+# ── Build output ────────────────────────────────────────────────────────────────
+client/dist/
+dist/
+build/
+
+# ── Logs ────────────────────────────────────────────────────────────────────────
 *.log
+npm-debug.log*
+yarn-debug.log*
+logs/
+
+# ── macOS ────────────────────────────────────────────────────────────────────────
 .DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+
+# ── Editor ───────────────────────────────────────────────────────────────────────
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# ── Test/temp files ───────────────────────────────────────────────────────────────
+test_api.js
+test_ai.js
+test_key.js
+*.backup
+*.corrupted.backup
+
+# ── Large duplicate folders (already cleaned up) ─────────────────────────────────
+dream-wave-ai/
+safe-ui/
+public/
+
+# ── Render cache ────────────────────────────────────────────────────────────────
+.render-buildpacks.json

@@ -1,92 +1,180 @@
-import React, { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useAuth } from '../../context/AuthContext';
+import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { motion } from 'framer-motion';
 
-const NAV = [
-  { to: '/dashboard',               icon: '🏠', label: 'Dashboard' },
-  { to: '/dashboard/goal',          icon: '🎯', label: 'Set Goal' },
-  { to: '/dashboard/roadmap',       icon: '🗺️', label: 'Roadmap' },
-  { to: '/dashboard/report',        icon: '📊', label: 'R&D Report' },
-  { to: '/dashboard/books',         icon: '📖', label: 'Books' },
-  { to: '/dashboard/tasks',         icon: '✅', label: 'Tasks' },
-  { to: '/dashboard/mentor',        icon: '🪷', label: 'Krishna Mentor' },
-  { to: '/dashboard/daily-life',    icon: '🌿', label: 'Daily Life AI' },
-  { to: '/dashboard/community',     icon: '👥', label: 'Community' },
-  { to: '/dashboard/profile',       icon: '👤', label: 'Profile' },
-];
+const Sidebar = ({ features, currentFeature, isOpen, onToggle, user, onLogout }) => {
+  const location = useLocation();
 
-export default function Sidebar() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-  const [collapsed, setCollapsed] = useState(false);
-
-  const handleLogout = () => { logout(); navigate('/login'); };
+  const sidebarVariants = {
+    open: { x: 0 },
+    closed: { x: -320 }
+  };
 
   return (
-    <motion.aside
-      animate={{ width: collapsed ? 72 : 240 }}
-      transition={{ duration: 0.2 }}
-      className="h-screen flex flex-col glass border-r border-violet-500/10 flex-shrink-0 overflow-hidden"
-    >
-      {/* Brand */}
-      <div className="flex items-center gap-3 px-4 py-5 border-b border-violet-500/10">
-        <span className="text-2xl flex-shrink-0">🌊</span>
-        {!collapsed && (
-          <span className="font-black text-sm bg-gradient-to-r from-violet-400 to-pink-400 bg-clip-text text-transparent whitespace-nowrap">
-            Dream Wave AI
-          </span>
-        )}
-        <button
-          onClick={() => setCollapsed(c => !c)}
-          className="ml-auto text-white/30 hover:text-white/70 transition-colors text-xs"
-        >
-          {collapsed ? '›' : '‹'}
-        </button>
-      </div>
-
-      {/* Nav */}
-      <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
-        {NAV.map(({ to, icon, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === '/dashboard'}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                isActive
-                  ? 'bg-violet-600/20 text-violet-300 border border-violet-500/30'
-                  : 'text-white/50 hover:text-white/80 hover:bg-white/5'
-              }`
-            }
-          >
-            <span className="text-base flex-shrink-0">{icon}</span>
-            {!collapsed && <span className="whitespace-nowrap">{label}</span>}
-          </NavLink>
-        ))}
-      </nav>
-
-      {/* User + Logout */}
-      <div className="p-3 border-t border-violet-500/10">
-        {!collapsed && user && (
-          <div className="flex items-center gap-2 px-2 py-2 mb-2">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center text-xs font-bold flex-shrink-0">
-              {user.name?.[0]?.toUpperCase()}
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-white/80 truncate">{user.name}</p>
-              <p className="text-xs text-white/30 truncate">{user.email}</p>
+    <>
+      {/* Desktop Sidebar */}
+      <div className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0">
+        <div className="flex flex-col flex-grow bg-dark-900/95 backdrop-blur-xl border-r border-primary-800/30">
+          {/* Logo */}
+          <div className="flex items-center justify-center h-16 px-4 border-b border-primary-800/30">
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-lg">🌊</span>
+              </div>
+              <span className="text-xl font-bold bg-gradient-to-r from-primary-400 to-accent-blue bg-clip-text text-transparent">
+                Dream Wave AI
+              </span>
             </div>
           </div>
-        )}
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-white/40 hover:text-red-400 hover:bg-red-500/10 transition-all"
-        >
-          <span className="flex-shrink-0">🚪</span>
-          {!collapsed && <span>Logout</span>}
-        </button>
+
+          {/* Navigation */}
+          <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+            {features.map((feature) => {
+              const isActive = location.pathname === feature.path || 
+                             (feature.path === '/dashboard' && location.pathname === '/dashboard');
+              
+              return (
+                <Link
+                  key={feature.id}
+                  to={feature.path}
+                  className={`
+                    group flex items-center px-3 py-3 text-sm font-medium rounded-xl transition-all duration-200
+                    ${isActive 
+                      ? 'bg-gradient-primary text-white shadow-blue' 
+                      : 'text-dark-300 hover:text-white hover:bg-dark-800/50'
+                    }
+                  `}
+                >
+                  <span className="text-lg mr-3">{feature.icon}</span>
+                  <div className="flex-1">
+                    <div className="font-medium">{feature.name}</div>
+                    <div className={`text-xs ${isActive ? 'text-primary-100' : 'text-dark-400'}`}>
+                      {feature.description}
+                    </div>
+                  </div>
+                  {isActive && (
+                    <div className="w-2 h-2 bg-white rounded-full animate-pulse-glow" />
+                  )}
+                </Link>
+              );
+            })}
+          </nav>
+
+          {/* User Info */}
+          <div className="p-4 border-t border-primary-800/30">
+            <div className="flex items-center space-x-3 mb-3">
+              <div className="w-10 h-10 bg-gradient-accent rounded-full flex items-center justify-center">
+                <span className="text-white font-semibold">
+                  {user?.name?.charAt(0)?.toUpperCase() || 'U'}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-white truncate">
+                  {user?.name || 'User'}
+                </p>
+                <p className="text-xs text-dark-400 truncate">
+                  {user?.email || 'user@example.com'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onLogout}
+              className="w-full px-3 py-2 text-sm text-dark-300 hover:text-white hover:bg-dark-800/50 rounded-lg transition-colors"
+            >
+              🚪 Sign Out
+            </button>
+          </div>
+        </div>
       </div>
-    </motion.aside>
+
+      {/* Mobile Sidebar */}
+      <motion.div
+        className="lg:hidden fixed inset-y-0 left-0 z-50 w-80"
+        variants={sidebarVariants}
+        animate={isOpen ? 'open' : 'closed'}
+        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+      >
+        <div className="flex flex-col h-full bg-dark-900/95 backdrop-blur-xl border-r border-primary-800/30">
+          {/* Mobile Header */}
+          <div className="flex items-center justify-between h-16 px-4 border-b border-primary-800/30">
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-lg">🌊</span>
+              </div>
+              <span className="text-lg font-bold bg-gradient-to-r from-primary-400 to-accent-blue bg-clip-text text-transparent">
+                Dream Wave AI
+              </span>
+            </div>
+            <button
+              onClick={onToggle}
+              className="p-2 text-dark-400 hover:text-white transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Mobile Navigation */}
+          <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+            {features.map((feature) => {
+              const isActive = location.pathname === feature.path || 
+                             (feature.path === '/dashboard' && location.pathname === '/dashboard');
+              
+              return (
+                <Link
+                  key={feature.id}
+                  to={feature.path}
+                  onClick={onToggle}
+                  className={`
+                    group flex items-center px-3 py-3 text-sm font-medium rounded-xl transition-all duration-200
+                    ${isActive 
+                      ? 'bg-gradient-primary text-white shadow-blue' 
+                      : 'text-dark-300 hover:text-white hover:bg-dark-800/50'
+                    }
+                  `}
+                >
+                  <span className="text-lg mr-3">{feature.icon}</span>
+                  <div className="flex-1">
+                    <div className="font-medium">{feature.name}</div>
+                    <div className={`text-xs ${isActive ? 'text-primary-100' : 'text-dark-400'}`}>
+                      {feature.description}
+                    </div>
+                  </div>
+                  {isActive && (
+                    <div className="w-2 h-2 bg-white rounded-full animate-pulse-glow" />
+                  )}
+                </Link>
+              );
+            })}
+          </nav>
+
+          {/* Mobile User Info */}
+          <div className="p-4 border-t border-primary-800/30">
+            <div className="flex items-center space-x-3 mb-3">
+              <div className="w-10 h-10 bg-gradient-accent rounded-full flex items-center justify-center">
+                <span className="text-white font-semibold">
+                  {user?.name?.charAt(0)?.toUpperCase() || 'U'}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-white truncate">
+                  {user?.name || 'User'}
+                </p>
+                <p className="text-xs text-dark-400 truncate">
+                  {user?.email || 'user@example.com'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onLogout}
+              className="w-full px-3 py-2 text-sm text-dark-300 hover:text-white hover:bg-dark-800/50 rounded-lg transition-colors"
+            >
+              🚪 Sign Out
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </>
   );
-}
+};
+
+export default Sidebar;

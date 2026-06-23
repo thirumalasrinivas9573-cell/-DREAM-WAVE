@@ -21,8 +21,8 @@ const userSchema = new mongoose.Schema({
   },
   aaid: {
     type: String,
-    required: true,
-    unique: true
+    unique: true,
+    default: () => 'AAID' + Math.random().toString(36).substr(2, 9).toUpperCase(),
   },
   profileImage: {
     type: String,
@@ -59,7 +59,15 @@ const userSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now
-  }
+  },
+  plan: {
+    type: String,
+    enum: ['free', 'pro'],
+    default: 'free',
+  },
+  planActivatedAt: {
+    type: Date,
+  },
 });
 
 // Hash password before saving
@@ -80,7 +88,7 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// Generate AAID
+// Generate AAID fallback (default handles this — kept for backward compat)
 userSchema.pre('save', function(next) {
   if (!this.aaid) {
     this.aaid = 'AAID' + Math.random().toString(36).substr(2, 9).toUpperCase();

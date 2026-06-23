@@ -1,118 +1,117 @@
 import axios from 'axios'
 
-// In development, prefer relative /api so Vite proxy applies.
-// In production builds, set VITE_API_URL to your backend origin.
-const API_BASE_URL = import.meta.env.PROD && import.meta.env.VITE_API_URL
-  ? import.meta.env.VITE_API_URL
-  : ''
+// ── Base URL ──────────────────────────────────────────────────────────────────
+// Local dev  → Vite proxy forwards /api → http://localhost:5001  (no CORS issues)
+// Production → VITE_API_URL env var set in Netlify dashboard
+//              e.g. https://dream-wave-api.onrender.com/api
+const BASE_URL = import.meta.env.VITE_API_URL || '/api'
 
-// Create axios instance
 const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json'
-  }
+  baseURL: BASE_URL,
+  timeout: 90000,            // 90s — AI roadmap calls can take time
+  withCredentials: false,    // JWT is in Authorization header, not cookies
 })
 
-// Add request interceptor to include auth token
+// ── Attach JWT to every request ───────────────────────────────────────────────
 api.interceptors.request.use(
-  (config) => {
+  config => {
     const token = localStorage.getItem('token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
+    if (token) config.headers.Authorization = `Bearer ${token}`
     return config
   },
-  (error) => {
-    return Promise.reject(error)
-  }
+  err => Promise.reject(err)
 )
 
-// Add response interceptor to handle errors
+// ── Handle global errors ──────────────────────────────────────────────────────
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
+  res => res,
+  err => {
+    // Session expired → force re-login
+    if (err.response?.status === 401) {
       localStorage.removeItem('token')
-      window.location.href = '/login'
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login'
+      }
     }
-    return Promise.reject(error)
+    return Promise.reject(err)
   }
 )
-
-// Auth APIs
-export const authAPI = {
-  login: (credentials) => api.post('/api/auth/login', credentials),
-  signup: (userData) => api.post('/api/auth/signup', userData),
-  aaidLogin: (credentials) => api.post('/api/auth/aaid-login', credentials),
-  getMe: () => api.get('/api/auth/me')
-}
-
-// Goal APIs
-export const goalAPI = {
-  createGoal: (goalData) => api.post('/api/goals', goalData),
-  getGoals: () => api.get('/api/goals'),
-  getGoal: (id) => api.get(`/api/goals/${id}`)
-}
-
-// Report APIs
-export const reportAPI = {
-  generateReport: (goalData) => api.post('/api/report', goalData),
-  getReports: () => api.get('/api/report'),
-  downloadPDF: (id) => api.get(`/api/report/${id}/download`, { responseType: 'blob' })
-}
-
-// Roadmap APIs
-export const roadmapAPI = {
-  generateRoadmap: (data) => api.post('/api/roadmap', data)
-}
-
-// Books APIs
-export const booksAPI = {
-  searchBooks: (query, category) => api.get('/api/books', { params: { query, category } })
-}
-
-// Tasks APIs
-export const taskAPI = {
-  getTasks: () => api.get('/api/tasks'),
-  createTask: (taskData) => api.post('/api/tasks', taskData),
-  completeTask: (id, answer) => api.post(`/api/tasks/${id}/complete`, { answer }),
-  generateTask: (data) => api.post('/api/tasks/generate', data)
-}
-
-// Daily Life APIs
-export const dailyAPI = {
-  getAdvice: (data) => api.post('/api/daily', data)
-}
-
-// Mentor APIs
-export const mentorAPI = {
-  getAdvice: (query) => api.post('/api/mentor', { query })
-}
-
-// Community APIs
-export const communityAPI = {
-  getPosts: () => api.get('/api/community/posts'),
-  createPost: (data) => api.post('/api/community/posts', data),
-  likePost: (id) => api.post(`/api/community/posts/${id}/like`),
-  commentPost: (id, content) => api.post(`/api/community/posts/${id}/comment`, { content }),
-  getFriends: () => api.get('/api/community/friends'),
-  addFriend: (id) => api.post(`/api/community/friends/${id}`)
-}
-
-// Profile APIs
-export const profileAPI = {
-  getProfile: () => api.get('/api/profile'),
-  updateProfile: (data) => api.put('/api/profile', data),
-  uploadImage: (formData) => api.post('/api/profile/upload', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }),
-  generateCertificate: (data) => api.post('/api/profile/certificate', data)
-}
-
-// Connectivity test API
-export const testAPI = {
-  ping: () => api.get('/api/test')
-}
 
 export default api
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+export const authApi = {
+  login:    (data) => api.post('/auth/login', data),
+  signup:   (data) => api.post('/auth/signup', data),
+  register: (data) => api.post('/auth/signup', data), // alias
+  me:       ()     => api.get('/auth/me'),
+}
+
+// ── Goals ─────────────────────────────────────────────────────────────────────
+export const goalApi = {
+  getAll:       ()         => api.get('/goals'),
+  create:       (data)     => api.post('/goals', data),
+  update:       (id, data) => api.put(`/goals/${id}`, data),
+  delete:       (id)       => api.delete(`/goals/${id}`),
+  generatePlan: (id)       => api.post(`/goals/${id}/ai-plan`),
+}
+
+// ── Tasks ─────────────────────────────────────────────────────────────────────
+export const taskApi = {
+  getAll:   ()         => api.get('/tasks'),
+  create:   (data)     => api.post('/tasks', data),
+  update:   (id, data) => api.put(`/tasks/${id}`, data),
+  delete:   (id)       => api.delete(`/tasks/${id}`),
+  generate: (data)     => api.post('/tasks/generate-from-roadmap', data),
+}
+
+// ── Roadmap ───────────────────────────────────────────────────────────────────
+export const roadmapApi = {
+  get:      (goalId) => api.get(`/roadmap/${goalId}`),
+  generate: (data)   => api.post('/roadmap/generate', data),
+}
+
+// ── Reports ───────────────────────────────────────────────────────────────────
+export const reportApi = {
+  getAll:   ()     => api.get('/report'),
+  generate: (data) => api.post('/report', data),
+  download: (id)   => api.get(`/report/${id}/download`, { responseType: 'blob' }),
+}
+
+// ── Mentor (AI chat) ──────────────────────────────────────────────────────────
+export const mentorApi = {
+  chat:    (message, mode = 'general') => api.post('/mentor/chat', { message, mode }),
+  history: ()        => api.get('/mentor/history'),
+  clear:   ()        => api.delete('/mentor/history'),
+}
+
+// ── Profile ───────────────────────────────────────────────────────────────────
+export const profileApi = {
+  get:    ()     => api.get('/profile'),
+  update: (data) => api.put('/profile', data),
+}
+
+// ── Community ─────────────────────────────────────────────────────────────────
+export const communityApi = {
+  getPosts:   ()     => api.get('/community'),
+  createPost: (data) => api.post('/community', data),
+  likePost:   (id)   => api.put(`/community/${id}/like`),
+  deletePost: (id)   => api.delete(`/community/${id}`),
+}
+
+// ── Books ─────────────────────────────────────────────────────────────────────
+export const booksApi = {
+  getAll:    ()     => api.get('/books'),
+  recommend: (data) => api.post('/books/recommend', data),
+}
+
+// ── Daily ─────────────────────────────────────────────────────────────────────
+export const dailyApi = {
+  get:     ()     => api.get('/daily'),
+  getPost: (data) => api.post('/daily', data),
+}
+export const lessonApi = {
+  generate:     (data) => api.post('/lesson/generate', data),
+  videoScript:  (data) => api.post('/lesson/video-script', data),
+  suggestions:  ()     => api.get('/lesson/suggestions'),
+}

@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: aa-dream-wave-api
+    env: node
+    region: oregon
+    plan: free
+    rootDir: .
+    buildCommand: npm install --production=false
+    startCommand: node server.js
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: MONGODB_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: CLIENT_URL
+        sync: false

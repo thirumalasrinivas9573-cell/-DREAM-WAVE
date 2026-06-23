@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
-const { searchBooks } = require('../controllers/booksController');
+const { searchBooks, recommendBooks } = require('../controllers/booksController');
 
 router.get('/', auth, searchBooks);
+router.post('/recommend', auth, recommendBooks);
 
 module.exports = router;

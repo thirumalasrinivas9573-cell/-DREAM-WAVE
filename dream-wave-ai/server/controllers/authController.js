@@ -9,17 +9,20 @@ const signToken = (user) =>
   );
 
 const safeUser = (user) => ({
-  id:        user._id,
-  name:      user.name,
-  email:     user.email,
-  aaId:      user.aaId,
-  goal:      user.goal,
-  bio:       user.bio || '',
-  credits:   user.credits,
-  streak:    user.streak,
-  level:     user.level || 1,
-  avatar:    user.avatar,
-  createdAt: user.createdAt
+  id:           user._id,
+  name:         user.name,
+  email:        user.email,
+  aaId:         user.aaId,
+  goal:         user.goal,
+  bio:          user.bio || '',
+  credits:      user.credits,
+  streak:       user.streak,
+  level:        user.level || 1,
+  avatar:       user.avatar,
+  points:       user.points || 0,
+  loginStreak:  user.loginStreak || 0,
+  achievements: user.achievements || [],
+  createdAt:    user.createdAt
 });
 
 // ── POST /api/auth/register ──────────────────────────────────────────────

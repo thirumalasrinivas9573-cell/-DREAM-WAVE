@@ -1,32 +1,60 @@
 const OpenAI = require('openai');
-let _client;
-const getClient = () => { if (!_client) _client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY }); return _client; };
+const { FALLBACK_MENTOR_REPLY } = require('../utils/fallbacks');
+const { MENTOR_PROMPT }         = require('../ai/prompts/mentorPrompt');
+const { getMemory, updateMemory, buildContextString, detectEmotion } = require('../services/memoryService');
 
-const KRISHNA_SYSTEM = `You are Lord Krishna speaking to Arjuna (the user) from the Bhagavad Gita.
-Speak with divine wisdom, compassion, and philosophical depth.
-Reference Gita verses when relevant. Use "Dear Arjuna" or "O seeker" occasionally.
-Give practical life guidance wrapped in spiritual wisdom.
-Keep responses focused, powerful, and under 200 words.`;
+let _client;
+const getClient = () => {
+  if (!_client) _client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  return _client;
+};
 
 exports.ask = async (req, res) => {
-  const { message } = req.body;
+  const { message, history = [] } = req.body;
   if (!message) return res.status(400).json({ message: 'Message required' });
+
+  // Load memory + detect emotion
+  const memory         = await getMemory(req.user._id);
+  const detectedEmotion = detectEmotion(message);
+  const memoryContext  = buildContextString(memory);
+
+  const userData = {
+    name:  req.user?.name,
+    goal:  memory.goal  || req.user?.goal,
+    level: memory.level || (req.user?.level ? `Level ${req.user.level}` : undefined),
+    state: detectedEmotion !== 'Normal' ? detectedEmotion : memory.emotionalState,
+  };
+
   try {
+    const systemPrompt = MENTOR_PROMPT(userData, message) + memoryContext;
+
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      ...history.slice(-6).map(m => ({
+        role:    m.role === 'ai' ? 'assistant' : 'user',
+        content: m.text,
+      })),
+      { role: 'user', content: message },
+    ];
+
     const completion = await getClient().chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: KRISHNA_SYSTEM },
-        { role: 'user', content: message }
-      ],
-      max_tokens: 350, temperature: 0.8
+      model:       'gpt-4o-mini',
+      messages,
+      max_tokens:  500,
+      temperature: 0.82,
     });
-    res.json({ reply: completion.choices[0].message.content.trim() });
+
+    const reply = completion.choices[0].message.content.trim();
+
+    // Save emotional state + last topic (non-blocking)
+    updateMemory(req.user._id, {
+      emotionalState: detectedEmotion,
+      lastTopics:     [message.slice(0, 60)],
+    }).catch(() => {});
+
+    res.json({ reply });
   } catch (err) {
-    const isQuota = err?.status === 429 || err?.code === 'insufficient_quota';
-    res.status(500).json({
-      message: isQuota
-        ? 'AI quota exceeded. Please try again later.'
-        : 'Mentor response failed'
-    });
+    console.warn('Mentor fallback triggered:', err.message);
+    res.json({ reply: FALLBACK_MENTOR_REPLY, fallback: true });
   }
 };

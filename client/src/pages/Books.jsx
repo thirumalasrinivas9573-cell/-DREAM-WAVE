@@ -1,234 +1,80 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { useQuery } from 'react-query'
-import { booksAPI } from '../services/api'
-import toast from 'react-hot-toast'
-import { Search, BookOpen, ExternalLink, Star } from 'lucide-react'
+import Layout from '../components/Layout'
+import { booksApi } from '../services/api'
 
-const Books = () => {
-  const [query, setQuery] = useState('')
-  const [category, setCategory] = useState('all')
-  const [searchTerm, setSearchTerm] = useState('')
+const DEFAULT = [
+  { title:'Atomic Habits',            author:'James Clear',     category:'Productivity',     rating:5, cover:'📗', desc:'Build good habits, break bad ones with proven science.' },
+  { title:'Deep Work',                author:'Cal Newport',     category:'Productivity',     rating:5, cover:'📘', desc:'Rules for focused success in a distracted world.' },
+  { title:'The Psychology of Money',  author:'Morgan Housel',   category:'Finance',          rating:5, cover:'📙', desc:'Timeless lessons on wealth, greed, and happiness.' },
+  { title:'Thinking, Fast and Slow',  author:'Daniel Kahneman', category:'Psychology',       rating:4, cover:'📕', desc:'How two systems of thinking shape all our decisions.' },
+  { title:'Zero to One',              author:'Peter Thiel',     category:'Entrepreneurship', rating:4, cover:'📗', desc:'Notes on startups, and how to build the future.' },
+  { title:'The Lean Startup',         author:'Eric Ries',       category:'Entrepreneurship', rating:4, cover:'📔', desc:'Build, Measure, Learn — the startup methodology.' },
+  { title:'Sapiens',                  author:'Yuval Noah Harari',category:'History',         rating:5, cover:'📓', desc:'A brief history of humankind — essential reading.' },
+  { title:'Rich Dad Poor Dad',        author:'Robert Kiyosaki', category:'Finance',          rating:4, cover:'📒', desc:'What the rich teach their kids about money.' },
+  { title:'The Art of Learning',      author:'Josh Waitzkin',   category:'Learning',         rating:5, cover:'📘', desc:'Master the art of deliberate practice and mastery.' },
+  { title:'So Good They Can\'t Ignore You', author:'Cal Newport', category:'Career',         rating:5, cover:'📙', desc:'Why skills trump passion in building great careers.' },
+  { title:'Mindset',                  author:'Carol S. Dweck',  category:'Psychology',       rating:5, cover:'📕', desc:'The new psychology of success via growth mindset.' },
+  { title:'Grit',                     author:'Angela Duckworth',category:'Psychology',       rating:4, cover:'📗', desc:'Passion and perseverance are the secrets to success.' },
+]
 
-  const { data: books, isLoading, refetch } = useQuery(
-    ['books', searchTerm, category],
-    () => booksAPI.searchBooks(searchTerm, category),
-    {
-      enabled: !!searchTerm,
-      refetchOnWindowFocus: false
-    }
-  )
+export default function Books() {
+  const [books, setBooks]     = useState(DEFAULT)
+  const [query, setQuery]     = useState('')
+  const [filter, setFilter]   = useState('All')
+  const [loading, setLoading] = useState(false)
 
-  const handleSearch = (e) => {
+  const cats = ['All', ...new Set(books.map(b => b.category))]
+  const filtered = filter === 'All' ? books : books.filter(b => b.category === filter)
+
+  const recommend = async (e) => {
     e.preventDefault()
-    if (!query.trim()) {
-      toast.error('Please enter a search term')
-      return
-    }
-    setSearchTerm(query)
+    if (!query.trim()) return
+    setLoading(true)
+    try {
+      const { data } = await booksApi.recommend({ goal: query })
+      if (data.books?.length > 0) setBooks(data.books)
+    } catch {}
+    setLoading(false)
   }
 
-  const categories = [
-    { value: 'all', label: 'All Categories' },
-    { value: 'programming', label: 'Programming' },
-    { value: 'business', label: 'Business' },
-    { value: 'science', label: 'Science' },
-    { value: 'self-help', label: 'Self Help' },
-    { value: 'fiction', label: 'Fiction' }
-  ]
-
   return (
-    <div className="space-y-6">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <h1 className="text-4xl font-bold gradient-text mb-2">Book Library</h1>
-        <p className="text-gray-600 text-lg">Discover books that align with your career goals</p>
-      </motion.div>
+    <Layout>
+      <div className="page-header">
+        <h1>📚 <span className="gradient-text">Books</span></h1>
+        <p>Curated reading list to accelerate your learning and career journey</p>
+      </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-      >
-        <div className="card">
-          <form onSubmit={handleSearch} className="space-y-4">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                  <input
-                    type="text"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search for books, authors, or topics..."
-                    className="input-field pl-10"
-                  />
-                </div>
-              </div>
-              
-              <div className="md:w-48">
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="input-field"
-                >
-                  {categories.map((cat) => (
-                    <option key={cat.value} value={cat.value}>
-                      {cat.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+      <div className="card card-purple" style={{ marginBottom: 20 }}>
+        <h3 style={{ marginBottom: 10, fontSize: '0.9375rem' }}>🤖 AI Book Recommendations</h3>
+        <form onSubmit={recommend} style={{ display: 'flex', gap: 10 }}>
+          <input className="input" value={query} onChange={e => setQuery(e.target.value)} placeholder="e.g. machine learning, entrepreneurship, web development..." style={{ flex: 1 }} />
+          <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? <><div className="spinner" style={{ borderTopColor: 'white' }} /> Finding...</> : '🔍 Recommend'}</button>
+        </form>
+      </div>
 
-              <button
-                type="submit"
-                className="btn-primary px-8"
-              >
-                Search
-              </button>
-            </div>
-          </form>
+      <div style={{ overflowX: 'auto', marginBottom: 18 }}>
+        <div className="tab-nav" style={{ width: 'max-content' }}>
+          {cats.map(c => <button key={c} className={`tab-item ${filter===c?'active':''}`} onClick={() => setFilter(c)}>{c}</button>)}
         </div>
-      </motion.div>
+      </div>
 
-      {isLoading && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="flex justify-center py-12"
-        >
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-        </motion.div>
-      )}
-
-      {books?.data?.books && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {books.data.books.map((book, index) => (
-              <motion.div
-                key={book.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                whileHover={{ y: -5 }}
-                className="card group"
-              >
-                <div className="flex space-x-4">
-                  {book.thumbnail ? (
-                    <img
-                      src={book.thumbnail}
-                      alt={book.title}
-                      className="w-20 h-28 object-cover rounded-lg shadow-md"
-                    />
-                  ) : (
-                    <div className="w-20 h-28 bg-gradient-to-br from-primary-100 to-secondary-100 rounded-lg flex items-center justify-center">
-                      <BookOpen className="w-8 h-8 text-primary-600" />
-                    </div>
-                  )}
-                  
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-gray-800 mb-1 line-clamp-2 group-hover:text-primary-600 transition-colors">
-                      {book.title}
-                    </h3>
-                    <p className="text-sm text-gray-600 mb-2">by {book.author}</p>
-                    
-                    {book.categories && book.categories.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-2">
-                        {book.categories.slice(0, 2).map((cat, i) => (
-                          <span
-                            key={i}
-                            className="px-2 py-1 bg-primary-100 text-primary-700 rounded-full text-xs"
-                          >
-                            {cat}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-1">
-                        <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                        <span className="text-sm text-gray-600">4.5</span>
-                      </div>
-                      
-                      {book.previewLink && (
-                        <a
-                          href={book.previewLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary-600 hover:text-primary-700 flex items-center space-x-1 text-sm"
-                        >
-                          <span>Preview</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                
-                {book.description && (
-                  <p className="mt-3 text-sm text-gray-600 line-clamp-3">
-                    {book.description}
-                  </p>
-                )}
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-      )}
-
-      {searchTerm && books?.data?.books?.length === 0 && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-center py-12"
-        >
-          <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-800 mb-2">No books found</h3>
-          <p className="text-gray-600">Try searching with different keywords</p>
-        </motion.div>
-      )}
-
-      {!searchTerm && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <div className="card">
-            <div className="text-center py-12">
-              <BookOpen className="w-16 h-16 text-primary-600 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">Start Your Reading Journey</h3>
-              <p className="text-gray-600 mb-6">
-                Search for books that will help you achieve your career goals
-              </p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto">
-                <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4">
-                  <h4 className="font-semibold text-gray-800 mb-2">Career Development</h4>
-                  <p className="text-sm text-gray-600">Books on professional growth and skills</p>
-                </div>
-                <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-4">
-                  <h4 className="font-semibold text-gray-800 mb-2">Technical Skills</h4>
-                  <p className="text-sm text-gray-600">Programming and technology guides</p>
-                </div>
-                <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg p-4">
-                  <h4 className="font-semibold text-gray-800 mb-2">Personal Growth</h4>
-                  <p className="text-sm text-gray-600">Self-improvement and motivation</p>
-                </div>
+      <div className="grid-4">
+        {filtered.map((b, i) => (
+          <motion.div key={i} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0, transition: { delay: i * 0.04 } }}>
+            <div className="card card-lift" style={{ textAlign: 'center', height: '100%' }}>
+              <div style={{ fontSize: '2.8rem', marginBottom: 10 }}>{b.cover || '📖'}</div>
+              <h3 style={{ fontSize: '0.9rem', marginBottom: 4, lineHeight: 1.35 }}>{b.title}</h3>
+              <p style={{ fontSize: '0.78rem', color: 'var(--purple-light)', marginBottom: 8 }}>{b.author}</p>
+              {b.desc && <p style={{ fontSize: '0.77rem', marginBottom: 10, lineHeight: 1.55 }}>{b.desc}</p>}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span className="badge badge-purple" style={{ fontSize: '0.68rem' }}>{b.category}</span>
+                <span style={{ fontSize: '0.8rem', color: '#F59E0B' }}>{'★'.repeat(b.rating || 4)}{'☆'.repeat(5-(b.rating||4))}</span>
               </div>
             </div>
-          </div>
-        </motion.div>
-      )}
-    </div>
+          </motion.div>
+        ))}
+      </div>
+    </Layout>
   )
 }
-
-export default Books

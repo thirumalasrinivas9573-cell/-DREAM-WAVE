@@ -1,18 +1,40 @@
 const mongoose = require('mongoose');
 const bcrypt   = require('bcryptjs');
 
+// ── AI Memory sub-schema ───────────────────────────────────────────────────
+const aiMemorySchema = new mongoose.Schema({
+  goal:            { type: String, default: '' },
+  level:           { type: String, default: 'Beginner' },
+  xp:              { type: Number, default: 0 },
+  streak:          { type: Number, default: 0 },
+  completedTasks:  { type: [String], default: [] },   // last 20
+  weakAreas:       { type: [String], default: [] },   // last 10
+  strongAreas:     { type: [String], default: [] },   // last 10
+  lastTopics:      { type: [String], default: [] },   // last 10
+  emotionalState:  { type: String, default: 'Normal' },
+  learningSpeed:   { type: String, default: 'normal' },
+  updatedAt:       { type: Date, default: Date.now },
+}, { _id: false });
+
 const userSchema = new mongoose.Schema({
-  name:      { type: String, required: true, trim: true },
-  email:     { type: String, required: true, unique: true, lowercase: true, trim: true },
-  password:  { type: String, required: true, minlength: 6 },
-  aaId:      { type: String, unique: true },   // auto-generated e.g. AA123456
-  avatar:    { type: String, default: '' },
-  goal:      { type: String, default: '' },
-  bio:       { type: String, default: '' },
-  credits:   { type: Number, default: 0 },
-  streak:    { type: Number, default: 0 },
-  level:     { type: Number, default: 1 },
-  createdAt: { type: Date, default: Date.now }
+  name:          { type: String, required: true, trim: true },
+  email:         { type: String, required: true, unique: true, lowercase: true, trim: true },
+  password:      { type: String, required: true, minlength: 6 },
+  aaId:          { type: String, unique: true },
+  avatar:        { type: String, default: '' },
+  goal:          { type: String, default: '' },
+  bio:           { type: String, default: '' },
+  credits:       { type: Number, default: 0 },
+  streak:        { type: Number, default: 0 },
+  level:         { type: Number, default: 1 },
+  // ── Gamification ──
+  points:        { type: Number, default: 0 },
+  achievements:  { type: [String], default: [] },
+  lastLoginDate: { type: String, default: '' },
+  loginStreak:   { type: Number, default: 0 },
+  // ── AI Memory ──
+  aiMemory:      { type: aiMemorySchema, default: () => ({}) },
+  createdAt:     { type: Date, default: Date.now }
 });
 
 // Auto-generate aaId before saving
