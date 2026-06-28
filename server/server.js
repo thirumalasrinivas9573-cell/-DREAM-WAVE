@@ -33,6 +33,7 @@ const dailyRoutes     = require('./routes/daily')
 const mentorRoutes    = require('./routes/mentor')
 const profileRoutes   = require('./routes/profile')
 const lessonRoutes    = require('./routes/lesson')
+const mjRoutes        = require('./routes/mj')
 
 const app    = express()
 const server = http.createServer(app)
@@ -128,6 +129,7 @@ app.use('/api/daily',     dailyRoutes)
 app.use('/api/mentor',    mentorRoutes)
 app.use('/api/profile',   profileRoutes)
 app.use('/api/lesson',    lessonRoutes)
+app.use('/api/mj',        mjRoutes)
 
 // ── Global error handler ──────────────────────────────────────────────────────
 app.use((err, req, res, _next) => {
