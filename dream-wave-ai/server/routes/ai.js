@@ -1,9 +1,12 @@
-const router      = require('express').Router();
-const auth        = require('../middleware/auth');
-const OpenAI      = require('openai');
+const router        = require('express').Router();
+const auth          = require('../middleware/auth');
+const OpenAI        = require('openai');
 const { analyzeUserGoal } = require('../services/aiService');
-const GoalSession = require('../models/GoalSession');
-const User        = require('../models/User');
+const GoalSession   = require('../models/GoalSession');
+const User          = require('../models/User');
+const agentService  = require('../services/agentService');
+const { buildMemoryContext, getMemory } = require('../services/memoryService');
+const logger        = require('../utils/logger');
 
 let _client;
 const getClient = () => {
@@ -342,6 +345,72 @@ Return ONLY valid JSON (no markdown):
       style,
       fallback: true
     });
+  }
+});
+
+// ── POST /api/ai/agent — multi-agent chat (Sage/Flux/Atlas/Nexus) ─────────────
+router.post('/agent', auth, async (req, res) => {
+  const { message, agentType = 'mentor', history = [] } = req.body;
+  if (!message?.trim()) return res.status(400).json({ success: false, message: 'message is required' });
+
+  try {
+    const memory  = await getMemory(req.user._id);
+    const profile = {
+      goal:        memory.goal || req.user.goal || '',
+      level:       memory.level || 'Beginner',
+      tone:        memory.tone || 'calm',
+      weakAreas:   memory.weakAreas || [],
+      interests:   [],
+    };
+
+    const result = await agentService.runAgent(agentType, message, history, profile);
+    logger.info('[ai] Agent response', { agentType, userId: req.user._id });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    logger.error('[ai] Agent error', { error: err.message });
+    res.json({ success: true, reply: 'I am here to guide you. Please try again.', agentType, fallback: true });
+  }
+});
+
+// ── POST /api/ai/resume ── agent-powered resume builder ──────────────────────
+router.post('/resume', auth, async (req, res) => {
+  const data = { ...req.body, name: req.user.name, email: req.user.email };
+  try {
+    const resume = await agentService.buildResume(data);
+    res.json({ success: true, resume });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Resume generation failed' });
+  }
+});
+
+// ── POST /api/ai/video ── video script generator ──────────────────────────────
+router.post('/video', auth, async (req, res) => {
+  const { topic, duration = 60 } = req.body;
+  if (!topic?.trim()) return res.status(400).json({ message: 'topic is required' });
+  try {
+    const script = await agentService.buildVideoScript(topic, parseInt(duration) || 60);
+    res.json({ success: true, script, topic });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Script generation failed' });
+  }
+});
+
+// ── GET /api/ai/nudge ── smart motivational nudge ─────────────────────────────
+router.get('/nudge', auth, async (req, res) => {
+  try {
+    const Task = require('../models/Task');
+    const [total, done] = await Promise.all([
+      Task.countDocuments({ userId: req.user._id }),
+      Task.countDocuments({ userId: req.user._id, completed: true }),
+    ]);
+    const memory = await getMemory(req.user._id);
+    const nudge  = await agentService.generateNudge(
+      { tasks: total, taskDone: done, streak: memory.streak || 0, goals: 0, aiChats: 0 },
+      { goal: memory.goal, tone: memory.tone || 'calm' }
+    );
+    res.json({ success: true, nudge });
+  } catch (err) {
+    res.json({ success: true, nudge: "Every step counts. Keep going! 💪", fallback: true });
   }
 });
 
