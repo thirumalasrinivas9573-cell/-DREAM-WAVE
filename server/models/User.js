@@ -68,6 +68,45 @@ const userSchema = new mongoose.Schema({
   planActivatedAt: {
     type: Date,
   },
+  emailVerified: {
+    type: Boolean,
+    default: false,
+  },
+  verificationOTP: {
+    type: String,
+    default: null,
+  },
+  verificationOTPExpires: {
+    type: Date,
+    default: null,
+  },
+  resetPasswordOTP: {
+    type: String,
+    default: null,
+  },
+  resetPasswordOTPExpires: {
+    type: Date,
+    default: null,
+  },
+  role: {
+    type: String,
+    enum: ['student', 'institution', 'company', 'admin'],
+    required: false,
+  },
+  onboardingCompleted: {
+    type: Boolean,
+    default: false,
+  },
+  organizationName: {
+    type: String,
+    default: '',
+    trim: true,
+  },
+  learningGoal: {
+    type: String,
+    default: '',
+    trim: true,
+  },
 });
 
 // Hash password before saving
