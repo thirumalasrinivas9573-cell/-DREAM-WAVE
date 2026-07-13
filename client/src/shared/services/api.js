@@ -83,9 +83,12 @@ export const authApi = {
   verifyLoginEmailOtp: (data) => api.post('/auth/verify-login-email-otp', data),
   refresh: (data) => api.post('/auth/refresh', data || {}),
   logout: (data) => api.post('/auth/logout', data || {}),
+  logoutAll: () => api.post('/auth/logout-all'),
   listSessions: () => api.get('/auth/sessions'),
   revokeSession: (id) => api.delete(`/auth/sessions/${id}`),
   revokeAllSessions: () => api.delete('/auth/sessions'),
+  loginHistory: () => api.get('/auth/login-history'),
+  profile: () => api.get('/auth/profile'),
 }
 
 const crud = (base) => ({

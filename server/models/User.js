@@ -151,6 +151,9 @@ const userSchema = new mongoose.Schema({
   emailOtpSentAt: { type: Date, default: null },
   phoneOtpAttempts: { type: Number, default: 0 },
   phoneOtpSentAt: { type: Date, default: null },
+  failedLoginAttempts: { type: Number, default: 0 },
+  lockUntil: { type: Date, default: null },
+  passwordHistory: { type: [String], default: [] },
 });
 
 // Hash password before saving

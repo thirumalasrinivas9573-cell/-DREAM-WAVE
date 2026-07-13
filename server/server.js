@@ -102,9 +102,21 @@ app.use(cors({ origin: corsOrigin, credentials: true }))
 app.use(cookieParser())
 
 // Rate limiters
-const authLimiter = rateLimit({ windowMs: 15*60*1000, max: 30,  standardHeaders: true, message: { success: false, message: 'Too many auth attempts.' } })
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 40,
+  standardHeaders: true,
+  message: { success: false, message: 'Too many auth attempts. Please wait and try again.' },
+})
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  message: { success: false, message: 'Too many login attempts. Please wait and try again.' },
+})
 const aiLimiter   = rateLimit({ windowMs: 60*1000,    max: 40,  standardHeaders: true, message: { success: false, message: 'AI rate limit. Please wait.' } })
 const apiLimiter  = rateLimit({ windowMs: 15*60*1000, max: 500, standardHeaders: true, message: { success: false, message: 'Too many requests.' } })
+app.use('/api/auth/login', loginLimiter)
 app.use('/api/auth', authLimiter)
 app.use('/api/ai',   aiLimiter)
 app.use('/api',      apiLimiter)

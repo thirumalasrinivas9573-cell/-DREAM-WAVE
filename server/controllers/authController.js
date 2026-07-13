@@ -1,6 +1,6 @@
 const User = require('../models/User');
+const LoginHistory = require('../models/LoginHistory');
 const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
 const {
   OTP_TTL_MS,
   generateOtp,
@@ -20,17 +20,43 @@ const {
   consumeVerified,
   markVerified,
 } = require('../utils/phoneOtpGuard');
+const { validatePasswordStrength } = require('../utils/passwordPolicy');
+const { clientIp } = require('../utils/userAgent');
+const {
+  assertNotLocked,
+  recordFailedLogin,
+  clearLoginFailures,
+  recordLoginEvent,
+  issueSecureEmailOtp,
+  verifySecureEmailOtp,
+  createPasswordReset,
+  consumePasswordReset,
+  assertPasswordNotReused,
+  pushPasswordHistory,
+} = require('../utils/authSecurity');
 
 const generateToken = (id) => generateAccessToken(id);
+const CHALLENGE_TTL = '5m';
 
 async function completeLoginSession(req, res, user, options = {}) {
   await bootstrapPortalProfile(user);
+  await clearLoginFailures(user);
   const ua = req.headers['user-agent'] || '';
   const remember = options.remember !== undefined
     ? Boolean(options.remember)
     : req.body?.remember !== false;
-  const { token, refreshToken, ttl } = await issueSession(user._id, ua, { remember });
+  const { token, refreshToken, ttl } = await issueSession(
+    user._id,
+    { userAgent: ua, ip: clientIp(req) },
+    { remember },
+  );
   setRefreshCookie(res, refreshToken, ttl);
+  await recordLoginEvent(req, {
+    user,
+    success: true,
+    portal: options.portal || req.body?.portal || user.role || '',
+    identifier: options.identifier || '',
+  });
   return res.json({
     success: true,
     message: 'Login successful',
@@ -76,7 +102,7 @@ function issueEmailLoginChallenge(user) {
   return jwt.sign(
     { purpose: 'login_email_otp', userId: String(user._id), email: user.email },
     process.env.JWT_SECRET,
-    { expiresIn: '10m' },
+    { expiresIn: CHALLENGE_TTL },
   );
 }
 
@@ -98,7 +124,7 @@ function issueLoginChallenge(user) {
       phone: user.phone,
     },
     process.env.JWT_SECRET,
-    { expiresIn: '10m' },
+    { expiresIn: CHALLENGE_TTL },
   );
 }
 
@@ -113,19 +139,11 @@ function readLoginChallenge(token) {
 }
 
 async function issueEmailOtp(user, purpose = 'verification') {
-  const gate = canResend(user.emailOtpSentAt);
-  if (!gate.ok) {
-    const err = new Error(`Please wait ${Math.ceil(gate.waitMs / 1000)}s before requesting another code.`);
-    err.statusCode = 429;
-    throw err;
-  }
-  const otp = generateOtp();
-  user.verificationOTP = hashOtp(otp);
-  user.verificationOTPExpires = new Date(Date.now() + OTP_TTL_MS);
-  user.emailOtpAttempts = 0;
-  user.emailOtpSentAt = new Date();
-  await user.save();
-  await sendOtpEmail({ to: user.email, name: user.name, otp, purpose });
+  await issueSecureEmailOtp({
+    user,
+    purpose: purpose === 'login' ? 'login' : 'verification',
+    emailFn: sendOtpEmail,
+  });
 }
 
 async function findUserByIdentifier(identifier) {
@@ -150,8 +168,9 @@ exports.signup = async (req, res) => {
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Name, email, and password are required' });
     }
-    if (String(password).length < 8) {
-      return res.status(400).json({ message: 'Password must be at least 8 characters' });
+    const strength = validatePasswordStrength(password);
+    if (!strength.ok) {
+      return res.status(400).json({ message: strength.message });
     }
 
     const userExists = await User.findOne({ email: String(email).toLowerCase().trim() });
@@ -160,7 +179,7 @@ exports.signup = async (req, res) => {
     }
 
     const user = await User.create({
-      name,
+      name: String(name).trim().slice(0, 120),
       email: String(email).toLowerCase().trim(),
       password,
       emailVerified: false,
@@ -214,7 +233,17 @@ exports.login = async (req, res) => {
     }
 
     const user = await findUserByIdentifier(id);
-    if (!user) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    if (!user) {
+      await recordLoginEvent(req, { success: false, reason: 'invalid_credentials', portal, identifier: id });
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+
+    try {
+      assertNotLocked(user);
+    } catch (lockErr) {
+      await recordLoginEvent(req, { user, success: false, reason: 'locked', portal, identifier: id });
+      return fail(res, lockErr);
+    }
 
     if (user.registrationComplete === false) {
       return res.status(403).json({
@@ -225,9 +254,14 @@ exports.login = async (req, res) => {
     }
 
     const isMatch = await user.comparePassword(password);
-    if (!isMatch) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    if (!isMatch) {
+      await recordFailedLogin(user);
+      await recordLoginEvent(req, { user, success: false, reason: 'bad_password', portal, identifier: id });
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
 
     if (user.suspended) {
+      await recordLoginEvent(req, { user, success: false, reason: 'suspended', portal, identifier: id });
       return res.status(403).json({ success: false, message: 'Account suspended. Contact support.' });
     }
 
@@ -276,7 +310,7 @@ exports.login = async (req, res) => {
       message: 'OTP sent successfully.',
       challengeToken,
       phoneMasked: maskPhone(user.phone),
-      expiresInSeconds: 600,
+      expiresInSeconds: 300,
     });
   } catch (error) {
     return fail(res, error);
@@ -314,20 +348,11 @@ exports.forgotPassword = async (req, res) => {
     const user = await User.findOne({ email: String(email).toLowerCase().trim() });
     if (!user) return res.json(base);
 
-    const gate = canResend(user.emailOtpSentAt);
-    if (!gate.ok) {
-      return res.status(429).json({
-        message: `Please wait ${Math.ceil(gate.waitMs / 1000)}s before requesting another code.`,
-      });
-    }
-
-    const otp = generateOtp();
-    user.resetPasswordOTP = hashOtp(otp);
-    user.resetPasswordOTPExpires = new Date(Date.now() + OTP_TTL_MS);
-    user.emailOtpSentAt = new Date();
-    user.emailOtpAttempts = 0;
-    await user.save();
-    await sendPasswordResetEmail({ to: user.email, name: user.name, otp });
+    await createPasswordReset({
+      user,
+      req,
+      emailFn: sendPasswordResetEmail,
+    });
 
     res.json(base);
   } catch (error) {
@@ -353,19 +378,11 @@ exports.resendOtp = async (req, res) => {
     if (purpose === 'verify') {
       await issueEmailOtp(user, 'verification');
     } else {
-      const gate = canResend(user.emailOtpSentAt);
-      if (!gate.ok) {
-        return res.status(429).json({
-          message: `Please wait ${Math.ceil(gate.waitMs / 1000)}s before requesting another code.`,
-        });
-      }
-      const otp = generateOtp();
-      user.resetPasswordOTP = hashOtp(otp);
-      user.resetPasswordOTPExpires = new Date(Date.now() + OTP_TTL_MS);
-      user.emailOtpSentAt = new Date();
-      user.emailOtpAttempts = 0;
-      await user.save();
-      await sendPasswordResetEmail({ to: user.email, name: user.name, otp });
+      await createPasswordReset({
+        user,
+        req,
+        emailFn: sendPasswordResetEmail,
+      });
     }
 
     res.json(base);
@@ -389,11 +406,15 @@ exports.verifyOtp = async (req, res) => {
     }
 
     if (purpose === 'verify') {
-      assertAttempts(user.emailOtpAttempts);
-      if (!isOtpValid(user.verificationOTP, user.verificationOTPExpires, otp)) {
-        user.emailOtpAttempts = (user.emailOtpAttempts || 0) + 1;
-        await user.save();
-        return res.status(400).json({ message: 'Invalid or expired verification code' });
+      const checked = await verifySecureEmailOtp({ email, purpose: 'verification', otp });
+      if (!checked.ok) {
+        // Fallback to legacy User fields
+        assertAttempts(user.emailOtpAttempts);
+        if (!isOtpValid(user.verificationOTP, user.verificationOTPExpires, otp)) {
+          user.emailOtpAttempts = (user.emailOtpAttempts || 0) + 1;
+          await user.save();
+          return res.status(400).json({ message: 'Invalid or expired verification code' });
+        }
       }
       user.emailVerified = true;
       user.verificationOTP = null;
@@ -404,11 +425,14 @@ exports.verifyOtp = async (req, res) => {
       return completeLoginSession(req, res, user, { remember: req.body?.remember !== false });
     }
 
-    assertAttempts(user.emailOtpAttempts);
-    if (!isOtpValid(user.resetPasswordOTP, user.resetPasswordOTPExpires, otp)) {
-      user.emailOtpAttempts = (user.emailOtpAttempts || 0) + 1;
-      await user.save();
-      return res.status(400).json({ message: 'Invalid or expired verification code' });
+    const resetCheck = await consumePasswordReset({ email, otp });
+    if (!resetCheck.ok) {
+      assertAttempts(user.emailOtpAttempts);
+      if (!isOtpValid(user.resetPasswordOTP, user.resetPasswordOTPExpires, otp)) {
+        user.emailOtpAttempts = (user.emailOtpAttempts || 0) + 1;
+        await user.save();
+        return res.status(400).json({ message: 'Invalid or expired verification code' });
+      }
     }
 
     return res.json({
@@ -428,19 +452,31 @@ exports.resetPassword = async (req, res) => {
     if (!email || !otp || !password) {
       return res.status(400).json({ message: 'Email, otp, and password are required' });
     }
-    if (String(password).length < 8) {
-      return res.status(400).json({ message: 'Password must be at least 8 characters' });
+    const strength = validatePasswordStrength(password);
+    if (!strength.ok) {
+      return res.status(400).json({ message: strength.message });
     }
 
     const user = await User.findOne({ email: String(email).toLowerCase().trim() });
-    if (!user || !isOtpValid(user.resetPasswordOTP, user.resetPasswordOTPExpires, otp)) {
+    if (!user) {
       return res.status(400).json({ message: 'Invalid or expired verification code' });
     }
 
+    const resetCheck = await consumePasswordReset({ email, otp });
+    const legacyOk = isOtpValid(user.resetPasswordOTP, user.resetPasswordOTPExpires, otp);
+    if (!resetCheck.ok && !legacyOk) {
+      return res.status(400).json({ message: 'Invalid or expired verification code' });
+    }
+
+    await assertPasswordNotReused(user, password);
+    await pushPasswordHistory(user);
     user.password = password;
     user.resetPasswordOTP = null;
     user.resetPasswordOTPExpires = null;
+    user.failedLoginAttempts = 0;
+    user.lockUntil = null;
     await user.save();
+    await revokeAllForUser(user._id);
 
     res.json({ success: true, message: 'Password updated successfully. You can sign in now.' });
   } catch (error) {
@@ -615,10 +651,10 @@ exports.registerVerified = async (req, res) => {
     if (confirmPassword != null && password !== confirmPassword) {
       return res.status(400).json({ success: false, message: 'Passwords do not match' });
     }
-    if (String(password).length < 8) {
+    if (String(password).length < 8 || !validatePasswordStrength(password).ok) {
       return res.status(400).json({
         success: false,
-        message: 'Password must be at least 8 characters',
+        message: validatePasswordStrength(password).message || 'Password must be at least 8 characters',
       });
     }
 
@@ -693,7 +729,11 @@ exports.registerVerified = async (req, res) => {
     await bootstrapPortalProfile(user);
     const ua = req.headers['user-agent'] || '';
     const remember = req.body?.remember !== false;
-    const { token, refreshToken, ttl } = await issueSession(user._id, ua, { remember });
+    const { token, refreshToken, ttl } = await issueSession(
+      user._id,
+      { userAgent: ua, ip: clientIp(req) },
+      { remember },
+    );
     setRefreshCookie(res, refreshToken, ttl);
     return res.status(201).json({
       success: true,
@@ -961,7 +1001,10 @@ exports.refresh = async (req, res) => {
     if (!refreshToken) {
       return res.status(400).json({ success: false, message: 'refreshToken is required' });
     }
-    const rotated = await rotateRefreshToken(refreshToken, req.headers['user-agent'] || '');
+    const rotated = await rotateRefreshToken(refreshToken, {
+      userAgent: req.headers['user-agent'] || '',
+      ip: clientIp(req),
+    });
     if (!rotated) {
       clearRefreshCookie(res);
       return res.status(401).json({ success: false, message: 'Invalid or expired refresh token' });
@@ -992,6 +1035,16 @@ exports.logout = async (req, res) => {
     }
     clearRefreshCookie(res);
     res.json({ success: true, message: 'Logged out' });
+  } catch (error) {
+    return fail(res, error);
+  }
+};
+
+exports.logoutAll = async (req, res) => {
+  try {
+    await revokeAllForUser(req.user.id || req.user._id);
+    clearRefreshCookie(res);
+    res.json({ success: true, message: 'Logged out from all devices' });
   } catch (error) {
     return fail(res, error);
   }
@@ -1029,3 +1082,18 @@ exports.revokeAllSessions = async (req, res) => {
     return fail(res, error);
   }
 };
+
+exports.listLoginHistory = async (req, res) => {
+  try {
+    const rows = await LoginHistory.find({ userId: req.user.id || req.user._id })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean();
+    res.json({ success: true, history: rows });
+  } catch (error) {
+    return fail(res, error);
+  }
+};
+
+/** Profile alias for /me */
+exports.getProfile = exports.getMe;

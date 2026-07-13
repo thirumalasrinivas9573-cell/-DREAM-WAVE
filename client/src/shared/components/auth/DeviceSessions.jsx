@@ -1,15 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 
-function formatUa(ua) {
-  if (!ua) return 'Unknown device'
-  if (/Mobile|Android|iPhone/i.test(ua)) return 'Mobile browser'
-  if (/Mac OS|Macintosh/i.test(ua)) return 'Mac browser'
-  if (/Windows/i.test(ua)) return 'Windows browser'
-  if (/Linux/i.test(ua)) return 'Linux browser'
-  return ua.slice(0, 64)
-}
-
 export default function DeviceSessions() {
   const { listSessions, revokeSession, revokeAllSessions, logout } = useAuth()
   const [sessions, setSessions] = useState([])
@@ -71,11 +62,15 @@ export default function DeviceSessions() {
           >
             <div>
               <div style={{ fontWeight: 500, fontSize: '0.875rem' }}>
-                {formatUa(s.userAgent)}
+                {s.device || 'Device'} · {s.browser || 'Browser'}
                 {s.current ? ' · This device' : ''}
               </div>
               <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                Last used {s.lastUsedAt ? new Date(s.lastUsedAt).toLocaleString() : '—'}
+                Login {s.loginAt ? new Date(s.loginAt).toLocaleString() : '—'}
+                {' · '}
+                Last activity {s.lastActivity || s.lastUsedAt
+                  ? new Date(s.lastActivity || s.lastUsedAt).toLocaleString()
+                  : '—'}
                 {s.remember ? ' · Remembered' : ' · Short session'}
               </div>
             </div>

@@ -54,8 +54,14 @@ export function AuthProvider({ children }) {
     boot()
   }, [persistSession, clearLocalSession])
 
-  const login = async (email, password, portal, options = {}) => {
-    const body = { email, password, remember: options.remember !== false }
+  const login = async (emailOrPhone, password, portal, options = {}) => {
+    const body = {
+      identifier: emailOrPhone,
+      email: String(emailOrPhone || '').includes('@') ? emailOrPhone : undefined,
+      phone: String(emailOrPhone || '').includes('@') ? undefined : emailOrPhone,
+      password,
+      remember: options.remember !== false,
+    }
     if (portal) body.portal = portal
     if (options.otpChannel) body.otpChannel = options.otpChannel
     else if (portal === 'institution' || portal === 'company') body.otpChannel = 'email'
@@ -66,7 +72,7 @@ export function AuthProvider({ children }) {
         data.token,
         data.refreshToken,
         data.user,
-        options.remember ? email : null,
+        options.remember && String(emailOrPhone).includes('@') ? emailOrPhone : null,
       )
     }
     return data

@@ -1,20 +1,19 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
 import { useAuth } from '@shared/context/AuthContext'
 import { authApi } from '@shared/services/api'
 import NeuralBg from '@shared/components/animations/NeuralBg'
 import OtpInput from '@shared/components/auth/OtpInput'
 
 /**
- * Student Portal login — original NeuralBg + auth-card UI (reference implementation).
- * OTP / forgot-password use the shared production auth APIs (no fake OTP).
+ * Student login — NeuralBg shell preserved (student portal look).
+ * Auth only: email/mobile + password + OTP. No Framer Motion.
  */
 export default function Login() {
   const { login, verifyLoginEmailOtp, verifyPhoneOtp, rememberedEmail } = useAuth()
   const navigate = useNavigate()
 
-  const [email, setEmail] = useState(rememberedEmail())
+  const [identifier, setIdentifier] = useState(rememberedEmail())
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(Boolean(rememberedEmail()))
   const [error, setError] = useState('')
@@ -29,6 +28,7 @@ export default function Login() {
   const [newPassword, setNewPassword] = useState('')
 
   const goDashboard = () => navigate('/student/dashboard')
+  const rememberKey = identifier.includes('@') ? identifier : null
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -36,10 +36,10 @@ export default function Login() {
     try {
       let data
       try {
-        data = await login(email, password, 'student', { remember, otpChannel: 'phone' })
+        data = await login(identifier, password, 'student', { remember, otpChannel: 'phone' })
       } catch (err) {
         if (err.response?.data?.code === 'PHONE_REQUIRED') {
-          data = await login(email, password, 'student', { remember, otpChannel: 'email' })
+          data = await login(identifier, password, 'student', { remember, otpChannel: 'email' })
         } else {
           throw err
         }
@@ -48,13 +48,13 @@ export default function Login() {
         setChallenge(data)
         setStep('otp')
         setInfo(data.requiresEmailOtp
-          ? `Code sent to ${data.email || email}`
+          ? `Code sent to ${data.email || identifier}`
           : `Code sent to ${data.phoneMasked || 'your phone'}`)
         return
       }
       goDashboard()
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid email or password.')
+      setError(err.response?.data?.message || 'Invalid email/mobile or password.')
     } finally {
       setLoading(false)
     }
@@ -66,12 +66,12 @@ export default function Login() {
     setError(''); setLoading(true)
     try {
       if (challenge.requiresEmailOtp || challenge.otpChannel === 'email') {
-        await verifyLoginEmailOtp(challenge.challengeToken, otp, remember ? email : null, remember)
+        await verifyLoginEmailOtp(challenge.challengeToken, otp, remember ? rememberKey : null, remember)
       } else {
         await verifyPhoneOtp({
           code: otp,
           challengeToken: challenge.challengeToken,
-        }, remember ? email : null, remember)
+        }, remember ? rememberKey : null, remember)
       }
       goDashboard()
     } catch (err) {
@@ -85,7 +85,7 @@ export default function Login() {
     e.preventDefault()
     setError(''); setLoading(true)
     try {
-      await authApi.forgotPassword({ email: resetEmail || email })
+      await authApi.forgotPassword({ email: resetEmail || (identifier.includes('@') ? identifier : '') })
       setInfo('If an account exists, a reset code was sent to your email.')
       setForgot('otp')
     } catch (err) {
@@ -99,7 +99,11 @@ export default function Login() {
     e.preventDefault()
     setError(''); setLoading(true)
     try {
-      await authApi.resetPassword({ email: resetEmail || email, otp: resetOtp, password: newPassword })
+      await authApi.resetPassword({
+        email: resetEmail || identifier,
+        otp: resetOtp,
+        password: newPassword,
+      })
       setInfo('Password updated. Sign in with your new password.')
       setForgot(false)
       setStep('credentials')
@@ -116,22 +120,9 @@ export default function Login() {
         <NeuralBg nodeCount={45} color="#8B5CF6" opacity={0.45} />
       </div>
 
-      <motion.div
-        className="auth-card"
-        initial={{ opacity: 0, y: 28, scale: 0.97 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
-        style={{ position: 'relative', zIndex: 1 }}
-      >
+      <div className="auth-card" style={{ position: 'relative', zIndex: 1 }}>
         <div className="auth-logo">
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: 'spring', delay: 0.1 }}
-            style={{ fontSize: '3rem', marginBottom: 10, display: 'inline-block' }}
-          >
-            🌊
-          </motion.div>
+          <div style={{ fontSize: '3rem', marginBottom: 10 }}>🌊</div>
           <h1 className="gradient-text-white" style={{ fontSize: '1.75rem', marginBottom: 6 }}>Dream Wave AI</h1>
           <p style={{ fontSize: '0.875rem' }}>Your AI-powered career intelligence platform</p>
         </div>
@@ -148,7 +139,7 @@ export default function Login() {
               <div className="form-group">
                 <label className="label">New password</label>
                 <input type="password" className="input" value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="8+ characters" required minLength={8} autoComplete="new-password" />
+                  placeholder="Letter + number, 8+" required minLength={8} autoComplete="new-password" />
               </div>
               {error && <div className="alert alert-error">{error}</div>}
               <button type="submit" className="btn btn-primary btn-lg" disabled={loading} style={{ width: '100%' }}>
@@ -160,7 +151,7 @@ export default function Login() {
             <form onSubmit={handleForgot} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div className="form-group">
                 <label className="label">Email address</label>
-                <input type="email" className="input" value={resetEmail || email}
+                <input type="email" className="input" value={resetEmail || (identifier.includes('@') ? identifier : '')}
                   onChange={(e) => setResetEmail(e.target.value)} required autoComplete="email" />
               </div>
               {error && <div className="alert alert-error">{error}</div>}
@@ -182,9 +173,9 @@ export default function Login() {
           ) : (
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div className="form-group">
-                <label className="label">Email address</label>
-                <input type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com" required autoComplete="email" />
+                <label className="label">Email or mobile</label>
+                <input type="text" className="input" value={identifier} onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder="you@example.com or +91…" required autoComplete="username" />
               </div>
               <div className="form-group">
                 <label className="label">Password</label>
@@ -202,7 +193,7 @@ export default function Login() {
               </button>
               <button
                 type="button"
-                onClick={() => { setForgot(true); setResetEmail(email); setError(''); setInfo('') }}
+                onClick={() => { setForgot(true); setResetEmail(identifier.includes('@') ? identifier : ''); setError(''); setInfo('') }}
                 style={{ background: 'none', border: 'none', color: 'var(--purple-light)', cursor: 'pointer', fontSize: '0.845rem' }}
               >
                 Forgot password?
@@ -217,7 +208,7 @@ export default function Login() {
             </p>
           )}
         </div>
-      </motion.div>
+      </div>
     </div>
   )
 }
