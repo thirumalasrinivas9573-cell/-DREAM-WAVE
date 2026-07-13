@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import StudentLayout from '../layouts/StudentLayout'
-import { booksApi } from '../../shared/services/api'
+import { booksApi } from '@shared/services/api'
 
 const DEFAULT = [
   { title:'Atomic Habits',            author:'James Clear',     category:'Productivity',     rating:5, cover:'📗', desc:'Build good habits, break bad ones with proven science.' },

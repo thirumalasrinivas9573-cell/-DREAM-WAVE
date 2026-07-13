@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import StudentLayout from '../layouts/StudentLayout'
-import { useAuth } from '../../shared/context/AuthContext'
-import DeviceSessions from '../../shared/components/auth/DeviceSessions'
+import { useAuth } from '@shared/context/AuthContext'
+import DeviceSessions from '@shared/components/auth/DeviceSessions'
 
 export default function Settings() {
   const { user, logout } = useAuth()

@@ -1,5 +1,5 @@
-import PortalCrudPage from '../../shared/components/portal/PortalCrudPage'
-import { companyApi } from '../../shared/services/api'
+import PortalCrudPage from '@shared/components/portal/PortalCrudPage'
+import { companyApi } from '@shared/services/api'
 import { COMPANY_THEME } from '../theme'
 
 const api = { list: companyApi.certificates.list, create: companyApi.certificates.create }

@@ -1,8 +1,8 @@
 import { Suspense, lazy } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { AuthProvider, useAuth } from './modules/shared/context/AuthContext'
-import GamificationProvider from './modules/shared/components/Gamification'
-import Landing from './modules/shared/pages/Landing'
+import { AuthProvider, useAuth } from '@shared/context/AuthContext'
+import GamificationProvider from '@shared/components/Gamification'
+import Landing from '@shared/pages/Landing'
 import StudentRoutes from './modules/student/routes'
 import StudentAuthRoutes from './modules/student/authRoutes'
 import InstitutionRoutes from './modules/institution/routes'
@@ -14,8 +14,8 @@ const CompanyLogin = lazy(() => import('./modules/company/pages/Login'))
 const CompanySignup = lazy(() => import('./modules/company/pages/Signup'))
 const DiscoveryPage = lazy(() => import('./modules/discovery/pages/DiscoveryPage'))
 const PromotionDetail = lazy(() => import('./modules/discovery/pages/PromotionDetail'))
-const InstitutionPublic = lazy(() => import('./modules/public/pages/InstitutionPublic'))
-const CompanyPublic = lazy(() => import('./modules/public/pages/CompanyPublic'))
+const InstitutionPublic = lazy(() => import('./modules/profiles/pages/InstitutionPublic'))
+const CompanyPublic = lazy(() => import('./modules/profiles/pages/CompanyPublic'))
 const SearchPage = lazy(() => import('./modules/search/pages/SearchPage'))
 const LibraryHome = lazy(() => import('./modules/digital-library/pages/LibraryHome'))
 const PdfReader = lazy(() => import('./modules/digital-library/pages/PdfReader'))

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import StudentLayout from '../layouts/StudentLayout'
-import { useAuth } from '../../shared/context/AuthContext'
-import { goalApi, taskApi } from '../../shared/services/api'
+import { useAuth } from '@shared/context/AuthContext'
+import { goalApi, taskApi } from '@shared/services/api'
 
 export default function Resume() {
   const { user }  = useAuth()

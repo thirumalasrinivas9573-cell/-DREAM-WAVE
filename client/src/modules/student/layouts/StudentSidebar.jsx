@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { useAuth } from '../../shared/context/AuthContext'
-import { XPRing, StreakFlame } from '../../shared/components/Gamification'
+import { useAuth } from '@shared/context/AuthContext'
+import { XPRing, StreakFlame } from '@shared/components/Gamification'
 import { STUDENT_THEME, studentPath } from '../theme'
 
 const NAV = [

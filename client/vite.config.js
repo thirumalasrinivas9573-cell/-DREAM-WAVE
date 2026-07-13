@@ -1,8 +1,20 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      '@shared': path.resolve(__dirname, 'src/shared'),
+      '@student': path.resolve(__dirname, 'src/modules/student'),
+      '@institution': path.resolve(__dirname, 'src/modules/institution'),
+      '@company': path.resolve(__dirname, 'src/modules/company'),
+    },
+  },
 
   build: {
     outDir: 'dist',
@@ -20,15 +32,13 @@ export default defineConfig({
 
   server: {
     port: 5173,
-    // Bind IPv4 so http://127.0.0.1:5173 works (macOS often prefers ::1 only)
     host: '127.0.0.1',
-    // Proxy /api → backend in development
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:5001',
         changeOrigin: true,
         secure: false,
-        rewrite: path => path, // keep /api prefix
+        rewrite: (p) => p,
         configure: (proxy) => {
           proxy.on('proxyRes', (proxyRes) => {
             const cookies = proxyRes.headers['set-cookie']

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { companyApi } from '../../shared/services/api'
+import { companyApi } from '@shared/services/api'
 import { COMPANY_THEME, companyPath } from '../theme'
 
 export default function Settings() {

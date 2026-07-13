@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useAuth } from '../../shared/context/AuthContext'
-import { companyApi } from '../../shared/services/api'
+import { useAuth } from '@shared/context/AuthContext'
+import { companyApi } from '@shared/services/api'
 import CompanyPageHeader, { CompanyMetricGrid } from '../components/CompanyPageHeader'
 import { companyPath } from '../theme'
 

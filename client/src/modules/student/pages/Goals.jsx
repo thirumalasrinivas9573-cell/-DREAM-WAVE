@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import StudentLayout from '../layouts/StudentLayout'
-import { goalApi } from '../../shared/services/api'
+import { goalApi } from '@shared/services/api'
 
 const CATS = ['Education','Career','Personal','Health','Finance']
 const CAT_COLORS = { Education:'#6366F1', Career:'#8B5CF6', Personal:'#10B981', Health:'#F59E0B', Finance:'#06B6D4' }

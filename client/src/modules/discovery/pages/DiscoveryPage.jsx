@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { discoveryApi } from '../../shared/services/api'
+import { discoveryApi } from '@shared/services/api'
 
 export default function DiscoveryPage() {
   const [feed, setFeed] = useState([])

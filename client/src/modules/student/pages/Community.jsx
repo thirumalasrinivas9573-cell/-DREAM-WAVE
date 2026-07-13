@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import StudentLayout from '../layouts/StudentLayout'
-import { useAuth } from '../../shared/context/AuthContext'
-import { communityApi } from '../../shared/services/api'
+import { useAuth } from '@shared/context/AuthContext'
+import { communityApi } from '@shared/services/api'
 
 const TAGS = ['Achievement', 'Goals', 'Books', 'Habits', 'General']
 

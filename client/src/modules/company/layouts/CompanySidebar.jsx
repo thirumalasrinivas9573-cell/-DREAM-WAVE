@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { useAuth } from '../../shared/context/AuthContext'
+import { useAuth } from '@shared/context/AuthContext'
 import { COMPANY_THEME, companyPath } from '../theme'
 
 const NAV = [

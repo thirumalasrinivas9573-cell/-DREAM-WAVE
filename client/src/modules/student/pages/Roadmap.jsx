@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSearchParams, Link } from 'react-router-dom'
 import StudentLayout from '../layouts/StudentLayout'
-import { goalApi, roadmapApi } from '../../shared/services/api'
+import { goalApi, roadmapApi } from '@shared/services/api'
 import SkillGalaxy from '../components/SkillGalaxy'
 
 const TABS = [

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import StudentSidebar from './StudentSidebar'
-import useScrollReveal from '../../shared/hooks/useScrollReveal'
+import useScrollReveal from '@shared/hooks/useScrollReveal'
 import '../styles/student.css'
 
 const pageVariants = {

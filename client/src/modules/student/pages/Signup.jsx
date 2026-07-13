@@ -1,11 +1,15 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { useAuth } from '../../shared/context/AuthContext'
-import { authApi } from '../../shared/services/api'
-import NeuralBg from '../../shared/components/animations/NeuralBg'
-import OtpInput from '../../shared/components/auth/OtpInput'
+import { useAuth } from '@shared/context/AuthContext'
+import { authApi } from '@shared/services/api'
+import NeuralBg from '@shared/components/animations/NeuralBg'
+import OtpInput from '@shared/components/auth/OtpInput'
 
+/**
+ * Student Portal signup — original NeuralBg + auth-card UI.
+ * Email OTP via shared production auth (no JWT until verified).
+ */
 export default function Signup() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -20,7 +24,10 @@ export default function Signup() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (password.length < 8) { setError('Password must be at least 8 characters.'); return }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.')
+      return
+    }
     setError(''); setLoading(true)
     try {
       const data = await signup(name, email, password)
@@ -32,7 +39,9 @@ export default function Signup() {
       navigate('/student/login')
     } catch (err) {
       setError(err.response?.data?.message || 'Signup failed. Please try again.')
-    } finally { setLoading(false) }
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleVerify = async (e) => {
@@ -46,11 +55,12 @@ export default function Signup() {
         navigate('/student/dashboard')
         return
       }
-      setInfo('Email verified. You can sign in now.')
       navigate('/student/login')
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid or expired code.')
-    } finally { setLoading(false) }
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -59,7 +69,13 @@ export default function Signup() {
         <NeuralBg nodeCount={45} color="#8B5CF6" opacity={0.45} />
       </div>
 
-      <motion.div className="auth-card" initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} style={{ position: 'relative', zIndex: 1 }}>
+      <motion.div
+        className="auth-card"
+        initial={{ opacity: 0, y: 28 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35 }}
+        style={{ position: 'relative', zIndex: 1 }}
+      >
         <div className="auth-logo">
           <div style={{ fontSize: '3rem', marginBottom: 10 }}>🌊</div>
           <h1 className="gradient-text-white" style={{ fontSize: '1.75rem', marginBottom: 6 }}>Join Dream Wave AI</h1>
@@ -73,7 +89,7 @@ export default function Signup() {
 
           {step === 'otp' ? (
             <form onSubmit={handleVerify} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>{info}</p>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>{info}</p>
               <OtpInput value={otp} onChange={setOtp} accent="#8B5CF6" />
               {error && <div className="alert alert-error">{error}</div>}
               <button type="submit" className="btn btn-primary btn-lg" disabled={loading || otp.length < 6} style={{ width: '100%' }}>
@@ -90,7 +106,9 @@ export default function Signup() {
                     setInfo('A new code was sent to your email.')
                   } catch (err) {
                     setError(err.response?.data?.message || 'Could not resend code.')
-                  } finally { setLoading(false) }
+                  } finally {
+                    setLoading(false)
+                  }
                 }}
               >
                 Resend code
@@ -100,15 +118,16 @@ export default function Signup() {
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div className="form-group">
                 <label className="label">Full name</label>
-                <input type="text" className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Your full name" required />
+                <input type="text" className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your full name" required />
               </div>
               <div className="form-group">
                 <label className="label">Email address</label>
-                <input type="email" className="input" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required />
+                <input type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required />
               </div>
               <div className="form-group">
                 <label className="label">Password</label>
-                <input type="password" className="input" value={password} onChange={e => setPassword(e.target.value)} placeholder="Min 8 characters" required minLength={8} />
+                <input type="password" className="input" value={password} onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Min 8 characters" required minLength={8} />
               </div>
               {error && <div className="alert alert-error">{error}</div>}
               <button type="submit" className="btn btn-primary btn-lg" disabled={loading} style={{ marginTop: 4, width: '100%' }}>
@@ -120,8 +139,6 @@ export default function Signup() {
           <p style={{ marginTop: 18, textAlign: 'center', fontSize: '0.845rem', color: 'var(--text-muted)' }}>
             Already have an account?{' '}
             <Link to="/student/login" style={{ color: 'var(--purple-light)', fontWeight: 600 }}>Sign in</Link>
-            {' · '}
-            <Link to="/" style={{ color: 'var(--purple-light)', fontWeight: 600 }}>All portals</Link>
           </p>
         </div>
       </motion.div>

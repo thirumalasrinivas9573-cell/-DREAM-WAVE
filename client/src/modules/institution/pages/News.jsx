@@ -1,5 +1,5 @@
-import CategoryCrudPage from '../../shared/components/portal/CategoryCrudPage'
-import { institutionApi } from '../../shared/services/api'
+import CategoryCrudPage from '@shared/components/portal/CategoryCrudPage'
+import { institutionApi } from '@shared/services/api'
 import { INSTITUTION_THEME } from '../theme'
 
 const F = [

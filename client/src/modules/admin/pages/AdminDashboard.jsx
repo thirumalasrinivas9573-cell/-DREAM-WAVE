@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { adminApi, libraryApi } from '../../shared/services/api'
+import { adminApi, libraryApi } from '@shared/services/api'
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null)

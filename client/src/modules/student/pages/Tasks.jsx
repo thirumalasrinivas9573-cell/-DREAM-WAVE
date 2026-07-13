@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import StudentLayout from '../layouts/StudentLayout'
-import { taskApi, goalApi, roadmapApi } from '../../shared/services/api'
+import { taskApi, goalApi, roadmapApi } from '@shared/services/api'
 import MessageRenderer from '../components/MessageRenderer'
-import { ConfettiBurst, XPBurst, SkillMasteredCard, AnimatedCheckmark } from '../../shared/components/animations/TaskCompleteEffect'
+import { ConfettiBurst, XPBurst, SkillMasteredCard, AnimatedCheckmark } from '@shared/components/animations/TaskCompleteEffect'
 
 // ── Expandable task card with full rich-content display ───────────────────────
 function ExpandableTask({ t, meta, onToggle, onDelete }) {

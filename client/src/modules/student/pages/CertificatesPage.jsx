@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import StudentLayout from '../layouts/StudentLayout'
-import { useAuth } from '../../shared/context/AuthContext'
-import { profileApi } from '../../shared/services/api'
-import NeuralBg from '../../shared/components/animations/NeuralBg'
+import { useAuth } from '@shared/context/AuthContext'
+import { profileApi } from '@shared/services/api'
+import NeuralBg from '@shared/components/animations/NeuralBg'
 
 export default function CertificatesPage() {
   const { user, updateUser } = useAuth()

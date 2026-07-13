@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { companyApi, interactionApi } from '../../shared/services/api'
-import { useAuth } from '../../shared/context/AuthContext'
-import PublicProfileActions from '../../shared/components/portal/PublicProfileActions'
+import { companyApi, interactionApi } from '@shared/services/api'
+import { useAuth } from '@shared/context/AuthContext'
+import PublicProfileActions from '@shared/components/portal/PublicProfileActions'
 
 export default function CompanyPublic() {
   const { slug } = useParams()

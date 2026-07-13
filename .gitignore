@@ -13,10 +13,13 @@ client/.env
 client/.env.local
 *.env
 
-# ── Build output ────────────────────────────────────────────────────────────────
+# ── Build / static output (do not ignore app modules) ───────────────────────────
+# Note: client/src/modules/profiles is the public org profile module (not /public)
 client/dist/
 dist/
 build/
+# Legacy root public folder only:
+/public/
 
 # ── Logs ────────────────────────────────────────────────────────────────────────
 *.log
@@ -46,7 +49,6 @@ test_key.js
 # ── Large duplicate folders (already cleaned up) ─────────────────────────────────
 dream-wave-ai/
 safe-ui/
-public/
 
 # ── Render cache ────────────────────────────────────────────────────────────────
 .render-buildpacks.json

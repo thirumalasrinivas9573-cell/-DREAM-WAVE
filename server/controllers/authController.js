@@ -275,7 +275,6 @@ exports.login = async (req, res) => {
       otpChannel: 'phone',
       message: 'OTP sent successfully.',
       challengeToken,
-      phone: user.phone,
       phoneMasked: maskPhone(user.phone),
       expiresInSeconds: 600,
     });
@@ -505,7 +504,6 @@ exports.sendPhoneOtp = async (req, res) => {
  */
 exports.verifyPhoneOtp = async (req, res) => {
   try {
-    const phone = assertE164(req.body.phone);
     const code = req.body.code || req.body.otp;
     if (!code) {
       return res.status(400).json({
@@ -513,6 +511,22 @@ exports.verifyPhoneOtp = async (req, res) => {
         verified: false,
         message: 'Invalid or expired OTP.',
       });
+    }
+
+    const challengeToken = req.body.challengeToken;
+    let phone;
+    if (challengeToken) {
+      const challenge = readLoginChallenge(challengeToken);
+      if (!challenge?.phone) {
+        return res.status(401).json({
+          success: false,
+          verified: false,
+          message: 'Login session expired. Sign in again.',
+        });
+      }
+      phone = assertE164(challenge.phone);
+    } else {
+      phone = assertE164(req.body.phone);
     }
 
     try {
@@ -531,7 +545,6 @@ exports.verifyPhoneOtp = async (req, res) => {
       });
     }
 
-    const challengeToken = req.body.challengeToken;
     if (challengeToken) {
       const challenge = readLoginChallenge(challengeToken);
       if (!challenge || challenge.phone !== phone) {

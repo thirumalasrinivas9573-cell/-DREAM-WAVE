@@ -1,11 +1,14 @@
 import { Suspense, lazy } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
 
-const Login  = lazy(() => import('../student/pages/Login'))
-const Signup = lazy(() => import('../student/pages/Signup'))
+const Login = lazy(() => import('./pages/Login'))
+const Signup = lazy(() => import('./pages/Signup'))
 
 function Loader() {
-  return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}><div className="spinner spinner-lg" /></div>
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+      <div className="spinner spinner-lg" />
+    </div>
+  )
 }
 
 export default function StudentAuthRoutes({ page }) {

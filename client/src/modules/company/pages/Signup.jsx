@@ -1,4 +1,4 @@
-import PortalSignupForm from '../../shared/components/auth/PortalSignupForm'
+import PortalSignupForm from '@shared/components/auth/PortalSignupForm'
 import { COMPANY_THEME, companyPath } from '../theme'
 import '../styles/company.css'
 

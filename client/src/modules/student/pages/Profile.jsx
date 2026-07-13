@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import StudentLayout from '../layouts/StudentLayout'
-import { useAuth } from '../../shared/context/AuthContext'
-import { goalApi, taskApi, profileApi } from '../../shared/services/api'
+import { useAuth } from '@shared/context/AuthContext'
+import { goalApi, taskApi, profileApi } from '@shared/services/api'
 
 export default function Profile() {
   const { user, updateUser } = useAuth()

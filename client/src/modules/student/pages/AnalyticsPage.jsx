@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import StudentLayout from '../layouts/StudentLayout'
-import { goalApi, taskApi, reportApi, communityApi } from '../../shared/services/api'
+import { goalApi, taskApi, reportApi, communityApi } from '@shared/services/api'
 import { AnimatedStat, HBar } from '../components/AnimatedChart'
-import NeuralBg from '../../shared/components/animations/NeuralBg'
+import NeuralBg from '@shared/components/animations/NeuralBg'
 
 export default function AnalyticsPage() {
   const [goals, setGoals] = useState([])

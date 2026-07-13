@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { institutionApi } from '../../shared/services/api'
+import { institutionApi } from '@shared/services/api'
 import { INSTITUTION_THEME } from '../theme'
 
 export default function Profile() {

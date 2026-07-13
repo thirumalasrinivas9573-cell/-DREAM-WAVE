@@ -64,7 +64,6 @@ export default function PortalLoginForm({
         data = await verifyLoginEmailOtp(challenge.challengeToken, otp, remember ? email : null, remember)
       } else {
         data = await verifyPhoneOtp({
-          phone: challenge.phone,
           code: otp,
           challengeToken: challenge.challengeToken,
         }, remember ? email : null, remember)

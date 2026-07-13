@@ -1,5 +1,5 @@
-import PortalCrudPage from '../../shared/components/portal/PortalCrudPage'
-import { institutionApi } from '../../shared/services/api'
+import PortalCrudPage from '@shared/components/portal/PortalCrudPage'
+import { institutionApi } from '@shared/services/api'
 import { INSTITUTION_THEME } from '../theme'
 
 const api = {

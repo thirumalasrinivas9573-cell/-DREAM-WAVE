@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import StudentLayout from '../layouts/StudentLayout'
-import { reportApi } from '../../shared/services/api'
+import { reportApi } from '@shared/services/api'
 import MessageRenderer from '../components/MessageRenderer'
 import { AnimatedStat, HBar } from '../components/AnimatedChart'
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { libraryApi } from '../../shared/services/api'
+import { libraryApi } from '@shared/services/api'
 
 export default function LibraryHome() {
   const [books, setBooks] = useState([])

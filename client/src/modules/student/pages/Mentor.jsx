@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import StudentLayout from '../layouts/StudentLayout'
-import { useAuth } from '../../shared/context/AuthContext'
-import { mentorApi } from '../../shared/services/api'
+import { useAuth } from '@shared/context/AuthContext'
+import { mentorApi } from '@shared/services/api'
 import MessageRenderer from '../components/MessageRenderer'
-import AIOrb from '../../shared/components/animations/AIOrb'
+import AIOrb from '@shared/components/animations/AIOrb'
 
 const MODES = [
   { id: 'general',  label: 'General',  icon: '🧠', color: '#8B5CF6', desc: 'Universal wisdom & career guidance' },
