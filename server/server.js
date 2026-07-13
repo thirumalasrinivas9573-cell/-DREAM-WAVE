@@ -6,6 +6,9 @@ const mongoose  = require('mongoose')
 const cors      = require('cors')
 const helmet    = require('helmet')
 const rateLimit = require('express-rate-limit')
+const cookieParser = require('cookie-parser')
+const { validateEmailEnv } = require('./services/emailService')
+const { validateTwilioEnv } = require('./services/twilioVerify')
 
 let compression
 try { compression = require('compression') } catch { compression = null }
@@ -17,6 +20,22 @@ const log = {
   error: (...a) => console.error(`[${new Date().toISOString()}] ERROR`, ...a),
 }
 
+// Validate Resend / email configuration (fatal in production)
+try {
+  validateEmailEnv({ fatalInProduction: true })
+} catch (err) {
+  log.error(err.message)
+  process.exit(1)
+}
+
+// Validate Twilio Verify (fatal in production)
+try {
+  validateTwilioEnv({ fatalInProduction: true })
+} catch (err) {
+  log.error(err.message)
+  process.exit(1)
+}
+
 // ── Routes ────────────────────────────────────────────────────────────────────
 const authRoutes      = require('./routes/auth')
 const aiRoutes        = require('./routes/aiRoutes')
@@ -26,6 +45,12 @@ const taskRoutes      = require('./routes/tasks')
 const communityRoutes = require('./routes/community')
 const paymentRoutes   = require('./routes/payment')
 const adminRoutes     = require('./routes/admin')
+const institutionRoutes = require('./routes/institution')
+const companyRoutes   = require('./routes/company')
+const discoveryRoutes = require('./routes/discovery')
+const searchRoutes    = require('./routes/search')
+const libraryRoutes   = require('./routes/library')
+const interactionRoutes = require('./routes/interaction')
 const reportRoutes    = require('./routes/report')
 const roadmapRoutes   = require('./routes/roadmap')
 const booksRoutes     = require('./routes/books')
@@ -39,16 +64,18 @@ const app    = express()
 const server = http.createServer(app)
 
 // ── CORS origin resolver ──────────────────────────────────────────────────────
-// Accepts: localhost (any port), any *.netlify.app, and CLIENT_URL env var
+// Localhost + explicit CLIENT_URL / EXTRA_CORS_ORIGINS (comma-separated)
 const corsOrigin = (origin, callback) => {
   if (!origin) return callback(null, true) // curl / mobile / server-to-server
+  const extras = String(process.env.EXTRA_CORS_ORIGINS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
   const ok =
-    !origin ||
-    /^https?:\/\/localhost(:\d+)?$/.test(origin) ||    // localhost dev
-    /^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin) || // 127.0.0.1 dev
-    /\.netlify\.app$/.test(origin) ||                   // any *.netlify.app
-    /\.netlify\.live$/.test(origin) ||                  // netlify deploy previews
-    (process.env.CLIENT_URL && origin === process.env.CLIENT_URL)
+    /^https?:\/\/localhost(:\d+)?$/.test(origin) ||
+    /^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin) ||
+    (process.env.CLIENT_URL && origin === process.env.CLIENT_URL) ||
+    extras.includes(origin)
 
   if (ok) return callback(null, true)
   log.warn(`CORS blocked: ${origin}`)
@@ -72,6 +99,7 @@ io.on('connection', socket => {
 if (compression) app.use(compression())
 app.use(helmet({ crossOriginResourcePolicy: false }))
 app.use(cors({ origin: corsOrigin, credentials: true }))
+app.use(cookieParser())
 
 // Rate limiters
 const authLimiter = rateLimit({ windowMs: 15*60*1000, max: 30,  standardHeaders: true, message: { success: false, message: 'Too many auth attempts.' } })
@@ -93,8 +121,8 @@ app.use((req, _res, next) => { log.info(`${req.method} ${req.path}`); next() })
 
 // ── MongoDB ───────────────────────────────────────────────────────────────────
 const connectDB = async (attempt = 1) => {
-  const url = process.env.MONGODB_URL
-  if (!url) { log.error('MONGODB_URL not set'); return }
+  const url = process.env.MONGODB_URL || process.env.MONGODB_URI
+  if (!url) { log.error('MONGODB_URL (or MONGODB_URI) not set'); return }
   try {
     const conn = await mongoose.connect(url, {
       serverSelectionTimeoutMS: 10000,
@@ -122,6 +150,12 @@ app.use('/api/tasks',     taskRoutes)
 app.use('/api/community', communityRoutes)
 app.use('/api/payment',   paymentRoutes)
 app.use('/api/admin',     adminRoutes)
+app.use('/api/institution', institutionRoutes)
+app.use('/api/company',   companyRoutes)
+app.use('/api/discovery', discoveryRoutes)
+app.use('/api/search',    searchRoutes)
+app.use('/api/library',   libraryRoutes)
+app.use('/api/interaction', interactionRoutes)
 app.use('/api/report',    reportRoutes)
 app.use('/api/roadmap',   roadmapRoutes)
 app.use('/api/books',     booksRoutes)

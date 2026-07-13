@@ -1,0 +1,17 @@
+.student-module {
+  --student-accent: #8B5CF6;
+  --student-accent-light: #A855F7;
+  --student-accent-blue: #3B82F6;
+}
+
+.student-module .gradient-text {
+  background: linear-gradient(135deg, var(--student-accent), var(--student-accent-blue));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.student-module .card-purple {
+  border-color: rgba(139, 92, 246, 0.25);
+  background: rgba(139, 92, 246, 0.06);
+}

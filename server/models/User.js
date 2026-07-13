@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 const userSchema = new mongoose.Schema({
   name: {
@@ -17,12 +18,12 @@ const userSchema = new mongoose.Schema({
   password: {
     type: String,
     required: true,
-    minlength: 6
+    minlength: 8
   },
   aaid: {
     type: String,
     unique: true,
-    default: () => 'AAID' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+    default: () => 'AAID' + crypto.randomBytes(6).toString('hex').toUpperCase(),
   },
   profileImage: {
     type: String,
@@ -49,8 +50,22 @@ const userSchema = new mongoose.Schema({
     ref: 'Goal'
   }],
   certificates: [{
-    type: String,
-    default: []
+    type: {
+      type: String,
+      default: 'completion',
+    },
+    title: {
+      type: String,
+      required: true,
+    },
+    url: {
+      type: String,
+      default: '',
+    },
+    issuedAt: {
+      type: Date,
+      default: Date.now,
+    },
   }],
   friends: [{
     type: mongoose.Schema.Types.ObjectId,
@@ -93,6 +108,10 @@ const userSchema = new mongoose.Schema({
     enum: ['student', 'institution', 'company', 'admin'],
     required: false,
   },
+  suspended: {
+    type: Boolean,
+    default: false,
+  },
   onboardingCompleted: {
     type: Boolean,
     default: false,
@@ -107,6 +126,31 @@ const userSchema = new mongoose.Schema({
     default: '',
     trim: true,
   },
+  phone: {
+    type: String,
+    default: '',
+    trim: true,
+  },
+  phoneVerified: {
+    type: Boolean,
+    default: false,
+  },
+  phoneOTP: {
+    type: String,
+    default: null,
+  },
+  phoneOTPExpires: {
+    type: Date,
+    default: null,
+  },
+  registrationComplete: {
+    type: Boolean,
+    default: true, // legacy users are complete; portal wizard sets false until finish
+  },
+  emailOtpAttempts: { type: Number, default: 0 },
+  emailOtpSentAt: { type: Date, default: null },
+  phoneOtpAttempts: { type: Number, default: 0 },
+  phoneOtpSentAt: { type: Date, default: null },
 });
 
 // Hash password before saving
