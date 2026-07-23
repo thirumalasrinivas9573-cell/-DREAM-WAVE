@@ -5,11 +5,18 @@
 export const MARKETING_NAV_LINKS = [
   { label: "Features", href: "#features" },
   { label: "Platform", href: "#platform" },
+  { label: "Discover", href: "/institutions" },
   { label: "AI", href: "#ai-showcase" },
   { label: "Pricing", href: "#pricing" },
   { label: "FAQ", href: "#faq" },
   { label: "Contact", href: "#contact" },
 ] as const;
+
+export const DISCOVERY_ROUTES = {
+  explore: "/institutions",
+  compare: "/institutions/compare",
+  profile: (slug: string) => `/institutions/${slug}`,
+} as const;
 
 export const MARKETING_AUTH_ROUTES = {
   login: "/login",

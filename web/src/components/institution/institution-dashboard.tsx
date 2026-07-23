@@ -1,18 +1,29 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-
-import { Spinner } from "@/components/common/spinner";
 import {
-  ActivityTimeline,
-  DashboardSection,
-  ExportButton,
-  MiniBarChart,
-  ProgressBar,
-  SimplePagination,
-  SmartStatCard,
-} from "@/components/dashboard/dashboard-ui";
+  BellRing,
+  BookOpen,
+  BriefcaseBusiness,
+  Building2,
+  CalendarDays,
+  GraduationCap,
+  Megaphone,
+  TrendingUp,
+  UserCheck,
+  Users,
+} from "lucide-react";
+import Link from "next/link";
+import { useEffect, useMemo } from "react";
+
+import { RouteLoading } from "@/components/common/route-loading";
+import {
+  InstitutionActivityList,
+  InstitutionBarChart,
+  InstitutionDistributionChart,
+  InstitutionLineChart,
+  InstitutionMetricCard,
+  InstitutionQuickAction,
+} from "@/components/institution/institution-dashboard-ui";
 import { InstitutionPageHeader } from "@/components/institution/institution-ui";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -23,305 +34,272 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { INSTITUTION_ROUTES } from "@/constants/institution";
+import {
+  INSTITUTION_ANALYTICS,
+  INSTITUTION_DASHBOARD_METRICS,
+  INSTITUTION_NOTICE_GROUPS,
+  INSTITUTION_QUICK_ACTIONS,
+  INSTITUTION_RECENT_ACTIVITY,
+} from "@/constants/institution-dashboard";
 import { cn } from "@/lib/utils";
 import { useInstitutionStore } from "@/store/institution-store";
 
 export function InstitutionDashboardPage() {
-  const hydrated = useInstitutionStore((s) => s.hydrated);
-  const hydrate = useInstitutionStore((s) => s.hydrate);
-  const profile = useInstitutionStore((s) => s.profile);
-  const departments = useInstitutionStore((s) => s.departments);
-  const courses = useInstitutionStore((s) => s.courses);
-  const students = useInstitutionStore((s) => s.students);
-  const teachers = useInstitutionStore((s) => s.teachers);
-  const classes = useInstitutionStore((s) => s.classes);
-  const notifications = useInstitutionStore((s) => s.notifications);
-
-  const [query, setQuery] = useState("");
-  const [page, setPage] = useState(1);
+  const hydrated = useInstitutionStore((state) => state.hydrated);
+  const hydrate = useInstitutionStore((state) => state.hydrate);
+  const profile = useInstitutionStore((state) => state.profile);
+  const departments = useInstitutionStore((state) => state.departments);
+  const courses = useInstitutionStore((state) => state.courses);
+  const students = useInstitutionStore((state) => state.students);
+  const teachers = useInstitutionStore((state) => state.teachers);
 
   useEffect(() => {
     if (!hydrated) hydrate();
   }, [hydrate, hydrated]);
 
-  const activeStudents = useMemo(
-    () => students.filter((row) => row.status === "active").length,
-    [students],
-  );
-  const activeTeachers = useMemo(
-    () => teachers.filter((row) => row.status === "active").length,
-    [teachers],
-  );
-  const fillRate = useMemo(() => {
-    const capacity = classes.reduce((sum, row) => sum + row.capacity, 0);
-    const enrolled = classes.reduce((sum, row) => sum + row.enrolled, 0);
-    if (!capacity) return 0;
-    return Math.round((enrolled / capacity) * 100);
-  }, [classes]);
-
-  const departmentLoad = useMemo(() => {
-    return departments.map((dept) => {
-      const courseIds = new Set(
-        courses.filter((course) => course.departmentId === dept.id).map((c) => c.id),
-      );
-      const value = students.filter((student) => courseIds.has(student.courseId)).length;
-      return {
-        label: dept.name.slice(0, 8),
-        value: Math.max(value, courses.filter((c) => c.departmentId === dept.id).length),
-      };
-    });
-  }, [courses, departments, students]);
-
-  const filteredStudents = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return students;
-    return students.filter(
-      (student) =>
-        student.name.toLowerCase().includes(q) ||
-        student.email.toLowerCase().includes(q),
+  const totals = useMemo(() => {
+    const departmentStudents = departments.reduce(
+      (total, department) => total + department.studentCount,
+      0,
     );
-  }, [query, students]);
-
-  const pageSize = 5;
-  const pageCount = Math.max(1, Math.ceil(filteredStudents.length / pageSize));
-  const safePage = Math.min(page, pageCount);
-  const pagedStudents = filteredStudents.slice(
-    (safePage - 1) * pageSize,
-    safePage * pageSize,
-  );
-
-  const exportOverview = () => {
-    const blob = new Blob(
-      [
-        JSON.stringify(
-          {
-            profile: profile.name,
-            departments: departments.length,
-            students: activeStudents,
-            teachers: activeTeachers,
-            fillRate,
-          },
-          null,
-          2,
-        ),
-      ],
-      { type: "application/json" },
+    const departmentFaculty = departments.reduce(
+      (total, department) => total + department.facultyCount,
+      0,
     );
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "institution-dashboard-export.json";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+
+    return {
+      students: Math.max(students.length, departmentStudents),
+      faculty: Math.max(teachers.length, departmentFaculty),
+      activeCourses: courses.filter((course) => course.status === "active").length,
+    };
+  }, [courses, departments, students.length, teachers.length]);
 
   if (!hydrated) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <Spinner label="Loading dashboard" />
-      </div>
-    );
+    return <RouteLoading label="Loading institution dashboard" />;
   }
 
+  const metrics = [
+    {
+      label: "Total Students",
+      value: totals.students.toLocaleString(),
+      hint: "Across all active programs",
+      trend: "+6.8%",
+      icon: GraduationCap,
+    },
+    {
+      label: "Total Faculty",
+      value: totals.faculty,
+      hint: "Academic and visiting faculty",
+      trend: "+4",
+      icon: Users,
+    },
+    {
+      label: "Departments",
+      value: departments.length,
+      hint: "Academic units",
+      icon: Building2,
+    },
+    {
+      label: "Courses",
+      value: totals.activeCourses,
+      hint: "Active programs",
+      icon: BookOpen,
+    },
+    {
+      label: "Admissions",
+      value: INSTITUTION_DASHBOARD_METRICS.admissions,
+      hint: "Current intake cycle",
+      trend: "+12.4%",
+      icon: UserCheck,
+    },
+    {
+      label: "Placement Rate",
+      value: `${INSTITUTION_DASHBOARD_METRICS.placementRate}%`,
+      hint: "Graduating cohort",
+      trend: "+3.2%",
+      icon: TrendingUp,
+    },
+    {
+      label: "Internships",
+      value: INSTITUTION_DASHBOARD_METRICS.internships,
+      hint: "Active student placements",
+      icon: BriefcaseBusiness,
+    },
+    {
+      label: "Upcoming Events",
+      value: INSTITUTION_DASHBOARD_METRICS.upcomingEvents,
+      hint: "Next 30 days",
+      icon: CalendarDays,
+    },
+    {
+      label: "Announcements",
+      value: INSTITUTION_DASHBOARD_METRICS.announcements,
+      hint: "Published this month",
+      icon: Megaphone,
+    },
+    {
+      label: "Active Recruiters",
+      value: INSTITUTION_DASHBOARD_METRICS.activeRecruiters,
+      hint: "Current hiring partners",
+      icon: BellRing,
+    },
+  ] as const;
+
   return (
-    <div className="container-app flex flex-1 flex-col gap-8 py-8 md:py-10">
+    <div className="container-app flex flex-1 flex-col gap-8 py-6 sm:py-8">
       <InstitutionPageHeader
-        title="Institution dashboard"
-        description={`Operational overview for ${profile.name}.`}
+        eyebrow="Organization overview"
+        title="Institution Dashboard"
+        description={`Welcome back. Here is the operational pulse of ${profile.name}.`}
         actions={
-          <>
-            <ExportButton onClick={exportOverview} />
-            <Link
-              href={INSTITUTION_ROUTES.analytics}
-              className={cn(buttonVariants({ variant: "outline" }), "h-10")}
-            >
-              Open analytics
-            </Link>
-          </>
+          <Link
+            href={INSTITUTION_ROUTES.reports}
+            className={cn(buttonVariants({ variant: "outline" }), "h-10")}
+          >
+            Generate report
+          </Link>
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <SmartStatCard label="Departments" value={departments.length} />
-        <SmartStatCard
-          label="Active courses"
-          value={courses.filter((c) => c.status === "active").length}
-        />
-        <SmartStatCard label="Active students" value={activeStudents} trend="+3%" />
-        <SmartStatCard label="Active teachers" value={activeTeachers} />
-      </div>
+      <section aria-labelledby="institution-metrics-heading">
+        <h2 id="institution-metrics-heading" className="sr-only">
+          Institution metrics
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          {metrics.map((metric) => (
+            <InstitutionMetricCard key={metric.label} {...metric} />
+          ))}
+        </div>
+      </section>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <DashboardSection
-          title="Attendance overview"
-          description="Class capacity as a proxy attendance/utilization signal."
-        >
-          <Card>
-            <CardContent className="space-y-4 pt-6">
-              <p className="text-4xl font-semibold tabular-nums">{fillRate}%</p>
-              <ProgressBar value={fillRate} label="Average fill rate" />
-            </CardContent>
-          </Card>
-        </DashboardSection>
-        <DashboardSection
-          title="Department statistics"
-          description="Learner distribution across departments."
-        >
-          <Card>
-            <CardContent className="pt-6">
-              <MiniBarChart
-                values={departmentLoad.map((item) => item.value)}
-                labels={departmentLoad.map((item) => item.label)}
-              />
-            </CardContent>
-          </Card>
-        </DashboardSection>
-      </div>
+      <section aria-labelledby="quick-actions-heading" className="space-y-3">
+        <div>
+          <h2 id="quick-actions-heading" className="text-lg font-semibold tracking-tight">
+            Quick actions
+          </h2>
+          <p className="text-muted-foreground text-sm">
+            Start frequent administrative workflows.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+          {INSTITUTION_QUICK_ACTIONS.map((action) => (
+            <InstitutionQuickAction key={action.label} {...action} />
+          ))}
+        </div>
+      </section>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <DashboardSection title="Course overview" description="Programs currently active.">
-          <Card>
-            <CardContent className="space-y-2 pt-6">
-              {courses.slice(0, 5).map((course) => (
-                <div
-                  key={course.id}
-                  className="border-border flex items-center justify-between rounded-xl border px-3 py-2 text-sm"
-                >
-                  <span className="truncate font-medium">{course.name}</span>
-                  <Badge variant="outline">{course.status}</Badge>
-                </div>
-              ))}
-              <Link
-                href={INSTITUTION_ROUTES.courses}
-                className={cn(buttonVariants({ variant: "link" }), "h-auto px-0")}
-              >
-                Manage courses
-              </Link>
-            </CardContent>
-          </Card>
-        </DashboardSection>
-        <DashboardSection
-          title="Placement analytics"
-          description="Outcome readiness snapshot for graduating cohorts."
-        >
-          <Card>
-            <CardContent className="space-y-3 pt-6">
-              <ProgressBar label="Internship readiness" value={68} />
-              <ProgressBar label="Placement pipeline" value={54} />
-              <ProgressBar label="Employer engagement" value={71} />
-              <Link
-                href={INSTITUTION_ROUTES.reports}
-                className={cn(buttonVariants({ variant: "outline" }), "h-9")}
-              >
-                Open reports
-              </Link>
-            </CardContent>
-          </Card>
-        </DashboardSection>
-      </div>
-
-      <DashboardSection
-        title="Student statistics"
-        description="Search roster with pagination."
-        action={
-          <Input
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setPage(1);
-            }}
-            placeholder="Filter students…"
-            className="h-9 w-48"
-            aria-label="Filter students"
+      <section aria-labelledby="analytics-heading" className="space-y-3">
+        <div>
+          <h2 id="analytics-heading" className="text-lg font-semibold tracking-tight">
+            Institutional analytics
+          </h2>
+          <p className="text-muted-foreground text-sm">
+            Typed visualization contracts ready for live reporting APIs.
+          </p>
+        </div>
+        <div className="grid gap-4 xl:grid-cols-2">
+          <InstitutionLineChart
+            title="Admissions Trend"
+            description="Applications received during the current cycle."
+            labels={INSTITUTION_ANALYTICS.admissions.labels}
+            values={INSTITUTION_ANALYTICS.admissions.values}
           />
-        }
-      >
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {pagedStudents.map((student) => (
-              <TableRow key={student.id}>
-                <TableCell className="font-medium">{student.name}</TableCell>
-                <TableCell>{student.email}</TableCell>
-                <TableCell>
-                  <Badge variant="muted">{student.status}</Badge>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        <div className="mt-3">
-          <SimplePagination
-            page={safePage}
-            pageCount={pageCount}
-            onPageChange={setPage}
+          <InstitutionLineChart
+            title="Student Growth"
+            description="Enrollment growth over six academic years."
+            labels={INSTITUTION_ANALYTICS.students.labels}
+            values={INSTITUTION_ANALYTICS.students.values}
+          />
+          <InstitutionDistributionChart
+            title="Placement Statistics"
+            description="Current graduating cohort placement pipeline."
+            labels={INSTITUTION_ANALYTICS.placements.labels}
+            values={INSTITUTION_ANALYTICS.placements.values}
+          />
+          <InstitutionBarChart
+            title="Department Distribution"
+            description="Student share by academic department."
+            labels={INSTITUTION_ANALYTICS.departments.labels}
+            values={INSTITUTION_ANALYTICS.departments.values}
+          />
+          <InstitutionBarChart
+            title="Course Popularity"
+            description="Relative demand across leading courses."
+            labels={INSTITUTION_ANALYTICS.courses.labels}
+            values={INSTITUTION_ANALYTICS.courses.values}
+          />
+          <InstitutionDistributionChart
+            title="Faculty Distribution"
+            description="Faculty composition by appointment level."
+            labels={INSTITUTION_ANALYTICS.faculty.labels}
+            values={INSTITUTION_ANALYTICS.faculty.values}
           />
         </div>
-      </DashboardSection>
+      </section>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <DashboardSection title="Teacher statistics" description="Faculty roster snapshot.">
-          <Card>
-            <CardContent className="space-y-2 pt-6">
-              {teachers.slice(0, 5).map((teacher) => (
-                <div
-                  key={teacher.id}
-                  className="border-border flex items-center justify-between rounded-xl border px-3 py-2 text-sm"
-                >
-                  <span>{teacher.name}</span>
-                  <Badge variant="outline">{teacher.status}</Badge>
-                </div>
-              ))}
+      <section
+        aria-label="Institution activity and announcements"
+        className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)]"
+      >
+        <Card className="bg-card/80 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle>Recent activity</CardTitle>
+            <CardDescription>
+              Admissions, faculty, courses, events, and communications.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <InstitutionActivityList items={INSTITUTION_RECENT_ACTIVITY} />
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card/80 backdrop-blur-sm">
+          <CardHeader>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <CardTitle>Announcements and notices</CardTitle>
+                <CardDescription>
+                  Priority communication for the institution.
+                </CardDescription>
+              </div>
               <Link
-                href={INSTITUTION_ROUTES.teachers}
-                className={cn(buttonVariants({ variant: "link" }), "h-auto px-0")}
-              >
-                Manage teachers
-              </Link>
-            </CardContent>
-          </Card>
-        </DashboardSection>
-        <DashboardSection title="Reports & alerts" description="Recent operational notifications.">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Notification center</CardTitle>
-              <CardDescription>Latest campus updates.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ActivityTimeline
-                items={notifications.slice(0, 5).map((item) => ({
-                  id: item.id,
-                  title: item.title,
-                  detail: item.body,
-                  time: new Date(item.createdAt).toLocaleString(),
-                }))}
-              />
-              <Link
-                href={INSTITUTION_ROUTES.notifications}
-                className={cn(buttonVariants({ variant: "link" }), "mt-2 h-auto px-0")}
+                href={INSTITUTION_ROUTES.announcements}
+                className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
               >
                 View all
               </Link>
-            </CardContent>
-          </Card>
-        </DashboardSection>
-      </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {INSTITUTION_NOTICE_GROUPS.map((group, index) => (
+                <section key={group.title} aria-labelledby={`notice-group-${index}`}>
+                  <div className="mb-2 flex items-center gap-2">
+                    <h3
+                      id={`notice-group-${index}`}
+                      className="text-sm font-semibold capitalize"
+                    >
+                      {group.title}
+                    </h3>
+                    <Badge variant="outline">{group.items.length}</Badge>
+                  </div>
+                  <ul className="space-y-1.5">
+                    {group.items.map((item) => (
+                      <li
+                        key={item}
+                        className="border-border bg-muted/20 rounded-lg border px-3 py-2 text-sm"
+                      >
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </section>
     </div>
   );
 }

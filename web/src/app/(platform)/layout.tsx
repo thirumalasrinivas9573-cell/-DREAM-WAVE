@@ -20,11 +20,18 @@ function PlatformLayoutInner({ children }: PlatformLayoutProps) {
   const onOnboarding =
     pathname === ROUTES.onboarding ||
     pathname.startsWith(`${ROUTES.onboarding}/`);
+  const onInstitution =
+    pathname === ROUTES.institution ||
+    pathname.startsWith(`${ROUTES.institution}/`);
 
   return (
     <RequireAuth>
       <OnboardingGate>
-        <PlatformShell minimal={onOnboarding}>{children}</PlatformShell>
+        {onInstitution ? (
+          children
+        ) : (
+          <PlatformShell minimal={onOnboarding}>{children}</PlatformShell>
+        )}
       </OnboardingGate>
     </RequireAuth>
   );

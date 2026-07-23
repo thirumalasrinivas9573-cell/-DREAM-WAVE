@@ -3,17 +3,17 @@ import dynamic from "next/dynamic";
 
 import { RouteLoading } from "@/components/common/route-loading";
 
-const InstitutionReportsPage = dynamic(
+const ReportCenterPage = dynamic(
   () =>
-    import("@/components/institution/institution-insights").then((mod) => mod.InstitutionReportsPage),
+    import("@/components/institution/analytics/report-center-page").then((mod) => mod.ReportCenterPage),
   { loading: () => <RouteLoading label="Loading reports" /> },
 );
 
 export const metadata: Metadata = {
   title: "Institution Reports",
-  description: "Institution reports",
+  description: "Institution report center with exports across every module",
 };
 
 export default function Page() {
-  return <InstitutionReportsPage />;
+  return <ReportCenterPage />;
 }
