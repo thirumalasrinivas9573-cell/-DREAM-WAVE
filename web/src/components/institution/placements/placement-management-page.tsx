@@ -64,6 +64,9 @@ import {
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Label } from "@/components/ui/label";
 import { INSTITUTION_ROUTES } from "@/constants/institution";
+import { isInstitutionDemoDataEnabled } from "@/lib/institution-data-mode";
+import { useAuth } from "@/components/providers/auth-provider";
+import { Alert } from "@/components/ui/alert";
 import { usePlacementManagementStore } from "@/store/placement-management-store";
 import type {
   Internship,
@@ -103,10 +106,21 @@ export function PlacementManagementPage({
 }: {
   initialTab?: PlacementTab;
 }) {
+  const { token } = useAuth();
   const store = usePlacementManagementStore();
   const {
     hydrated,
     hydrate,
+    apiEnabled,
+    loading,
+    error,
+    stats,
+    eligibility,
+    fetchWorkspace,
+    fetchEligibility,
+    transitionDrive,
+    generateShortlist,
+    sendNotification,
     recruiters,
     drives,
     internships,
@@ -115,6 +129,8 @@ export function PlacementManagementPage({
     interviews,
     offers,
   } = store;
+
+  const useLiveApi = Boolean(token) && !isInstitutionDemoDataEnabled();
 
   const [tab, setTab] = useState<PlacementTab>(initialTab);
   const [query, setQuery] = useState("");
@@ -138,11 +154,21 @@ export function PlacementManagementPage({
 
   const [eligDriveId, setEligDriveId] = useState<string>("");
 
+  const activeDriveId = eligDriveId || drives[0]?.id || "";
+
   useEffect(() => {
     if (!hydrated) hydrate();
   }, [hydrate, hydrated]);
 
-  const activeDriveId = eligDriveId || drives[0]?.id || "";
+  useEffect(() => {
+    if (!useLiveApi || !token) return;
+    void fetchWorkspace(token);
+  }, [useLiveApi, token, fetchWorkspace]);
+
+  useEffect(() => {
+    if (!useLiveApi || !token || tab !== "eligibility" || !activeDriveId) return;
+    void fetchEligibility(token, activeDriveId);
+  }, [useLiveApi, token, tab, activeDriveId, fetchEligibility]);
 
   const companyName = useCallback(
     (id: string) => recruiters.find((r) => r.id === id)?.name ?? "—",
@@ -202,9 +228,22 @@ export function PlacementManagementPage({
     [offers],
   );
 
-  const metrics = useMemo(
-    () =>
-      [
+  const metrics = useMemo(() => {
+    if (apiEnabled && stats) {
+      return [
+        { label: "Companies Registered", value: stats.companies, hint: "Active partnerships", icon: Building2 },
+        { label: "Placement Drives", value: stats.drives, hint: "All drives", icon: CalendarDays },
+        { label: "Applications", value: stats.applications, hint: "Submitted", icon: Users },
+        { label: "Students Placed", value: stats.placed, hint: "Hired / accepted", icon: BadgeCheck },
+        { label: "Internships", value: stats.internships, hint: "Listings", icon: Briefcase },
+        { label: "Offers Released", value: stats.offers, hint: "All offers", icon: Award },
+        { label: "Interviews", value: stats.interviews, hint: "Scheduled", icon: CalendarClock },
+        { label: "Jobs", value: stats.jobs, hint: "Open listings", icon: Briefcase },
+        { label: "Active Partnerships", value: stats.activePartnerships, hint: "Company links", icon: Building2 },
+        { label: "Upcoming Drives", value: drives.filter((d) => d.status === "upcoming").length, hint: "Scheduled ahead", icon: CalendarClock },
+      ] as const;
+    }
+    return [
         { label: "Companies Registered", value: recruiters.length, hint: "Active recruiters", icon: Building2 },
         { label: "Placement Drives", value: drives.length, hint: "All drives", icon: CalendarDays },
         { label: "Students Eligible", value: eligibleStudents, hint: "In pipeline", icon: Users },
@@ -215,9 +254,8 @@ export function PlacementManagementPage({
         { label: "Average Package", value: averagePackage ? formatCurrency(averagePackage) : "—", hint: "Mean offer", icon: Coins },
         { label: "Placement %", value: `${eligibleStudents ? Math.round((placedStudents / eligibleStudents) * 100) : 0}%`, hint: "Placed of eligible", icon: Percent },
         { label: "Upcoming Drives", value: drives.filter((d) => d.status === "upcoming").length, hint: "Scheduled ahead", icon: CalendarClock },
-      ] as const,
-    [averagePackage, drives, eligibleStudents, highestPackage, internships.length, offers.length, placedStudents, recruiters.length],
-  );
+      ] as const;
+  }, [averagePackage, apiEnabled, drives, eligibleStudents, highestPackage, internships.length, offers.length, placedStudents, recruiters.length, stats]);
 
   const filteredRecruiters = useMemo(
     () =>
@@ -323,14 +361,27 @@ export function PlacementManagementPage({
   const recruiterOptions = useMemo(() => recruiters.map((r) => ({ value: r.id, label: r.name })), [recruiters]);
 
   const eligibleForDrive = useMemo(() => {
+    if (apiEnabled && eligibility.length) {
+      return eligibility.map((row) => ({
+        id: row.studentId,
+        studentName: row.studentName || row.fullName || "—",
+        department: row.department || "",
+        cgpa: row.cgpa ?? 0,
+        graduationYear: "",
+        role: "",
+        status: row.status,
+        eligible: row.eligible,
+        reasons: row.reasons,
+      }));
+    }
     const drive = drives.find((d) => d.id === activeDriveId);
     if (!drive) return [];
     return applications.filter(
       (a) =>
         a.cgpa >= drive.minCgpa &&
         (drive.eligibleDepartments.length === 0 || drive.eligibleDepartments.includes(a.department)),
-    );
-  }, [applications, drives, activeDriveId]);
+    ).map((a) => ({ ...a, status: "eligible", eligible: true, reasons: [] as string[] }));
+  }, [apiEnabled, eligibility, applications, drives, activeDriveId]);
 
   const confirmDelete = () => {
     if (!deleteTarget) return;
@@ -382,6 +433,28 @@ export function PlacementManagementPage({
     { key: "minCgpa", header: "Min CGPA", sortable: true, cell: (row) => row.minCgpa },
     { key: "registrationDeadline", header: "Reg. Deadline", sortable: true, cell: (row) => row.registrationDeadline },
     { key: "status", header: "Status", sortable: true, cell: (row) => <PlacementStatusBadge status={row.status} /> },
+    ...(apiEnabled
+      ? [{
+          key: "actions",
+          header: "Actions",
+          cell: (row: PlacementDrive) => (
+            <div className="flex flex-wrap gap-1">
+              {["draft", "published"].includes(row.status) ? (
+                <Button type="button" size="sm" variant="outline" onClick={() => void transitionDrive(row.id, "publish", token ?? undefined)}>Publish</Button>
+              ) : null}
+              {row.status === "registration_open" ? (
+                <Button type="button" size="sm" variant="outline" onClick={() => void transitionDrive(row.id, "close_registration", token ?? undefined)}>Close reg.</Button>
+              ) : null}
+              {!["cancelled", "archived", "completed"].includes(row.status) ? (
+                <Button type="button" size="sm" variant="outline" onClick={() => void generateShortlist(row.id, token ?? undefined)}>Shortlist</Button>
+              ) : null}
+              {["completed", "closed"].includes(row.status) ? (
+                <Button type="button" size="sm" variant="outline" onClick={() => void transitionDrive(row.id, "archive", token ?? undefined)}>Archive</Button>
+              ) : null}
+            </div>
+          ),
+        }]
+      : []),
   ];
 
   const internshipColumns: Array<AcademicColumn<Internship>> = [
@@ -468,6 +541,9 @@ export function PlacementManagementPage({
         <Link href={INSTITUTION_ROUTES.placementsAnalytics} className={buttonVariants({ variant: "ghost", size: "sm" })}>Analytics</Link>
         <Link href={INSTITUTION_ROUTES.placementsReports} className={buttonVariants({ variant: "ghost", size: "sm" })}>Reports</Link>
       </nav>
+
+      {error ? <Alert variant="error">{error}</Alert> : null}
+      {loading && apiEnabled ? <RouteLoading label="Loading placement data" /> : null}
 
       <section aria-labelledby="placement-metrics-heading">
         <h2 id="placement-metrics-heading" className="sr-only">Placement metrics</h2>
@@ -854,9 +930,31 @@ export function PlacementManagementPage({
                   { key: "studentName", header: "Student", cell: (row) => <span className="font-medium">{row.studentName}</span> },
                   { key: "department", header: "Department", cell: (row) => row.department },
                   { key: "cgpa", header: "CGPA", cell: (row) => row.cgpa },
-                  { key: "graduationYear", header: "Graduation", cell: (row) => row.graduationYear },
-                  { key: "role", header: "Applied Role", cell: (row) => row.role },
-                  { key: "eligible", header: "Eligibility", cell: () => <Badge variant="outline" className="border-emerald-500/40 text-emerald-600 dark:text-emerald-400">Eligible</Badge> },
+                  { key: "graduationYear", header: "Graduation", cell: (row) => row.graduationYear || "—" },
+                  { key: "role", header: "Applied Role", cell: (row) => row.role || "—" },
+                  {
+                    key: "eligible",
+                    header: "Eligibility",
+                    cell: (row) => (
+                      <div className="space-y-1">
+                        <Badge
+                          variant="outline"
+                          className={
+                            row.eligible
+                              ? "border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
+                              : row.status === "conditionally_eligible"
+                                ? "border-amber-500/40 text-amber-600 dark:text-amber-400"
+                                : "border-destructive/40 text-destructive"
+                          }
+                        >
+                          {String(row.status).replace(/_/g, " ")}
+                        </Badge>
+                        {row.reasons?.length ? (
+                          <p className="text-muted-foreground max-w-xs text-xs">{row.reasons.join("; ")}</p>
+                        ) : null}
+                      </div>
+                    ),
+                  },
                 ]}
                 emptyTitle="No eligible students"
                 emptyDescription="No candidates match this drive's criteria yet."
@@ -881,13 +979,13 @@ export function PlacementManagementPage({
         <RecruiterDialog key={dialog.record?.id ?? "new"} record={dialog.record} open onOpenChange={(open) => { if (!open) setDialog(null); }} onSave={store.upsertRecruiter} />
       ) : null}
       {dialog?.kind === "drive" ? (
-        <DriveDialog key={dialog.record?.id ?? "new"} record={dialog.record} recruiters={recruiters} open onOpenChange={(open) => { if (!open) setDialog(null); }} onSave={store.upsertDrive} />
+        <DriveDialog key={dialog.record?.id ?? "new"} record={dialog.record} recruiters={recruiters} open onOpenChange={(open) => { if (!open) setDialog(null); }} onSave={(record) => void store.upsertDrive(record, token ?? undefined)} />
       ) : null}
       {dialog?.kind === "internship" ? (
-        <InternshipDialog key={dialog.record?.id ?? "new"} record={dialog.record} recruiters={recruiters} open onOpenChange={(open) => { if (!open) setDialog(null); }} onSave={store.upsertInternship} />
+        <InternshipDialog key={dialog.record?.id ?? "new"} record={dialog.record} recruiters={recruiters} open onOpenChange={(open) => { if (!open) setDialog(null); }} onSave={(record) => void store.upsertInternship(record, token ?? undefined)} />
       ) : null}
       {dialog?.kind === "job" ? (
-        <JobDialog key={dialog.record?.id ?? "new"} record={dialog.record} recruiters={recruiters} open onOpenChange={(open) => { if (!open) setDialog(null); }} onSave={store.upsertJob} />
+        <JobDialog key={dialog.record?.id ?? "new"} record={dialog.record} recruiters={recruiters} open onOpenChange={(open) => { if (!open) setDialog(null); }} onSave={(record) => void store.upsertJob(record, token ?? undefined)} />
       ) : null}
       {dialog?.kind === "interview" ? (
         <InterviewDialog key={dialog.record?.id ?? "new"} record={dialog.record} recruiters={recruiters} open onOpenChange={(open) => { if (!open) setDialog(null); }} onSave={store.upsertInterview} />
@@ -896,8 +994,15 @@ export function PlacementManagementPage({
         <OfferDialog key={dialog.record?.id ?? "new"} record={dialog.record} recruiters={recruiters} open onOpenChange={(open) => { if (!open) setDialog(null); }} onSave={store.upsertOffer} />
       ) : null}
 
-      <ApplicationStageDialog application={stageApp} open={Boolean(stageApp)} onOpenChange={(open) => { if (!open) setStageApp(null); }} onSave={store.updateApplicationStage} />
-      <PlacementNotificationDialog open={notifyOpen} onOpenChange={setNotifyOpen} />
+      <ApplicationStageDialog application={stageApp} open={Boolean(stageApp)} onOpenChange={(open) => { if (!open) setStageApp(null); }} onSave={(id, stage) => void store.updateApplicationStage(id, stage, token ?? undefined)} />
+      <PlacementNotificationDialog
+        open={notifyOpen}
+        onOpenChange={setNotifyOpen}
+        {...(activeDriveId ? { driveId: activeDriveId } : {})}
+        {...(apiEnabled && token
+          ? { onSend: (payload) => sendNotification(payload, token) }
+          : {})}
+      />
 
       <ConfirmDialog
         open={Boolean(deleteTarget)}

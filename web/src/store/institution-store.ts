@@ -1,7 +1,9 @@
 "use client";
 
+import { EMPTY_INSTITUTION_STATE } from "@/constants/institution-empty-state";
 import { INSTITUTION_SEED } from "@/constants/institution-seed";
 import { STORAGE_KEYS } from "@/constants/storage";
+import { isInstitutionDemoDataEnabled } from "@/lib/institution-data-mode";
 import { createAppStore } from "@/store";
 import type {
   Branch,
@@ -33,7 +35,9 @@ function loadState(): InstitutionState {
   if (stored?.profile?.name) {
     return stored;
   }
-  return structuredClone(INSTITUTION_SEED);
+  return structuredClone(
+    isInstitutionDemoDataEnabled() ? INSTITUTION_SEED : EMPTY_INSTITUTION_STATE,
+  );
 }
 
 function persist(state: InstitutionState) {
@@ -43,7 +47,6 @@ function persist(state: InstitutionState) {
 type InstitutionStore = InstitutionState & {
   hydrated: boolean;
   hydrate: () => void;
-  resetDemoData: () => void;
   updateProfile: (profile: Partial<InstitutionProfile>) => void;
   updateSettings: (settings: Partial<InstitutionSettings>) => void;
   upsertDepartment: (item: Omit<Department, "id"> & { id?: string }) => void;
@@ -94,15 +97,12 @@ function withPersist(
 
 export const useInstitutionStore = createAppStore<InstitutionStore>(
   (set, get) => ({
-    ...INSTITUTION_SEED,
+    ...structuredClone(
+      isInstitutionDemoDataEnabled() ? INSTITUTION_SEED : EMPTY_INSTITUTION_STATE,
+    ),
     hydrated: false,
     hydrate: () => {
       const data = loadState();
-      set({ ...data, hydrated: true });
-    },
-    resetDemoData: () => {
-      const data = structuredClone(INSTITUTION_SEED);
-      persist(data);
       set({ ...data, hydrated: true });
     },
     updateProfile: (profile) => {

@@ -22,11 +22,26 @@ import { ExportBar } from "@/components/institution/analytics/analytics-ui";
 import { useInstitutionAnalytics } from "@/components/institution/analytics/use-institution-analytics";
 import { InstitutionPageHeader } from "@/components/institution/institution-ui";
 import { EntityFilterSelect } from "@/components/institution/shared/entity-toolbar";
+import { useAuth } from "@/components/providers/auth-provider";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { INSTITUTION_ROUTES } from "@/constants/institution";
+import { isInstitutionDemoDataEnabled } from "@/lib/institution-data-mode";
+
+const STUDENT_INTELLIGENCE_REPORTS = [
+  { title: "Student Directory", description: "Full directory with filters, sorting, and export." },
+  { title: "Department Report", description: "Enrollment and performance by department." },
+  { title: "Program Report", description: "Program-level academic distribution." },
+  { title: "Placement Report", description: "Placement lifecycle and eligibility metrics." },
+  { title: "Skills Report", description: "Shared and verified skills across cohorts." },
+  { title: "Projects Report", description: "Shared project visibility summary." },
+  { title: "Certificates Report", description: "Certificate verification status." },
+  { title: "Academic Summary", description: "CGPA, attendance, and academic standing." },
+  { title: "Profile Completeness", description: "Missing documents and incomplete profiles." },
+  { title: "Attendance Summary", description: "Aggregated attendance when available." },
+] as const;
 
 type ReportDef = {
   id: string;
@@ -183,9 +198,11 @@ const REPORTS: ReportDef[] = [
 const CATEGORIES = [...new Set(REPORTS.map((report) => report.category))];
 
 export function ReportCenterPage() {
+  const { token } = useAuth();
   const { hydrated, data } = useInstitutionAnalytics();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
+  const useLiveStudentReports = Boolean(token) && !isInstitutionDemoDataEnabled();
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -215,11 +232,48 @@ export function ReportCenterPage() {
         title="Report Center"
         description="Generate, export and share institution-wide reports across every module."
         actions={
-          <Link href={INSTITUTION_ROUTES.analytics} className={buttonVariants({ variant: "outline" })}>
-            Analytics Center
-          </Link>
+          <>
+            <Link href={INSTITUTION_ROUTES.analytics} className={buttonVariants({ variant: "outline" })}>
+              Analytics Center
+            </Link>
+            <Link href={INSTITUTION_ROUTES.studentAnalytics} className={buttonVariants({ variant: "outline" })}>
+              Student Analytics
+            </Link>
+          </>
         }
       />
+
+      <Card className="border-primary/20 bg-primary/5">
+        <CardHeader>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <Badge variant="muted" className="mb-2">Student Intelligence</Badge>
+              <CardTitle className="text-lg">Live student reports</CardTitle>
+              <CardDescription>
+                Server-generated reports from institution student records — preview, filter, paginate, and export with audit logging.
+              </CardDescription>
+            </div>
+            <Link href={INSTITUTION_ROUTES.studentReports} className={buttonVariants()}>
+              Open report center
+            </Link>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground mb-3 text-sm">
+            {useLiveStudentReports
+              ? `${STUDENT_INTELLIGENCE_REPORTS.length} reports available from live API`
+              : "Sign in with live data mode to generate reports from MongoDB records"}
+          </p>
+          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {STUDENT_INTELLIGENCE_REPORTS.map((report) => (
+              <li key={report.title} className="rounded-lg border bg-card/80 p-3 text-sm">
+                <p className="font-medium">{report.title}</p>
+                <p className="text-muted-foreground text-xs">{report.description}</p>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
 
       <Card className="bg-card/80 backdrop-blur-sm">
         <CardContent className="flex flex-col gap-3 pt-6 sm:flex-row sm:items-end">

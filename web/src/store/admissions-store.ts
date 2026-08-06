@@ -2,6 +2,7 @@
 
 import { ADMISSIONS_SEED } from "@/constants/admissions-seed";
 import { STORAGE_KEYS } from "@/constants/storage";
+import { isInstitutionDemoDataEnabled } from "@/lib/institution-data-mode";
 import { createAppStore } from "@/store";
 import type {
   AdmissionApplication,
@@ -115,14 +116,19 @@ function createApplication(
 }
 
 export const useAdmissionsStore = createAppStore<AdmissionsStore>((set, get) => ({
-  applications: ADMISSIONS_SEED,
+  applications: isInstitutionDemoDataEnabled() ? ADMISSIONS_SEED : [],
   hydrated: false,
   hydrate: () => {
     const stored = getJsonStorageItem<AdmissionApplication[]>(
       STORAGE_KEYS.institutionAdmissions,
     );
     set({
-      applications: Array.isArray(stored) && stored.length ? stored : ADMISSIONS_SEED,
+      applications:
+        Array.isArray(stored) && stored.length
+          ? stored
+          : isInstitutionDemoDataEnabled()
+            ? ADMISSIONS_SEED
+            : [],
       hydrated: true,
     });
   },

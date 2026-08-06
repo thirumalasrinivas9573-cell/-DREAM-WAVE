@@ -20,6 +20,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { RouteLoading } from "@/components/common/route-loading";
 import { InstitutionMetricCard } from "@/components/institution/institution-dashboard-ui";
 import { InstitutionPageHeader } from "@/components/institution/institution-ui";
+import { useAuth } from "@/components/providers/auth-provider";
+import { useToast } from "@/components/providers/toast-provider";
+import { Alert } from "@/components/ui/alert";
 import {
   EditStudentDialog,
   ImportStudentsDialog,
@@ -44,6 +47,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { INSTITUTION_ROUTES } from "@/constants/institution";
+import { isInstitutionDemoDataEnabled } from "@/lib/institution-data-mode";
 import { useStudentManagementStore } from "@/store/student-management-store";
 import type {
   ManagedStudent,
@@ -65,6 +69,15 @@ const EMPTY_FILTERS: StudentManagementFilters = {
 };
 
 const PAGE_SIZE = 8;
+
+function useDebouncedValue<T>(value: T, delay = 350): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return debounced;
+}
 
 function exportDirectory(students: ManagedStudent[]) {
   const header = [
@@ -140,9 +153,19 @@ function valuesToOptions(values: string[]) {
 }
 
 export function StudentManagementPage() {
+  const { token } = useAuth();
+  const { toast } = useToast();
   const hydrated = useStudentManagementStore((state) => state.hydrated);
   const hydrate = useStudentManagementStore((state) => state.hydrate);
   const students = useStudentManagementStore((state) => state.students);
+  const apiEnabled = useStudentManagementStore((state) => state.apiEnabled);
+  const loading = useStudentManagementStore((state) => state.loading);
+  const error = useStudentManagementStore((state) => state.error);
+  const stats = useStudentManagementStore((state) => state.stats);
+  const filterOptions = useStudentManagementStore((state) => state.filterOptions);
+  const storePagination = useStudentManagementStore((state) => state.pagination);
+  const fetchOverview = useStudentManagementStore((state) => state.fetchOverview);
+  const fetchStudents = useStudentManagementStore((state) => state.fetchStudents);
   const updateStudent = useStudentManagementStore((state) => state.updateStudent);
   const transferStudent = useStudentManagementStore(
     (state) => state.transferStudent,
@@ -157,6 +180,7 @@ export function StudentManagementPage() {
   );
 
   const [query, setQuery] = useState("");
+  const debouncedQuery = useDebouncedValue(query);
   const [filters, setFilters] = useState<StudentManagementFilters>(EMPTY_FILTERS);
   const [sortField, setSortField] = useState<StudentSortField>("fullName");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -173,23 +197,77 @@ export function StudentManagementPage() {
     if (!hydrated) hydrate();
   }, [hydrate, hydrated]);
 
+  const useLiveApi = Boolean(token) && !isInstitutionDemoDataEnabled();
+
+  useEffect(() => {
+    if (!useLiveApi || !token) return;
+    void fetchOverview(token);
+  }, [useLiveApi, token, fetchOverview]);
+
+  useEffect(() => {
+    if (!useLiveApi || !token) return;
+    const controller = new AbortController();
+    void fetchStudents(
+      token,
+      {
+        q: debouncedQuery || undefined,
+        department: filters.department || undefined,
+        course: filters.course || undefined,
+        semester: filters.semester || undefined,
+        section: filters.section || undefined,
+        academicYear: filters.academicYear || undefined,
+        admissionYear: filters.admissionYear || undefined,
+        gender: filters.gender || undefined,
+        status: filters.status || undefined,
+        placementStatus: filters.placementStatus || undefined,
+        scholarshipStatus: filters.scholarshipStatus || undefined,
+        sort: sortField === "id" ? "studentId" : sortField,
+        sortDir: sortDirection,
+        page: String(page),
+        limit: String(PAGE_SIZE),
+      },
+      controller.signal,
+    );
+    return () => controller.abort();
+  }, [
+    useLiveApi,
+    token,
+    debouncedQuery,
+    filters,
+    sortField,
+    sortDirection,
+    page,
+    fetchStudents,
+  ]);
+
   const options = useMemo(
-    () => ({
-      departments: [...new Set(students.map((student) => student.department))].sort(),
-      courses: [...new Set(students.map((student) => student.course))].sort(),
-      semesters: [...new Set(students.map((student) => student.semester))].sort(),
-      sections: [...new Set(students.map((student) => student.section))].sort(),
-      academicYears: [
-        ...new Set(students.map((student) => student.academicYear)),
-      ].sort(),
-      admissionYears: [
-        ...new Set(students.map((student) => student.admissionYear)),
-      ].sort(),
-    }),
-    [students],
+    () =>
+      apiEnabled && filterOptions
+        ? {
+            departments: filterOptions.departments,
+            courses: filterOptions.courses,
+            semesters: filterOptions.semesters,
+            sections: filterOptions.sections,
+            academicYears: filterOptions.academicYears,
+            admissionYears: filterOptions.admissionYears,
+          }
+        : {
+            departments: [...new Set(students.map((student) => student.department))].sort(),
+            courses: [...new Set(students.map((student) => student.course))].sort(),
+            semesters: [...new Set(students.map((student) => student.semester))].sort(),
+            sections: [...new Set(students.map((student) => student.section))].sort(),
+            academicYears: [
+              ...new Set(students.map((student) => student.academicYear)),
+            ].sort(),
+            admissionYears: [
+              ...new Set(students.map((student) => student.admissionYear)),
+            ].sort(),
+          },
+    [students, apiEnabled, filterOptions],
   );
 
   const filteredStudents = useMemo(() => {
+    if (apiEnabled) return students;
     const term = query.trim().toLowerCase();
     const filtered = students.filter((student) => {
       const searchable = [
@@ -231,14 +309,16 @@ export function StudentManagementPage() {
       );
       return sortDirection === "asc" ? result : -result;
     });
-  }, [filters, query, sortDirection, sortField, students]);
+  }, [filters, query, sortDirection, sortField, students, apiEnabled]);
 
-  const pageCount = Math.max(1, Math.ceil(filteredStudents.length / PAGE_SIZE));
-  const safePage = Math.min(page, pageCount);
-  const visibleStudents = filteredStudents.slice(
-    (safePage - 1) * PAGE_SIZE,
-    safePage * PAGE_SIZE,
-  );
+  const pageCount = apiEnabled
+    ? storePagination.pageCount
+    : Math.max(1, Math.ceil(filteredStudents.length / PAGE_SIZE));
+  const safePage = apiEnabled ? storePagination.page : Math.min(page, pageCount);
+  const visibleStudents = apiEnabled
+    ? students
+    : filteredStudents.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const totalCount = apiEnabled ? storePagination.total : filteredStudents.length;
 
   const findStudent = (id: string | null) =>
     students.find((student) => student.id === id) ?? null;
@@ -250,6 +330,16 @@ export function StudentManagementPage() {
   const notificationTarget = findStudent(notifyId);
 
   const metrics = useMemo(() => {
+    if (apiEnabled && stats) {
+      return [
+        { label: "Total Students", value: stats.total, hint: "All records", icon: Users },
+        { label: "Active Students", value: stats.active, hint: "Currently enrolled", icon: UserCheck },
+        { label: "Inactive Students", value: stats.inactive, hint: "Inactive records", icon: UserMinus },
+        { label: "Graduated Students", value: stats.graduated, hint: "Alumni records", icon: GraduationCap },
+        { label: "Departments", value: stats.departments, hint: "Academic units", icon: Building2 },
+        { label: "Placement Ready", value: stats.placementReady, hint: "Career pipeline", icon: GraduationCap },
+      ] as const;
+    }
     const active = students.filter((student) => student.status === "active").length;
     const inactive = students.filter(
       (student) => student.status === "inactive",
@@ -303,7 +393,7 @@ export function StudentManagementPage() {
         icon: AlertTriangle,
       },
     ] as const;
-  }, [students]);
+  }, [students, apiEnabled, stats]);
 
   const setFilter = useCallback(
     (key: keyof StudentManagementFilters, value: string) => {
@@ -329,6 +419,7 @@ export function StudentManagementPage() {
 
   return (
     <div className="container-app flex flex-1 flex-col gap-8 py-6 sm:py-8">
+      {error ? <Alert variant="error">{error}</Alert> : null}
       <InstitutionPageHeader
         eyebrow="Institution ERP"
         title="Student Management"
@@ -344,6 +435,9 @@ export function StudentManagementPage() {
       <nav aria-label="Student management sections" className="border-border flex flex-wrap gap-1 border-b pb-2">
         <Link href={INSTITUTION_ROUTES.students} aria-current="page" className={buttonVariants({ variant: "default", size: "sm" })}>
           Directory
+        </Link>
+        <Link href={INSTITUTION_ROUTES.studentTalent} className={buttonVariants({ variant: "ghost", size: "sm" })}>
+          Talent Discovery
         </Link>
         <Link href={INSTITUTION_ROUTES.studentAnalytics} className={buttonVariants({ variant: "ghost", size: "sm" })}>
           Analytics
@@ -435,21 +529,24 @@ export function StudentManagementPage() {
           </details>
 
           <p className="text-muted-foreground text-sm" aria-live="polite">
-            {filteredStudents.length} student{filteredStudents.length === 1 ? "" : "s"} found
+            {totalCount} student{totalCount === 1 ? "" : "s"} found
           </p>
+
+          {loading && apiEnabled ? <RouteLoading label="Loading students" /> : null}
 
           <StudentDirectoryTable
             students={visibleStudents}
             sortField={sortField}
             sortDirection={sortDirection}
+            searchQuery={debouncedQuery}
             onSort={handleSort}
             onView={(student) => setSelectedId(student.id)}
           />
 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-muted-foreground text-xs">
-              Showing {filteredStudents.length ? (safePage - 1) * PAGE_SIZE + 1 : 0}–
-              {Math.min(safePage * PAGE_SIZE, filteredStudents.length)} of {filteredStudents.length}
+              Showing {totalCount ? (safePage - 1) * PAGE_SIZE + 1 : 0}–
+              {Math.min(safePage * PAGE_SIZE, totalCount)} of {totalCount}
             </p>
             <div className="flex items-center gap-2">
               <Button type="button" size="sm" variant="outline" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)}>
@@ -475,7 +572,7 @@ export function StudentManagementPage() {
         onPromote={(student) => setPromoteId(student.id)}
         onDeactivate={(student) => setDeactivateId(student.id)}
         onNotify={(student) => setNotifyId(student.id)}
-        onAddNote={(id, text) => addNote(id, text, "Student Services")}
+        onAddNote={(id, text) => addNote(id, text, "Student Services", token ?? undefined)}
       />
 
       {editStudent ? (
@@ -486,7 +583,7 @@ export function StudentManagementPage() {
           onOpenChange={(open) => {
             if (!open) setEditId(null);
           }}
-          onSave={updateStudent}
+          onSave={(id, patch) => void updateStudent(id, patch, token ?? undefined)}
         />
       ) : null}
 
@@ -498,11 +595,33 @@ export function StudentManagementPage() {
           onOpenChange={(open) => {
             if (!open) setTransferId(null);
           }}
-          onTransfer={transferStudent}
+          onTransfer={(id, dept, course, section) =>
+            void transferStudent(id, dept, course, section, token ?? undefined)
+          }
         />
       ) : null}
 
-      <ImportStudentsDialog open={importOpen} onOpenChange={setImportOpen} onImport={importStudents} />
+      <ImportStudentsDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImport={async (rows) => {
+          const created = await importStudents(rows, token ?? undefined);
+          if (created > 0) {
+            toast({
+              title: "Import completed",
+              description: `${created} student${created === 1 ? "" : "s"} added to the directory.`,
+              variant: "success",
+            });
+          } else {
+            toast({
+              title: "Import failed",
+              description: "No rows were imported. Review the file and try again.",
+              variant: "error",
+            });
+          }
+          return created;
+        }}
+      />
 
       <StudentNotificationDialog
         student={notificationTarget}
@@ -521,7 +640,7 @@ export function StudentManagementPage() {
         description={`Promote ${promoteTarget?.fullName ?? "this student"} to the next semester?`}
         confirmLabel="Promote"
         onConfirm={() => {
-          if (promoteTarget) promoteSemester(promoteTarget.id);
+          if (promoteTarget) void promoteSemester(promoteTarget.id, token ?? undefined);
         }}
       />
 
@@ -535,7 +654,7 @@ export function StudentManagementPage() {
         confirmLabel="Deactivate"
         destructive
         onConfirm={() => {
-          if (deactivateTarget) updateStatus(deactivateTarget.id, "inactive");
+          if (deactivateTarget) void updateStatus(deactivateTarget.id, "inactive", token ?? undefined);
         }}
       />
     </div>

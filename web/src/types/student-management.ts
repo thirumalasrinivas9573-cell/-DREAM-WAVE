@@ -120,9 +120,11 @@ export type ManagedStudent = {
   notes: Array<{
     id: string;
     text: string;
+    type?: string;
     author: string;
     createdAt: string;
   }>;
+  adminTags?: string[];
 };
 
 export type StudentManagementFilters = {

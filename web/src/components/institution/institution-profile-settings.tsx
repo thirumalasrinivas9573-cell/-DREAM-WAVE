@@ -6,9 +6,7 @@ import { AuthAlert } from "@/components/auth/auth-alert";
 import { Spinner } from "@/components/common/spinner";
 import { EntityForm } from "@/components/institution/entity-form";
 import { InstitutionPageHeader } from "@/components/institution/institution-ui";
-import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useInstitutionStore } from "@/store/institution-store";
 import type { InstitutionProfile, InstitutionSettings } from "@/types/institution";
 
@@ -113,9 +111,7 @@ export function InstitutionSettingsPage() {
   const hydrate = useInstitutionStore((s) => s.hydrate);
   const settings = useInstitutionStore((s) => s.settings);
   const updateSettings = useInstitutionStore((s) => s.updateSettings);
-  const resetDemoData = useInstitutionStore((s) => s.resetDemoData);
   const [saved, setSaved] = useState(false);
-  const [resetOpen, setResetOpen] = useState(false);
 
   useEffect(() => {
     if (!hydrated) hydrate();
@@ -204,35 +200,6 @@ export function InstitutionSettingsPage() {
           </div>
         </CardHeader>
       </Card>
-      <Card className="max-w-xl">
-        <CardHeader>
-          <CardTitle>Demo data</CardTitle>
-          <p className="text-muted-foreground mt-2 text-sm">
-            Reset institution records to the seeded demo dataset stored in this
-            browser.
-          </p>
-          <Button
-            type="button"
-            variant="outline"
-            className="mt-4 w-fit"
-            onClick={() => setResetOpen(true)}
-          >
-            Reset demo data
-          </Button>
-        </CardHeader>
-      </Card>
-      <ConfirmDialog
-        open={resetOpen}
-        onOpenChange={setResetOpen}
-        title="Reset demo data"
-        description="Reset all institution demo data to the seeded dataset stored in this browser?"
-        confirmLabel="Reset"
-        destructive
-        onConfirm={() => {
-          resetDemoData();
-          setSaved(false);
-        }}
-      />
     </div>
   );
 }

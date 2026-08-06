@@ -213,7 +213,7 @@ export function ImportStudentsDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onImport: (rows: StudentImportRow[]) => number;
+  onImport: (rows: StudentImportRow[]) => number | Promise<number>;
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -238,7 +238,7 @@ export function ImportStudentsDialog({
         section: row[6] || "A",
         gender: "prefer-not-to-say",
       }));
-    const count = onImport(rows);
+    const count = await Promise.resolve(onImport(rows));
     setMessage(`${count} student${count === 1 ? "" : "s"} imported.`);
   };
 

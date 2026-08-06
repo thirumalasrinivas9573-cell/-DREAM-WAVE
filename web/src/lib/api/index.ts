@@ -25,6 +25,12 @@ export { profileApi } from "@/lib/api/profile";
 export { reportApi } from "@/lib/api/report";
 export { roadmapApi } from "@/lib/api/roadmap";
 export { tasksApi } from "@/lib/api/tasks";
+export { recruitmentApi } from "@/lib/api/recruitment";
+export {
+  partnershipsApi,
+  discoveryApi,
+  platformNotificationsApi,
+} from "@/lib/api/partnerships";
 
 export const API_READY = true as const;
 

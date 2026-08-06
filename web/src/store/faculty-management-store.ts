@@ -2,6 +2,7 @@
 
 import { FACULTY_MANAGEMENT_SEED } from "@/constants/faculty-management-seed";
 import { STORAGE_KEYS } from "@/constants/storage";
+import { isInstitutionDemoDataEnabled } from "@/lib/institution-data-mode";
 import { createAppStore } from "@/store";
 import type {
   FacultyStatus,
@@ -44,7 +45,7 @@ function persist(faculty: ManagedFaculty[]) {
 
 export const useFacultyManagementStore =
   createAppStore<FacultyManagementStore>((set, get) => ({
-    faculty: FACULTY_MANAGEMENT_SEED,
+    faculty: isInstitutionDemoDataEnabled() ? FACULTY_MANAGEMENT_SEED : [],
     hydrated: false,
     hydrate: () => {
       const stored = getJsonStorageItem<ManagedFaculty[]>(
@@ -54,7 +55,9 @@ export const useFacultyManagementStore =
         faculty:
           Array.isArray(stored) && stored.length
             ? stored
-            : FACULTY_MANAGEMENT_SEED,
+            : isInstitutionDemoDataEnabled()
+              ? FACULTY_MANAGEMENT_SEED
+              : [],
         hydrated: true,
       });
     },

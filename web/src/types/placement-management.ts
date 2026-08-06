@@ -1,8 +1,21 @@
 export type PlacementStatus =
+  | "draft"
+  | "published"
+  | "registration_open"
+  | "registration_closed"
   | "upcoming"
   | "ongoing"
   | "completed"
-  | "cancelled";
+  | "closed"
+  | "cancelled"
+  | "archived";
+
+export type DriveWorkflowStage = {
+  key: string;
+  label: string;
+  order: number;
+  status: "pending" | "active" | "completed";
+};
 
 export type ListingStatus = "open" | "closed" | "draft";
 
@@ -54,13 +67,18 @@ export type PlacementDrive = {
   companyId: string;
   date: string;
   venue: string;
+  onlinePlatform?: string;
   mode: DriveMode;
   eligibleDepartments: string[];
   eligiblePrograms: string[];
   minCgpa: number;
   maxBacklogs: number;
   skillsRequired: string[];
+  documentsRequired?: string[];
   registrationDeadline: string;
+  expectedHiringCount?: number;
+  workflowStages?: DriveWorkflowStage[];
+  currentWorkflowStage?: string;
   status: PlacementStatus;
 };
 

@@ -1,7 +1,9 @@
 "use client";
 
 import { ACADEMIC_SEED } from "@/constants/academic-management-seed";
+import { EMPTY_ACADEMIC_STATE } from "@/constants/institution-empty-state";
 import { STORAGE_KEYS } from "@/constants/storage";
+import { isInstitutionDemoDataEnabled } from "@/lib/institution-data-mode";
 import { createAppStore } from "@/store";
 import type {
   AcademicCalendarEvent,
@@ -65,7 +67,7 @@ export const useAcademicManagementStore =
     };
 
     return {
-      ...ACADEMIC_SEED,
+      ...(isInstitutionDemoDataEnabled() ? ACADEMIC_SEED : EMPTY_ACADEMIC_STATE),
       hydrated: false,
       hydrate: () => {
         const stored = getJsonStorageItem<AcademicState>(
@@ -74,7 +76,12 @@ export const useAcademicManagementStore =
         set(
           stored && Array.isArray(stored.departments)
             ? { ...stored, hydrated: true }
-            : { ...ACADEMIC_SEED, hydrated: true },
+            : {
+                ...(isInstitutionDemoDataEnabled()
+                  ? ACADEMIC_SEED
+                  : EMPTY_ACADEMIC_STATE),
+                hydrated: true,
+              },
         );
       },
       upsertDepartment: (record) =>

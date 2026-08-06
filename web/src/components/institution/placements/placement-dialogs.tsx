@@ -9,7 +9,6 @@ import {
   LISTING_STATUS_OPTIONS,
   PLACEMENT_STATUS_OPTIONS,
 } from "@/components/institution/placements/placement-ui";
-import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -658,19 +657,54 @@ export function ApplicationStageDialog({
 export function PlacementNotificationDialog({
   open,
   onOpenChange,
+  onSend,
+  driveId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSend?: (payload: { template: string; title: string; body: string; driveId?: string }) => Promise<void>;
+  driveId?: string;
 }) {
-  const [template, setTemplate] = useState("drive-announced");
+  const [template, setTemplate] = useState("opportunity_published");
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  const templateMap: Record<string, string> = {
+    "drive-announced": "opportunity_published",
+    "new-internship": "opportunity_published",
+    "interview-scheduled": "interview_scheduled",
+    "offer-released": "offer_released",
+    "registration-closing": "registration_deadline_reminder",
+    "company-visit": "opportunity_published",
+  };
+
+  const handleSend = async () => {
+    if (!onSend) {
+      setSent(true);
+      return;
+    }
+    setSending(true);
+    try {
+      await onSend({
+        template: templateMap[template] || "opportunity_published",
+        title: title || template.replace(/-/g, " "),
+        body: body || title || template.replace(/-/g, " "),
+        ...(driveId ? { driveId } : {}),
+      });
+      setSent(true);
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
       title="Placement notification"
-      description="Prepare a placement communication for students and recruiters."
+      description="Send placement communications to registered students."
     >
       <div className="space-y-4">
         <AcademicField label="Template">
@@ -683,15 +717,16 @@ export function PlacementNotificationDialog({
             <option value="company-visit">Company Visit</option>
           </select>
         </AcademicField>
-        <Alert
-          variant="info"
-          title="Notification service boundary"
-          description="Template, recipients (students & recruiters), and channel are ready for the placement notification API."
-        />
-        {sent ? <p role="status" className="text-primary text-sm">Notification prepared successfully.</p> : null}
+        <AcademicField label="Title">
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Notification title" />
+        </AcademicField>
+        <AcademicField label="Message">
+          <Input value={body} onChange={(e) => setBody(e.target.value)} placeholder="Notification body" />
+        </AcademicField>
+        {sent ? <p role="status" className="text-primary text-sm">Notification sent successfully.</p> : null}
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button type="button" onClick={() => setSent(true)}><Send aria-hidden="true" />Prepare notification</Button>
+          <Button type="button" disabled={sending} onClick={() => void handleSend()}><Send aria-hidden="true" />{sending ? "Sending…" : "Send notification"}</Button>
         </div>
       </div>
     </Dialog>

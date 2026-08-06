@@ -34,6 +34,10 @@ const mentorRoutes    = require('./routes/mentor')
 const profileRoutes   = require('./routes/profile')
 const lessonRoutes    = require('./routes/lesson')
 const mjRoutes        = require('./routes/mj')
+const partnershipRoutes = require('./routes/partnerships')
+const discoveryRoutes   = require('./routes/discovery')
+const platformNotificationRoutes = require('./routes/platformNotifications')
+const recruitmentRoutes = require('./routes/recruitment')
 
 const app    = express()
 const server = http.createServer(app)
@@ -93,8 +97,11 @@ app.use((req, _res, next) => { log.info(`${req.method} ${req.path}`); next() })
 
 // ── MongoDB ───────────────────────────────────────────────────────────────────
 const connectDB = async (attempt = 1) => {
-  const url = process.env.MONGODB_URL
-  if (!url) { log.error('MONGODB_URL not set'); return }
+  const url = process.env.MONGODB_URL?.trim()
+  if (!url) {
+    log.error('MONGODB_URL not set — add your MongoDB connection string to server/.env')
+    return
+  }
   try {
     const conn = await mongoose.connect(url, {
       serverSelectionTimeoutMS: 10000,
@@ -130,6 +137,16 @@ app.use('/api/mentor',    mentorRoutes)
 app.use('/api/profile',   profileRoutes)
 app.use('/api/lesson',    lessonRoutes)
 app.use('/api/mj',        mjRoutes)
+app.use('/api/partnerships', partnershipRoutes)
+app.use('/api/discovery', discoveryRoutes)
+app.use('/api/platform-notifications', platformNotificationRoutes)
+app.use('/api/recruitment', recruitmentRoutes)
+app.use('/api/institution/students', require('./routes/institutionStudents'))
+app.use('/api/institution/placements', require('./routes/institutionPlacements'))
+app.use('/api/institution/research', require('./routes/institutionResearch'))
+app.use('/api/institution/incubation', require('./routes/institutionIncubation'))
+app.use('/api/institution/alumni', require('./routes/institutionAlumni'))
+app.use('/api/institution/command-center', require('./routes/institutionCommandCenter'))
 
 // ── Global error handler ──────────────────────────────────────────────────────
 app.use((err, req, res, _next) => {
@@ -155,9 +172,12 @@ app.use('*', (req, res) => res.status(404).json({ success: false, message: `Rout
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 const PORT = parseInt(process.env.PORT || '5001', 10)
-server.listen(PORT, '0.0.0.0', () =>
+server.listen(PORT, '0.0.0.0', () => {
   log.info(`Server running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`)
-)
+  if (!process.env.OPENAI_API_KEY?.trim()) {
+    log.warn('OPENAI_API_KEY not set — AI routes will fail until you add it to server/.env')
+  }
+})
 
 process.on('unhandledRejection', err => log.warn('Unhandled rejection:', err?.message))
 process.on('uncaughtException',  err => { log.error('Uncaught exception:', err?.message); process.exit(1) })

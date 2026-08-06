@@ -16,6 +16,7 @@ import {
   LogOut,
   Megaphone,
   Menu,
+  Network,
   Plus,
   Search,
   Settings,
@@ -64,6 +65,7 @@ const NAV_ICONS = [
   Building2,
   BookOpen,
   BriefcaseBusiness,
+  Network,
   CalendarDays,
   GalleryHorizontal,
   Megaphone,
@@ -86,6 +88,11 @@ const SEARCH_TARGETS = [
     label: "Admissions",
     href: INSTITUTION_ROUTES.admissions,
     keywords: "applications enrollment",
+  },
+  {
+    label: "Industry Network",
+    href: INSTITUTION_ROUTES.industryNetwork,
+    keywords: "partnerships companies industry",
   },
   {
     label: "Announcements",

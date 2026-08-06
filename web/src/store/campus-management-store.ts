@@ -1,7 +1,9 @@
 "use client";
 
 import { CAMPUS_SEED } from "@/constants/campus-management-seed";
+import { EMPTY_CAMPUS_STATE } from "@/constants/institution-empty-state";
 import { STORAGE_KEYS } from "@/constants/storage";
+import { isInstitutionDemoDataEnabled } from "@/lib/institution-data-mode";
 import { createAppStore } from "@/store";
 import type {
   Announcement,
@@ -59,7 +61,7 @@ export const useCampusManagementStore = createAppStore<CampusStore>(
     };
 
     return {
-      ...CAMPUS_SEED,
+      ...(isInstitutionDemoDataEnabled() ? CAMPUS_SEED : EMPTY_CAMPUS_STATE),
       hydrated: false,
       hydrate: () => {
         const stored = getJsonStorageItem<CampusState>(
@@ -68,7 +70,10 @@ export const useCampusManagementStore = createAppStore<CampusStore>(
         set(
           stored && Array.isArray(stored.announcements)
             ? { ...stored, hydrated: true }
-            : { ...CAMPUS_SEED, hydrated: true },
+            : {
+                ...(isInstitutionDemoDataEnabled() ? CAMPUS_SEED : EMPTY_CAMPUS_STATE),
+                hydrated: true,
+              },
         );
       },
       upsertAnnouncement: (record) =>

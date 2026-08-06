@@ -1,11 +1,13 @@
 "use client";
 
 import {
+  Award,
   BellRing,
   BookOpen,
   BriefcaseBusiness,
   Building2,
   CalendarDays,
+  FileBarChart,
   GraduationCap,
   Megaphone,
   TrendingUp,
@@ -13,9 +15,11 @@ import {
   Users,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { RouteLoading } from "@/components/common/route-loading";
+import { InstitutionPartnershipDashboardWidget } from "@/components/institution/partnerships/institution-partnership-dashboard-widget";
+import { InstitutionPlacementDashboardWidget } from "@/components/institution/placements/placement-dashboard-widget";
 import {
   InstitutionActivityList,
   InstitutionBarChart,
@@ -25,6 +29,7 @@ import {
   InstitutionQuickAction,
 } from "@/components/institution/institution-dashboard-ui";
 import { InstitutionPageHeader } from "@/components/institution/institution-ui";
+import { useAuth } from "@/components/providers/auth-provider";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -42,10 +47,13 @@ import {
   INSTITUTION_QUICK_ACTIONS,
   INSTITUTION_RECENT_ACTIVITY,
 } from "@/constants/institution-dashboard";
+import { institutionStudentsApi, type StudentStats } from "@/lib/api/institution-students";
+import { isInstitutionDemoDataEnabled } from "@/lib/institution-data-mode";
 import { cn } from "@/lib/utils";
 import { useInstitutionStore } from "@/store/institution-store";
 
 export function InstitutionDashboardPage() {
+  const { token } = useAuth();
   const hydrated = useInstitutionStore((state) => state.hydrated);
   const hydrate = useInstitutionStore((state) => state.hydrate);
   const profile = useInstitutionStore((state) => state.profile);
@@ -54,9 +62,22 @@ export function InstitutionDashboardPage() {
   const students = useInstitutionStore((state) => state.students);
   const teachers = useInstitutionStore((state) => state.teachers);
 
+  const useLiveApi = Boolean(token) && !isInstitutionDemoDataEnabled();
+  const [liveStats, setLiveStats] = useState<StudentStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+
   useEffect(() => {
     if (!hydrated) hydrate();
   }, [hydrate, hydrated]);
+
+  useEffect(() => {
+    if (!useLiveApi || !token) return;
+    setStatsLoading(true);
+    void institutionStudentsApi
+      .getStats(token)
+      .then((res) => setLiveStats(res.stats))
+      .finally(() => setStatsLoading(false));
+  }, [useLiveApi, token]);
 
   const totals = useMemo(() => {
     const departmentStudents = departments.reduce(
@@ -69,11 +90,34 @@ export function InstitutionDashboardPage() {
     );
 
     return {
-      students: Math.max(students.length, departmentStudents),
+      students: liveStats?.total ?? Math.max(students.length, departmentStudents),
       faculty: Math.max(teachers.length, departmentFaculty),
       activeCourses: courses.filter((course) => course.status === "active").length,
     };
-  }, [courses, departments, students.length, teachers.length]);
+  }, [courses, departments, liveStats?.total, students.length, teachers.length]);
+
+  const activityItems = useMemo(() => {
+    if (liveStats?.recentActivity?.length) {
+      return liveStats.recentActivity.map((item) => ({
+        id: item.id,
+        type: item.type,
+        title: item.title,
+        detail: item.detail,
+      }));
+    }
+    return INSTITUTION_RECENT_ACTIVITY;
+  }, [liveStats?.recentActivity]);
+
+  const departmentChart = useMemo(() => {
+    if (liveStats?.byDepartment && Object.keys(liveStats.byDepartment).length) {
+      const labels = Object.keys(liveStats.byDepartment);
+      return {
+        labels,
+        values: labels.map((l) => liveStats.byDepartment[l] ?? 0),
+      };
+    }
+    return INSTITUTION_ANALYTICS.departments;
+  }, [liveStats?.byDepartment]);
 
   if (!hydrated) {
     return <RouteLoading label="Loading institution dashboard" />;
@@ -83,8 +127,8 @@ export function InstitutionDashboardPage() {
     {
       label: "Total Students",
       value: totals.students.toLocaleString(),
-      hint: "Across all active programs",
-      trend: "+6.8%",
+      hint: useLiveApi ? "Live institution records" : "Across all active programs",
+      ...(liveStats ? {} : { trend: "+6.8%" }),
       icon: GraduationCap,
     },
     {
@@ -115,9 +159,11 @@ export function InstitutionDashboardPage() {
     },
     {
       label: "Placement Rate",
-      value: `${INSTITUTION_DASHBOARD_METRICS.placementRate}%`,
-      hint: "Graduating cohort",
-      trend: "+3.2%",
+      value: liveStats?.placedStudents && liveStats.total
+        ? `${Math.round((liveStats.placedStudents / liveStats.total) * 100)}%`
+        : `${INSTITUTION_DASHBOARD_METRICS.placementRate}%`,
+      hint: liveStats ? "From student intelligence API" : "Graduating cohort",
+      ...(liveStats ? {} : { trend: "+3.2%" }),
       icon: TrendingUp,
     },
     {
@@ -153,14 +199,67 @@ export function InstitutionDashboardPage() {
         title="Institution Dashboard"
         description={`Welcome back. Here is the operational pulse of ${profile.name}.`}
         actions={
-          <Link
-            href={INSTITUTION_ROUTES.reports}
-            className={cn(buttonVariants({ variant: "outline" }), "h-10")}
-          >
-            Generate report
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={INSTITUTION_ROUTES.commandCenter}
+              className={cn(buttonVariants({ variant: "default" }), "h-10")}
+            >
+              Command Center
+            </Link>
+            <Link
+              href={INSTITUTION_ROUTES.reports}
+              className={cn(buttonVariants({ variant: "outline" }), "h-10")}
+            >
+              Generate report
+            </Link>
+          </div>
         }
       />
+
+      {useLiveApi ? (
+        <section aria-labelledby="student-intelligence-heading" className="space-y-3">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 id="student-intelligence-heading" className="text-lg font-semibold tracking-tight">
+                Student intelligence
+              </h2>
+              <p className="text-muted-foreground text-sm">
+                Live metrics from institution student records.
+              </p>
+            </div>
+            <Link href={INSTITUTION_ROUTES.studentAnalytics} className={buttonVariants({ variant: "outline", size: "sm" })}>
+              Open analytics
+            </Link>
+          </div>
+          {statsLoading ? <RouteLoading label="Loading student metrics" /> : null}
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <InstitutionMetricCard
+              label="Placement Eligible"
+              value={liveStats?.placementEligible ?? 0}
+              hint="Ready pipeline"
+              icon={BriefcaseBusiness}
+            />
+            <InstitutionMetricCard
+              label="Pending Verifications"
+              value={liveStats?.pendingVerifications ?? 0}
+              hint="Certificates & achievements"
+              icon={Award}
+            />
+            <InstitutionMetricCard
+              label="Recently Added"
+              value={liveStats?.recentlyAdded?.length ?? 0}
+              hint="Latest enrollments"
+              icon={UserCheck}
+            />
+            <InstitutionMetricCard
+              label="Recent Reports"
+              value={liveStats?.recentActivity?.filter((a) => a.action === "report_generated").length ?? 0}
+              hint="Audit-logged exports"
+              icon={FileBarChart}
+            />
+          </div>
+        </section>
+      ) : null}
 
       <section aria-labelledby="institution-metrics-heading">
         <h2 id="institution-metrics-heading" className="sr-only">
@@ -188,6 +287,9 @@ export function InstitutionDashboardPage() {
           ))}
         </div>
       </section>
+
+      <InstitutionPartnershipDashboardWidget />
+      <InstitutionPlacementDashboardWidget />
 
       <section aria-labelledby="analytics-heading" className="space-y-3">
         <div>
@@ -219,9 +321,9 @@ export function InstitutionDashboardPage() {
           />
           <InstitutionBarChart
             title="Department Distribution"
-            description="Student share by academic department."
-            labels={INSTITUTION_ANALYTICS.departments.labels}
-            values={INSTITUTION_ANALYTICS.departments.values}
+            description={useLiveApi ? "Live student share by department." : "Student share by academic department."}
+            labels={departmentChart.labels}
+            values={departmentChart.values}
           />
           <InstitutionBarChart
             title="Course Popularity"
@@ -250,7 +352,7 @@ export function InstitutionDashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <InstitutionActivityList items={INSTITUTION_RECENT_ACTIVITY} />
+            <InstitutionActivityList items={activityItems} />
           </CardContent>
         </Card>
 

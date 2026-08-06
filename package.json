@@ -5,10 +5,14 @@
   "scripts": {
     "start":       "bash start.sh",
     "dev":         "bash start.sh",
-    "server":      "cd server && node server.js",
+    "dev:legacy":  "concurrently \"npm run server\" \"npm run client\"",
+    "dev:web":     "concurrently \"npm run server\" \"npm run web\"",
+    "server":      "cd server && npm run dev",
+    "web":         "cd web && npm run dev",
     "client":      "cd client && npm run dev",
-    "install:all": "npm install && cd client && npm install && cd ../server && npm install",
-    "build":       "cd client && npm run build"
+    "install:all": "npm install && cd client && npm install && cd ../server && npm install && cd ../web && npm install",
+    "build":       "cd client && npm run build",
+    "build:web":   "cd web && npm run build"
   },
   "devDependencies": {
     "concurrently": "^8.2.0"
