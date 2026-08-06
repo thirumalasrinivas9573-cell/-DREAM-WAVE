@@ -1,70 +1,76 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Button, ErrorState, LoadingState } from '@shared/components/ui'
+import { profileApi } from '@shared/services/api'
+import profileService from '@shared/services/profileService'
 import StudentLayout from '../layouts/StudentLayout'
-import { useAuth } from '@shared/context/AuthContext'
 import DeviceSessions from '@shared/components/auth/DeviceSessions'
+import useStudentProfile from '../hooks/useStudentProfile'
+import '../styles/profile.css'
+
+function Toggle({ value, onChange, label }) {
+  return <button type="button" className={`identity-toggle ${value ? 'is-on' : ''}`} role="switch" aria-checked={value} aria-label={label} onClick={() => onChange(!value)}><span /></button>
+}
 
 export default function Settings() {
-  const { user, logout } = useAuth()
-  const [notifs, setNotifs] = useState({ email: true, push: false, weekly: true })
-  const [saved, setSaved]   = useState(false)
+  const { user, profile, loading, error, load, setProfile } = useStudentProfile()
+  const [privacy, setPrivacy] = useState(null)
+  const [preferences, setPreferences] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState('')
 
-  const save = () => { setSaved(true); setTimeout(() => setSaved(false), 2500) }
+  useEffect(() => {
+    if (profile) {
+      setPrivacy({ ...profile.privacy })
+      setPreferences({ ...profile.preferences })
+    }
+  }, [profile])
 
-  const Toggle = ({ on, onChange }) => (
-    <button onClick={onChange} style={{ width: 44, height: 24, borderRadius: 999, border: 'none', cursor: 'pointer', background: on ? 'linear-gradient(135deg,var(--purple),var(--purple-mid))' : 'var(--border)', transition: 'var(--t)', position: 'relative', flexShrink: 0 }}>
-      <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'white', position: 'absolute', top: 3, left: on ? 23 : 3, transition: 'var(--t)', boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }} />
-    </button>
-  )
+  const save = async () => {
+    setSaving(true)
+    setMessage('')
+    try {
+      const [privacyResponse, preferencesResponse] = await Promise.all([
+        profileApi.privacy(privacy),
+        profileApi.preferences(preferences),
+      ])
+      setProfile((current) => ({
+        ...current,
+        privacy: privacyResponse.data.privacy,
+        preferences: preferencesResponse.data.preferences,
+        revision: Math.max(privacyResponse.data.revision, preferencesResponse.data.revision),
+      }))
+      profileService.invalidate()
+      setMessage('Profile settings saved.')
+    } catch (requestError) {
+      setMessage(requestError.userMessage || 'Unable to save settings.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) return <StudentLayout><LoadingState label="Loading profile settings…" rows={6} /></StudentLayout>
+  if (error || !profile) return <StudentLayout><ErrorState title="Settings unavailable" message={error} onRetry={load} /></StudentLayout>
+  if (!privacy || !preferences) return <StudentLayout><LoadingState label="Preparing profile settings…" rows={6} /></StudentLayout>
 
   return (
     <StudentLayout>
-      <div className="page-header"><h1>⚙️ <span className="gradient-text">Settings</span></h1><p>Manage your account, notifications, and preferences</p></div>
-
-      <div style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div className="card">
-          <h3 style={{ marginBottom: 14 }}>👤 Account Information</h3>
-          {[
-            { l: 'Name', v: user?.name, action: <a href="/student/profile" className="btn btn-secondary btn-sm" style={{ textDecoration: 'none' }}>Edit</a> },
-            { l: 'Email', v: user?.email, action: <span className="badge badge-green">Verified</span> },
-            { l: 'Dream Wave ID', v: user?.aaid, action: <button className="btn btn-ghost btn-sm" onClick={() => navigator.clipboard?.writeText(user?.aaid)}>Copy</button> },
-            { l: 'Plan', v: user?.plan === 'pro' ? 'Pro Plan ⭐' : 'Free Plan', action: user?.plan !== 'pro' ? <button className="btn btn-primary btn-sm">⬆️ Upgrade</button> : null },
-          ].map(row => (
-            <div key={row.l} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-              <div><div style={{ fontWeight: 500, fontSize: '0.875rem' }}>{row.l}</div><div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{row.v}</div></div>
-              {row.action}
-            </div>
-          ))}
-        </div>
-
+      <div className="identity-settings">
+        <header className="identity-page-header"><div><span>Identity controls</span><h1>Profile Settings</h1><p>Manage privacy, discoverability, notifications, theme and language.</p></div></header>
+        <section className="identity-panel"><header><h2>Account information</h2><Link to="/student/profile" className="btn btn-secondary">Edit profile</Link></header><dl className="settings-account"><div><dt>Name</dt><dd>{user.name}</dd></div><div><dt>Email</dt><dd>{user.email}</dd></div><div><dt>Phone</dt><dd>{user.phone || 'Not added'}</dd></div><div><dt>Public username</dt><dd>@{profile.username}</dd></div></dl></section>
+        <section className="identity-panel">
+          <header><div><span>Public portfolio</span><h2>Privacy</h2></div></header>
+          <label className="settings-select"><span>Profile visibility<small>Private, unlisted share link, or public and discoverable</small></span><select className="select" value={privacy.visibility} onChange={(event) => setPrivacy((current) => ({ ...current, visibility: event.target.value, discoverable: event.target.value === 'public' ? current.discoverable : false }))}><option value="private">Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option></select></label>
+          {[['discoverable','Discoverable in search'],['showEmail','Show email'],['showPhone','Show phone'],['showAcademic','Show academic profile'],['showLearning','Show learning statistics'],['showSkills','Show skills'],['showProjects','Show projects'],['showAchievements','Show achievements'],['showCredentials','Show certificates'],['showExperience','Show experience'],['showCareer','Show career direction'],['showLinks','Show professional links']].map(([key, label]) => <div className="settings-toggle-row" key={key}><div><strong>{label}</strong><small>{key === 'discoverable' ? 'Allow people to find your public portfolio' : 'Control this section on your public portfolio'}</small></div><Toggle value={Boolean(privacy[key])} onChange={(value) => setPrivacy((current) => ({ ...current, [key]: value }))} label={label} /></div>)}
+        </section>
+        <section className="identity-panel">
+          <header><div><span>Personal experience</span><h2>Preferences</h2></div></header>
+          <div className="settings-preference-grid"><label><span>Theme</span><select className="select" value={preferences.theme} onChange={(event) => setPreferences((current) => ({ ...current, theme: event.target.value }))}><option value="system">System</option><option value="dark">Dark</option><option value="light">Light</option></select></label><label><span>Language</span><select className="select" value={preferences.language} onChange={(event) => setPreferences((current) => ({ ...current, language: event.target.value }))}><option value="en">English</option><option value="hi">Hindi</option><option value="te">Telugu</option><option value="ta">Tamil</option></select></label></div>
+          {[['emailNotifications','Email notifications'],['pushNotifications','Push notifications'],['weeklySummary','Weekly learning summary']].map(([key, label]) => <div className="settings-toggle-row" key={key}><div><strong>{label}</strong><small>Saved to your Dream Wave profile across devices</small></div><Toggle value={Boolean(preferences[key])} onChange={(value) => setPreferences((current) => ({ ...current, [key]: value }))} label={label} /></div>)}
+        </section>
         <DeviceSessions />
-
-        <div className="card">
-          <h3 style={{ marginBottom: 14 }}>🔔 Notifications</h3>
-          {[
-            { k:'email',  l:'Email notifications', d:'Receive updates via email' },
-            { k:'push',   l:'Push notifications',  d:'Browser push notifications' },
-            { k:'weekly', l:'Weekly report',        d:'Get weekly progress summary' },
-          ].map(({ k, l, d }) => (
-            <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-              <div><div style={{ fontWeight: 500, fontSize: '0.875rem' }}>{l}</div><div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{d}</div></div>
-              <Toggle on={notifs[k]} onChange={() => setNotifs(n => ({ ...n, [k]: !n[k] }))} />
-            </div>
-          ))}
-        </div>
-
-        <div className="card" style={{ border: '1px solid rgba(239,68,68,0.2)' }}>
-          <h3 style={{ marginBottom: 14 }}>⚠️ Danger Zone</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <button className="btn btn-secondary" style={{ justifyContent: 'flex-start' }}>🔑 Change Password</button>
-            <button className="btn btn-secondary" style={{ justifyContent: 'flex-start' }}>📂 Export My Data</button>
-            <button className="btn btn-danger" style={{ justifyContent: 'flex-start' }} onClick={() => confirm('Delete account permanently?') && logout(true)}>🗑️ Delete Account</button>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button className="btn btn-primary" onClick={save}>{saved ? '✅ Saved!' : 'Save Settings'}</button>
-          <button className="btn btn-secondary" onClick={() => logout(false)}>Sign Out</button>
-        </div>
+        {message && <p className="identity-settings__message" role="status">{message}</p>}
+        <Button onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save settings'}</Button>
       </div>
     </StudentLayout>
   )

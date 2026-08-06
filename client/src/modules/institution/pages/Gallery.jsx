@@ -1,19 +1,33 @@
-import PortalCrudPage from '@shared/components/portal/PortalCrudPage'
-import { institutionApi } from '@shared/services/api'
-import { INSTITUTION_THEME } from '../theme'
+import InstCrudPage from '../components/InstCrudPage'
+import { institutionService } from '../services/api'
 
 const F = [
-  { key: 'type', label: 'Type', type: 'select', options: ['image', 'video'], default: 'image' },
-  { key: 'url', label: 'Media URL' },
-  { key: 'caption', label: 'Caption' },
+  { key: 'url', label: 'Image URL' },
+  { key: 'caption', label: 'Caption', required: false },
   { key: 'order', label: 'Order', type: 'number', default: 0 },
 ]
 const C = [
-  { key: 'type', label: 'Type' },
   { key: 'caption', label: 'Caption' },
-  { key: 'url', label: 'URL', render: r => <a href={r.url} target="_blank" rel="noreferrer" style={{ color: '#FCD34D' }}>View</a> },
+  { key: 'url', label: 'URL' },
+  { key: 'order', label: 'Order' },
 ]
 
+const api = {
+  list: (params) => institutionService.gallery.list({ ...params, type: 'image' }),
+  create: (data) => institutionService.gallery.create({ ...data, type: 'image' }),
+  delete: institutionService.gallery.delete,
+}
+
 export default function Gallery() {
-  return <PortalCrudPage title="Gallery & Videos" icon="🖼️" theme={INSTITUTION_THEME} api={institutionApi.gallery} fields={F} columns={C} emptyHint="Campus images and videos for your public profile" />
+  return (
+    <InstCrudPage
+      title="Gallery"
+      subtitle="Campus images for your public profile."
+      api={api}
+      fields={F}
+      columns={C}
+      emptyHint="No campus images yet. Add licensed image URLs."
+      allowCreate
+    />
+  )
 }

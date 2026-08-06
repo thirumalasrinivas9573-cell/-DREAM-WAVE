@@ -1,132 +1,153 @@
-import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
-import StudentLayout from '../layouts/StudentLayout'
+import { useEffect, useState } from 'react'
 import { useAuth } from '@shared/context/AuthContext'
-import { goalApi, taskApi, profileApi } from '@shared/services/api'
+import { profileApi } from '@shared/services/api'
+import { Button, ErrorState, LoadingState } from '@shared/components/ui'
+import StudentLayout from '../layouts/StudentLayout'
+import useStudentProfile from '../hooks/useStudentProfile'
+import {
+  AcademicProfile,
+  AchievementTimeline,
+  CareerDirectionPanel,
+  CredentialGallery,
+  KnowledgeGraph,
+  LearningStats,
+  PortfolioReadiness,
+  PROFILE_TABS,
+  ProfileHero,
+  ProjectPortfolio,
+  SkillsProfile,
+} from '../components/profile/ProfileWorkspace'
+import AcademicJourneyPanel from '../components/profile/AcademicJourneyPanel'
+import ExperiencePanel from '../components/profile/ExperiencePanel'
+import ProfileAssistantPanel from '../components/profile/ProfileAssistantPanel'
+import PortfolioCustomizer from '../components/profile/PortfolioCustomizer'
+import PublicPreviewPanel from '../components/profile/PublicPreviewPanel'
+import { EntityDialog, ProfileEditDialog } from '../components/profile/ProfileDialogs'
+import '../styles/profile.css'
 
 export default function Profile() {
-  const { user, updateUser } = useAuth()
-  const [goals, setGoals]   = useState([])
-  const [tasks, setTasks]   = useState([])
-  const [loading, setLoad]  = useState(true)
-  const [editing, setEdit]  = useState(false)
-  const [name, setName]     = useState(user?.name || '')
-  const [saving, setSave]   = useState(false)
-  const [msg, setMsg]       = useState('')
+  const { updateUser } = useAuth()
+  const { user, profile, summary, loading, error, setError, load, update, addItem, updateItem, deleteItem, setProfile } = useStudentProfile()
+  const [tab, setTab] = useState('overview')
+  const [editingProfile, setEditingProfile] = useState(false)
+  const [entityEditor, setEntityEditor] = useState(null)
+  const [uploading, setUploading] = useState('')
+  const [graph, setGraph] = useState(null)
+  const [graphLoading, setGraphLoading] = useState(false)
+  const [completeness, setCompleteness] = useState(null)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [shareMessage, setShareMessage] = useState('')
 
   useEffect(() => {
-    Promise.all([goalApi.getAll(), taskApi.getAll()])
-      .then(([g, t]) => { setGoals(g.data.goals || []); setTasks(t.data.tasks || []) })
-      .catch(() => {}).finally(() => setLoad(false))
-  }, [])
+    profileApi.completeness().then((response) => setCompleteness(response.data.completeness)).catch(() => {})
+  }, [profile?.revision])
 
-  const save = async () => {
-    setSave(true)
-    try {
-      const { data } = await profileApi.update({ name })
-      updateUser({ name: data.user?.name || name })
-      setEdit(false); setMsg('Profile updated!'); setTimeout(() => setMsg(''), 3000)
-    } catch { setMsg('Failed to update.') }
-    setSave(false)
+  useEffect(() => {
+    if (tab !== 'graph' || graph) return
+    setGraphLoading(true)
+    profileApi.graph().then((response) => setGraph(response.data.graph)).catch((requestError) => setError(requestError.userMessage || 'Unable to load knowledge graph.')).finally(() => setGraphLoading(false))
+  }, [graph, setError, tab])
+
+  const saveProfile = async (payload) => {
+    const next = await update(payload)
+    updateUser({ name: next.displayName, profileImage: next.profilePhoto })
   }
 
-  const completedGoals = goals.filter(g => g.completed).length
-  const activeGoals    = goals.filter(g => !g.completed).length
-  const completedTasks = tasks.filter(t => t.completed).length
-  const avgProgress    = goals.length ? Math.round(goals.reduce((a, g) => a + (g.progress || 0), 0) / goals.length) : 0
+  const upload = async (file, purpose) => {
+    if (!file) return ''
+    setUploading(purpose)
+    setError('')
+    try {
+      const { data } = await profileApi.upload(file, purpose)
+      if (purpose === 'profile-photo') {
+        setProfile((current) => ({ ...current, profilePhoto: data.asset.url }))
+        updateUser({ profileImage: data.asset.url })
+      }
+      if (purpose === 'cover-banner') setProfile((current) => ({ ...current, coverBanner: data.asset.url }))
+      return data.asset.url
+    } catch (requestError) {
+      setError(requestError.userMessage || requestError.response?.data?.message || 'Upload failed.')
+      return ''
+    } finally {
+      setUploading('')
+    }
+  }
 
-  const STATS = [
-    { icon:'🎯', l:'Total Goals',   v:goals.length,    c:'#8B5CF6' },
-    { icon:'✅', l:'Completed',     v:completedGoals,  c:'#10B981' },
-    { icon:'⚡', l:'Active Goals',  v:activeGoals,     c:'#F59E0B' },
-    { icon:'📝', l:'Tasks Done',    v:completedTasks,  c:'#6366F1' },
-    { icon:'📈', l:'Avg Progress',  v:avgProgress+'%', c:'#06B6D4' },
-    { icon:'🔥', l:'Day Streak',    v:user?.streak||0, c:'#EF4444' },
-  ]
+  const openEntity = (section, item = null) => setEntityEditor({ section, item })
+  const saveEntity = async (payload) => {
+    if (entityEditor.item) await updateItem(entityEditor.section, entityEditor.item._id, payload)
+    else await addItem(entityEditor.section, payload)
+    setGraph(null)
+  }
+  const removeEntity = async (section, item) => {
+    if (!window.confirm(`Delete “${item.title || item.name || item.institution}” from your profile?`)) return
+    try {
+      await deleteItem(section, item._id)
+      setGraph(null)
+    } catch (requestError) {
+      setError(requestError.userMessage || `Unable to delete ${section}.`)
+    }
+  }
+
+  const shareProfile = async () => {
+    try {
+      const { data } = await profileApi.share()
+      await navigator.clipboard?.writeText(data.share.url)
+      setShareMessage('Portfolio link copied.')
+    } catch (requestError) {
+      setShareMessage(requestError.userMessage || 'Unable to copy portfolio link.')
+    }
+  }
+
+  if (loading) return <StudentLayout><div className="identity-workspace"><LoadingState label="Loading your digital identity…" rows={7} /></div></StudentLayout>
+  if (error && (!profile || !user)) return <StudentLayout><ErrorState title="Profile unavailable" message={error} onRetry={load} /></StudentLayout>
 
   return (
     <StudentLayout>
-      <div className="page-header"><h1>👤 <span className="gradient-text">Profile</span></h1><p>Your Dream Wave AI journey and achievements</p></div>
+      <div className="identity-workspace">
+        {error && <ErrorState title="Profile action failed" message={error} onRetry={() => setError('')} />}
+        {shareMessage && <p className="identity-settings__message" role="status">{shareMessage}</p>}
+        <ProfileHero user={user} profile={profile} onEdit={() => setEditingProfile(true)} onUpload={upload} uploading={uploading} onPreview={() => setPreviewOpen(true)} onShare={shareProfile} />
+        <nav className="identity-tabs" role="tablist" aria-label="Profile sections">
+          {PROFILE_TABS.map(([id, label]) => <button type="button" role="tab" aria-selected={tab === id} className={tab === id ? 'is-active' : ''} onClick={() => setTab(id)} key={id}>{label}</button>)}
+        </nav>
 
-      {/* Profile card */}
-      <div className="card card-purple" style={{ marginBottom: 20 }}>
-        <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-          <div style={{ width: 68, height: 68, borderRadius: '50%', background: 'linear-gradient(135deg,#8B5CF6,#C084FC)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.75rem', fontWeight: 700, flexShrink: 0, color: 'white', boxShadow: '0 4px 20px rgba(139,92,246,0.4)' }}>
-            {user?.name?.[0]?.toUpperCase()}
+        {tab === 'overview' && <>
+          <LearningStats summary={summary} />
+          <div className="identity-section-grid">
+            <section className="identity-panel identity-about"><header><div><span>About</span><h2>Digital identity</h2></div><Button variant="ghost" onClick={() => setEditingProfile(true)}>Edit</Button></header><p>{profile.bio || 'Tell the Dream Wave community about your learning journey.'}</p><dl><div><dt>Email</dt><dd>{user.email}</dd></div><div><dt>Phone</dt><dd>{user.phone || 'Not added'}</dd></div><div><dt>Languages</dt><dd>{profile.languages?.join(', ') || 'Not added'}</dd></div><div><dt>Dream Wave ID</dt><dd>{user.aaid}</dd></div></dl></section>
+            <PortfolioReadiness profile={profile} completeness={completeness} />
           </div>
-          <div style={{ flex: 1, minWidth: 200 }}>
-            {editing ? (
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>
-                <input className="input" value={name} onChange={e => setName(e.target.value)} style={{ maxWidth: 280 }} autoFocus />
-                <button className="btn btn-primary btn-sm" onClick={save} disabled={saving}>{saving ? <div className="spinner" style={{ borderTopColor: 'white', width: 13, height: 13 }} /> : 'Save'}</button>
-                <button className="btn btn-secondary btn-sm" onClick={() => setEdit(false)}>Cancel</button>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                <h2 style={{ fontSize: '1.25rem' }}>{user?.name}</h2>
-                <button className="btn btn-ghost btn-icon" onClick={() => setEdit(true)} style={{ fontSize: '0.85rem' }}>✏️</button>
-              </div>
-            )}
-            {msg && <span className="badge badge-green" style={{ marginBottom: 8, display: 'inline-block' }}>{msg}</span>}
-            <p style={{ marginBottom: 10, fontSize: '0.845rem' }}>{user?.email}</p>
-            <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
-              {user?.aaid && <span className="badge badge-purple">ID: {user.aaid}</span>}
-              <span className="badge badge-blue">Level {user?.level || 1}</span>
-              <span className="badge badge-yellow">⚡ {user?.credits || 0} XP</span>
-              <span className={`badge ${user?.plan === 'pro' ? 'badge-green' : 'badge-gray'}`}>{user?.plan === 'pro' ? '⭐ Pro' : '🆓 Free'}</span>
-            </div>
-          </div>
-        </div>
+          <ProfileAssistantPanel profile={profile} onApply={saveProfile} />
+          <CareerDirectionPanel careerDirection={profile.careerDirection} onEdit={() => setEditingProfile(true)} />
+          <SkillsProfile skills={profile.skills.slice(0, 8)} onAdd={() => openEntity('skills')} onEdit={(item) => openEntity('skills', item)} onDelete={(item) => removeEntity('skills', item)} />
+          <ProjectPortfolio projects={profile.projects.filter((item) => item.featured).slice(0, 4).length ? profile.projects.filter((item) => item.featured).slice(0, 4) : profile.projects.slice(0, 4)} onAdd={() => openEntity('projects')} onEdit={(item) => openEntity('projects', item)} onDelete={(item) => removeEntity('projects', item)} />
+        </>}
+        {tab === 'academic' && <>
+          <AcademicJourneyPanel entries={profile.academicJourney || []} onAdd={() => openEntity('academicJourney')} onEdit={(item) => openEntity('academicJourney', item)} onDelete={(item) => removeEntity('academicJourney', item)} />
+          <AcademicProfile academic={profile.academic} />
+        </>}
+        {tab === 'experience' && <ExperiencePanel entries={profile.experience || []} onAdd={() => openEntity('experience')} onEdit={(item) => openEntity('experience', item)} onDelete={(item) => removeEntity('experience', item)} />}
+        {tab === 'learning' && <><LearningStats summary={summary} /><section className="identity-panel"><header><div><span>Growing with every activity</span><h2>Learning profile</h2></div></header><div className="learning-profile-bars">{[
+          ['Goal completion', summary?.goals?.total ? summary.goals.completed / summary.goals.total * 100 : 0],
+          ['Task completion', summary?.tasks?.total ? summary.tasks.completed / summary.tasks.total * 100 : 0],
+          ['Books completed', summary?.books?.started ? summary.books.read / summary.books.started * 100 : 0],
+          ['Roadmap completion', summary?.roadmaps?.total ? summary.roadmaps.completed / summary.roadmaps.total * 100 : 0],
+        ].map(([label, value]) => <div key={label}><span>{label}</span><strong>{Math.round(value)}%</strong><i><b style={{ width: `${value}%` }} /></i></div>)}</div></section></>}
+        {tab === 'skills' && <SkillsProfile skills={profile.skills} onAdd={() => openEntity('skills')} onEdit={(item) => openEntity('skills', item)} onDelete={(item) => removeEntity('skills', item)} />}
+        {tab === 'projects' && <ProjectPortfolio projects={profile.projects} onAdd={() => openEntity('projects')} onEdit={(item) => openEntity('projects', item)} onDelete={(item) => removeEntity('projects', item)} />}
+        {tab === 'credentials' && <CredentialGallery credentials={profile.credentials} onAdd={() => openEntity('credentials')} onEdit={(item) => openEntity('credentials', item)} onDelete={(item) => removeEntity('credentials', item)} />}
+        {tab === 'achievements' && <AchievementTimeline achievements={profile.achievements} onAdd={() => openEntity('achievements')} onEdit={(item) => openEntity('achievements', item)} onDelete={(item) => removeEntity('achievements', item)} />}
+        {tab === 'graph' && <KnowledgeGraph graph={graph} loading={graphLoading} />}
+        {tab === 'portfolio' && <>
+          <PortfolioCustomizer profile={profile} onUpdated={setProfile} />
+          <PortfolioReadiness profile={profile} completeness={completeness} />
+        </>}
       </div>
 
-      {/* Stats */}
-      <div className="grid-3" style={{ marginBottom: 20 }}>
-        {STATS.map(s => (
-          <div key={s.l} className="stat-card" style={{ background: `${s.c}0d`, border: `1px solid ${s.c}22` }}>
-            <div className="stat-icon" style={{ background: `${s.c}18` }}><span style={{ fontSize: '1.2rem' }}>{s.icon}</span></div>
-            <div><div className="stat-value" style={{ color: s.c }}>{loading ? '--' : s.v}</div><div className="stat-label">{s.l}</div></div>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid-2">
-        {/* Goal progress */}
-        <div className="card">
-          <h3 style={{ marginBottom: 16 }}>🎯 Goal Progress</h3>
-          {loading ? [...Array(3)].map((_,i) => <div key={i} className="skeleton" style={{ height: 48, marginBottom: 10 }} />) :
-          goals.length === 0 ? <div className="empty-state" style={{ padding: '20px 0' }}><p>No goals yet</p></div> :
-          goals.slice(0, 5).map(g => (
-            <div key={g._id} style={{ marginBottom: 14 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                <span style={{ fontSize: '0.845rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>{g.title}</span>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  {g.completed && <span className="badge badge-green" style={{ fontSize: '0.65rem' }}>Done</span>}
-                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--purple-light)' }}>{g.progress}%</span>
-                </div>
-              </div>
-              <div className="progress-bar"><div className="progress-fill" style={{ width: `${g.progress}%`, background: g.progress >= 100 ? 'linear-gradient(90deg,#10B981,#34D399)' : undefined }} /></div>
-            </div>
-          ))}
-        </div>
-
-        {/* Activity */}
-        <div className="card">
-          <h3 style={{ marginBottom: 16 }}>📊 Activity Summary</h3>
-          {[
-            { l:'Goals created',    v:goals.length,     i:'🎯' },
-            { l:'Goals completed',  v:completedGoals,   i:'🏆' },
-            { l:'Tasks completed',  v:completedTasks,   i:'✅' },
-            { l:'Learning streak',  v:`${user?.streak||0} days`, i:'🔥' },
-            { l:'Total XP',         v:user?.credits||0, i:'⚡' },
-            { l:'Account level',    v:user?.level||1,   i:'⬆️' },
-          ].map(row => (
-            <div key={row.l} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', borderBottom:'1px solid var(--border)' }}>
-              <span style={{ fontSize:'0.845rem', color:'var(--text-secondary)', display:'flex', gap:7, alignItems:'center' }}><span>{row.i}</span>{row.l}</span>
-              <span style={{ fontWeight:700, color:'var(--text-primary)', fontSize:'0.9rem' }}>{loading ? '--' : row.v}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      {editingProfile && <ProfileEditDialog open profile={profile} onClose={() => setEditingProfile(false)} onSave={saveProfile} />}
+      {entityEditor && <EntityDialog key={`${entityEditor.section}-${entityEditor.item?._id || 'new'}`} open section={entityEditor.section} item={entityEditor.item} onClose={() => setEntityEditor(null)} onSave={saveEntity} onUpload={(file) => upload(file, 'credential')} />}
+      {previewOpen && <PublicPreviewPanel onClose={() => setPreviewOpen(false)} />}
     </StudentLayout>
   )
 }

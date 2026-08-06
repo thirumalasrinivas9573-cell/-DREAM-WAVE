@@ -70,6 +70,47 @@ const userProfileSchema = new mongoose.Schema({
     weeklyReport:  { type: Boolean, default: true },
   },
 
+  // ── V2 Intelligence Core ────────────────────────────────────────────────────
+  preferredTopics: [{ type: String, trim: true }],
+  careerPreferences: {
+    industries: [{ type: String, trim: true }],
+    roles: [{ type: String, trim: true }],
+    workMode: { type: String, default: '' },
+    locations: [{ type: String, trim: true }],
+  },
+  learningPreferences: {
+    preferredTimeOfDay: { type: String, enum: ['morning', 'afternoon', 'evening', 'night', ''], default: '' },
+    sessionLengthMinutes: { type: Number, default: 30, min: 5, max: 240 },
+    focusAreas: [{ type: String, trim: true }],
+  },
+  totalLearningMinutes: { type: Number, default: 0, min: 0 },
+  knowledgeMemory: {
+    bookmarks: [{
+      resourceType: { type: String, default: '' },
+      resourceId: { type: String, default: '' },
+      title: { type: String, default: '' },
+      url: { type: String, default: '' },
+      savedAt: { type: Date, default: Date.now },
+    }],
+    savedConversations: [{
+      session: { type: String, default: '' },
+      snippet: { type: String, default: '' },
+      savedAt: { type: Date, default: Date.now },
+    }],
+    favoriteResources: [{
+      resourceType: { type: String, default: '' },
+      resourceId: { type: String, default: '' },
+      title: { type: String, default: '' },
+      savedAt: { type: Date, default: Date.now },
+    }],
+    recentSuggestions: [{
+      kind: { type: String, default: '' },
+      title: { type: String, default: '' },
+      payload: { type: mongoose.Schema.Types.Mixed },
+      savedAt: { type: Date, default: Date.now },
+    }],
+  },
+
 }, { timestamps: true })
 
 module.exports = mongoose.model('UserProfile', userProfileSchema)

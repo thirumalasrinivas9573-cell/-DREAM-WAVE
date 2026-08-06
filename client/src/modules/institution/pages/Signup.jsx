@@ -9,7 +9,7 @@ export default function InstitutionSignup() {
       portal="institution"
       portalLabel="Institution"
       icon="🏛️"
-      accent={t.accent}
+      accent={t.accentMid}
       accentLight={t.accentLight}
       loginPath={institutionPath('login')}
       cssClass="institution-module"

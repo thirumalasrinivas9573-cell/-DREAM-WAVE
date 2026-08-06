@@ -1,6 +1,5 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
@@ -35,13 +34,6 @@ import { cn } from "@/lib/utils";
 import { studentService } from "@/services/student.service";
 import { useLearnStore } from "@/store/learn-store";
 import type { LessonSuggestion } from "@/types/learn";
-
-const LearnCanvas = dynamic(() => import("@/components/three/learn-canvas"), {
-  ssr: false,
-  loading: () => (
-    <div className="bg-muted/30 h-full w-full animate-pulse rounded-2xl" />
-  ),
-});
 
 export function LearnDashboardPage() {
   const { token } = useAuth();
@@ -223,15 +215,9 @@ export function LearnDashboardPage() {
               ) : null}
             </div>
           </div>
-          <div className="bg-muted/20 relative min-h-56 lg:min-h-72">
-            <LearnCanvas
-              key={sceneSubject}
-              className="absolute inset-0 h-full w-full"
-              reducedMotion={reducedMotion}
-              subject={sceneSubject}
-            />
+          <div className="bg-muted/20 relative min-h-56 overflow-hidden bg-[radial-gradient(ellipse_at_center,rgba(56,189,248,0.15),transparent_65%)] lg:min-h-72">
             <p className="bg-background/80 absolute right-3 bottom-3 rounded-full px-2.5 py-1 text-xs capitalize backdrop-blur">
-              {sceneSubject} scene
+              {sceneSubject}
             </p>
           </div>
         </div>

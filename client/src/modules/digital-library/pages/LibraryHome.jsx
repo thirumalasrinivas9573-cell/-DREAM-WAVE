@@ -1,52 +1,221 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { libraryApi } from '@shared/services/api'
+import { useAuth } from '@shared/context/AuthContext'
+import { BookRow } from '../components/BookCard'
+import CollectionCard from '../components/CollectionCard'
+import LibrarySeo from '../components/LibrarySeo'
+import { LibraryInsights, LibrarySkeleton, LibraryState, VirtualBookGrid } from '../components/LibraryWorkspace'
+import { MyLibrarySections } from '../components/LibraryIntelligence'
+import '../styles/library.css'
 
 export default function LibraryHome() {
-  const [books, setBooks] = useState([])
-  const [continueItems, setContinueItems] = useState([])
-  const [q, setQ] = useState('')
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const [params, setParams] = useSearchParams()
+  const [home, setHome] = useState(null)
+  const [q, setQ] = useState(params.get('q') || '')
+  const [category, setCategory] = useState(params.get('category') || '')
+  const [catalog, setCatalog] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [dashboard, setDashboard] = useState(null)
+  const [enriched, setEnriched] = useState(null)
+  const [myLibrary, setMyLibrary] = useState(null)
+  const [error, setError] = useState('')
+  const userId = user?._id
 
   useEffect(() => {
-    libraryApi.list({ limit: 40 }).then(r => setBooks(r.data.items || [])).catch(() => {})
-    libraryApi.continueReading().then(r => setContinueItems(r.data.items || [])).catch(() => {})
-  }, [])
+    setLoading(true)
+    setError('')
+    libraryApi.home()
+      .then((r) => setHome(r.data.home))
+      .catch((requestError) => {
+        setHome(null)
+        setError(requestError.userMessage || 'The library is temporarily unavailable.')
+      })
+      .finally(() => setLoading(false))
+    if (userId) {
+      libraryApi.dashboard().then((response) => setDashboard(response.data.dashboard)).catch(() => {})
+      libraryApi.enrichedHome().then((r) => setEnriched(r.data)).catch(() => {})
+      libraryApi.myLibrary().then((r) => setMyLibrary(r.data.library)).catch(() => {})
+    }
+  }, [userId])
 
-  const search = async (e) => {
+  useEffect(() => {
+    const cat = params.get('category') || ''
+    const query = params.get('q') || ''
+    setCategory(cat)
+    setQ(query)
+    if (cat || query) {
+      libraryApi.list({ category: cat || undefined, q: query || undefined, limit: 48, sort: 'popular' })
+        .then((r) => setCatalog(r.data.items || []))
+        .catch(() => setCatalog([]))
+    } else {
+      setCatalog([])
+    }
+  }, [params])
+
+  const submitSearch = (e) => {
     e.preventDefault()
-    const { data } = await libraryApi.list({ q, limit: 40 })
-    setBooks(data.items || [])
+    const next = new URLSearchParams(params)
+    if (q) next.set('q', q)
+    else next.delete('q')
+    setParams(next)
   }
 
+  const pickCategory = (name) => {
+    const next = new URLSearchParams(params)
+    if (!name || name === category) next.delete('category')
+    else next.set('category', name)
+    setParams(next)
+  }
+
+  const cols = home?.collections || {}
+  const showBrowse = Boolean(category || params.get('q'))
+
   return (
-    <div style={{ minHeight: '100vh', background: '#0C1222', color: '#E2E8F0', padding: '28px 20px' }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-        <Link to="/" style={{ color: '#94A3B8' }}>← Home</Link>
-        <h1 style={{ margin: '12px 0' }}>📚 Digital Library</h1>
-        <form onSubmit={search} style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search books..." style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '1px solid #334155', background: '#1E293B', color: '#fff' }} />
-          <button type="submit" style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: '#38BDF8', color: '#0F172A', fontWeight: 700 }}>Search</button>
-        </form>
-        {continueItems.length > 0 && (
-          <section style={{ marginBottom: 28 }}>
-            <h2>Continue Reading</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
-              {continueItems.map(p => (
-                <Link key={p._id} to={`/library/read/${p.bookId?._id || p.bookId}`} style={{ padding: 14, borderRadius: 12, background: '#1E293B', textDecoration: 'none', color: 'inherit' }}>
-                  {p.bookId?.title || 'Book'} — {Math.round(p.percent || 0)}%
-                </Link>
-              ))}
+    <div className="library-module">
+      <LibrarySeo
+        title="Dream Wave Knowledge Center | Digital Library"
+        description="Licensed and legally available learning resources with AI reading tools, collections, and progress tracking."
+        canonical="/library"
+      />
+      <div className="library-shell">
+        <div className="library-hero">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between' }}>
+            <div>
+              <Link to="/" style={{ color: 'var(--lib-muted)', fontFamily: 'DM Sans, sans-serif', fontSize: '0.85rem' }}>← Home</Link>
+              {user?.role === 'student' && (
+                <Link to="/student/books" style={{ marginLeft: 12, color: 'var(--lib-muted)', fontFamily: 'DM Sans, sans-serif', fontSize: '0.85rem' }}>Student bookshelf</Link>
+              )}
+              <h1>Knowledge Center</h1>
+              <p>Dream Wave Digital Library — licensed titles, reading tools, and AI study aids. No placeholder catalogs.</p>
             </div>
-          </section>
-        )}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 14 }}>
-          {books.map(b => (
-            <Link key={b._id} to={`/library/read/${b._id}`} style={{ padding: 16, borderRadius: 14, background: 'rgba(30,41,59,0.9)', border: '1px solid #334155', textDecoration: 'none', color: 'inherit' }}>
-              <div style={{ fontWeight: 700 }}>{b.title}</div>
-              <div style={{ fontSize: '0.82rem', opacity: 0.65 }}>{b.author} · {b.category}</div>
-            </Link>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+              <Link to="/discover" className="library-btn library-btn-secondary">Discovery</Link>
+              <Link to="/search" className="library-btn library-btn-secondary">Global search</Link>
+              {(user?.role === 'institution' || user?.role === 'company' || user?.role === 'admin') && (
+                <Link to="/library/org" className="library-btn library-btn-primary">Publish desk</Link>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <form className="library-search" onSubmit={submitSearch} role="search">
+          <input
+            aria-label="Search books, authors, ISBN, publishers"
+            placeholder="Search books, authors, ISBN, publishers…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          <button type="submit" className="library-btn library-btn-primary">Search</button>
+          <button type="button" className="library-btn library-btn-secondary" onClick={() => navigate('/library/search')}>Advanced</button>
+        </form>
+
+        <div className="library-chips" role="navigation" aria-label="Categories">
+          {(home?.categories || []).slice(0, 16).map((c) => (
+            <button key={c} type="button" className={`library-chip ${category === c ? 'active' : ''}`} onClick={() => pickCategory(c)}>
+              {c}
+            </button>
           ))}
         </div>
+
+        {dashboard && <LibraryInsights dashboard={dashboard} />}
+        {loading && <LibrarySkeleton count={6} />}
+        {!loading && error && <LibraryState title="Knowledge Center unavailable" message={error} action={<button className="library-btn library-btn-secondary" type="button" onClick={() => window.location.reload()}>Try again</button>} />}
+
+        {showBrowse ? (
+          <section className="library-section">
+            <h2>{category || 'Search results'}</h2>
+            {catalog.length === 0 ? (
+              <div className="library-empty">No licensed titles match this filter yet.</div>
+            ) : (
+              <VirtualBookGrid books={catalog} />
+            )}
+          </section>
+        ) : home && (
+          <>
+            <BookRow title="Continue reading" books={home.continueReading} />
+            {user && myLibrary && (
+              <section className="library-section library-panel">
+                <h2>My Library</h2>
+                <MyLibrarySections library={myLibrary} />
+              </section>
+            )}
+            {user && enriched?.goalResources?.length > 0 && enriched.goalResources.map(({ goal, items }) => (
+              <section key={goal._id} className="library-section">
+                <h2>For your goal: {goal.title}</h2>
+                <div className="library-grid">
+                  {(items || []).map(({ book, explanation }) => (
+                    <article key={book._id} className="library-goal-resource-card">
+                      <Link to={`/library/books/${book._id}`}><strong>{book.title}</strong></Link>
+                      <small>{book.author}</small>
+                      <p>{explanation}</p>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ))}
+            {user && enriched?.roadmapResources?.length > 0 && enriched.roadmapResources.map(({ roadmap, items }) => (
+              <section key={roadmap._id} className="library-section">
+                <h2>Roadmap resources: {roadmap.goalId?.title || 'Learning path'}</h2>
+                <div className="library-grid">
+                  {(items || []).map(({ book, explanation }) => (
+                    <article key={book._id} className="library-goal-resource-card">
+                      <Link to={`/library/books/${book._id}`}><strong>{book.title}</strong></Link>
+                      <p>{explanation}</p>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ))}
+            <BookRow title="Recommended for you" books={home.recommended} />
+            <BookRow title="AI picks" books={home.aiPicks} />
+            <BookRow title="Recently added" books={home.recentlyAdded} />
+            <BookRow title="Trending" books={home.trending} />
+            <BookRow title="Most popular" books={home.popular} />
+            <BookRow title="Featured" books={home.featured} />
+            <BookRow title="Editor's picks" books={home.editorsPicks} />
+            <BookRow title="Saved books" books={home.saved} />
+            <BookRow title="Bookmarks" books={home.bookmarks} />
+            <BookRow title="Reading history" books={home.history} />
+
+            {['career', 'course', 'research'].map((key) => (
+              (cols[key] || []).length > 0 && (
+                <section key={key} className="library-section">
+                  <h2>{key === 'career' ? 'Career collections' : key === 'course' ? 'Course collections' : 'Research collections'}</h2>
+                  <div className="library-row">
+                    {cols[key].map((c) => <CollectionCard key={c._id} item={c} />)}
+                  </div>
+                </section>
+              )
+            ))}
+
+            {(cols.institution || []).length > 0 && (
+              <section className="library-section">
+                <h2>Institution reading lists</h2>
+                <div className="library-row">
+                  {cols.institution.map((c) => <CollectionCard key={c._id} item={c} />)}
+                </div>
+              </section>
+            )}
+
+            {(cols.company || []).length > 0 && (
+              <section className="library-section">
+                <h2>Company learning guides</h2>
+                <div className="library-row">
+                  {cols.company.map((c) => <CollectionCard key={c._id} item={c} />)}
+                </div>
+              </section>
+            )}
+
+            {!home.recentlyAdded?.length && !home.continueReading?.length && (
+              <div className="library-empty">
+                The Knowledge Center is ready. Licensed books appear here when admins, institutions, or companies publish them.
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   )

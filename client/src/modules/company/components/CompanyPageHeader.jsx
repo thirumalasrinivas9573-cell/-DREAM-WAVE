@@ -1,37 +1,28 @@
 import { COMPANY_THEME } from '../theme'
 
-export default function CompanyPageHeader({ title, subtitle, badge, actions }) {
+export default function CompanyPageHeader({ title, subtitle, actions, badge }) {
   const t = COMPANY_THEME
   return (
-    <div className="company-glass" style={{ marginBottom: 24, display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 14, marginBottom: 20 }}>
       <div>
-        {badge && <span style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.1em', color: t.accentLight, textTransform: 'uppercase' }}>{badge}</span>}
-        <h1 style={{ margin: '4px 0 6px', fontSize: '1.5rem', fontWeight: 800 }}>{title}</h1>
-        {subtitle && <p style={{ margin: 0, opacity: 0.6, fontSize: '0.88rem' }}>{subtitle}</p>}
+        {badge && <div style={{ fontSize: '0.72rem', fontWeight: 700, color: t.accentLight, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>{badge}</div>}
+        <h1 style={{ margin: 0, fontSize: '1.45rem', color: '#F8FAFC' }}>{title}</h1>
+        {subtitle && <p style={{ margin: '6px 0 0', color: t.muted, fontSize: '0.9rem', maxWidth: 560 }}>{subtitle}</p>}
       </div>
       {actions && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{actions}</div>}
     </div>
   )
 }
 
-export function CompanyMetric({ label, value, delta, icon }) {
-  const t = COMPANY_THEME
-  return (
-    <div className="company-glass" style={{ padding: '18px 20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <span style={{ fontSize: '0.7rem', fontWeight: 600, color: t.accentLight, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
-        {icon && <span style={{ fontSize: '1.1rem', opacity: 0.7 }}>{icon}</span>}
-      </div>
-      <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: 8 }}>{value}</div>
-      {delta && <div style={{ fontSize: '0.75rem', marginTop: 4, color: delta.startsWith('+') ? '#34D399' : '#F87171' }}>{delta}</div>}
-    </div>
-  )
-}
-
 export function CompanyMetricGrid({ metrics }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14, marginBottom: 24 }}>
-      {metrics.map(m => <CompanyMetric key={m.label} {...m} />)}
+    <div className="company-stat-grid">
+      {metrics.map((m) => (
+        <div key={m.label} className="company-glass" style={{ padding: 16 }}>
+          <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#60A5FA' }}>{m.value}</div>
+          <div style={{ fontSize: '0.78rem', color: '#94A3B8', marginTop: 4 }}>{m.label}</div>
+        </div>
+      ))}
     </div>
   )
 }

@@ -9,6 +9,7 @@ export default function PublicProfileActions({ targetType, targetId, accent = '#
   const [bookmarked, setBookmarked] = useState(false)
   const [rating, setRating] = useState(5)
   const [review, setReview] = useState('')
+  const [photoUrl, setPhotoUrl] = useState('')
   const [msg, setMsg] = useState('')
 
   useEffect(() => {
@@ -42,9 +43,11 @@ export default function PublicProfileActions({ targetType, targetId, accent = '#
   const submitReview = async (e) => {
     e.preventDefault()
     if (!user) return needLogin()
-    await interactionApi.createReview({ targetType, targetId, rating, content: review })
+    const photos = photoUrl.trim() ? [photoUrl.trim()] : []
+    await interactionApi.createReview({ targetType, targetId, rating, content: review, photos })
     setMsg('Review submitted for moderation')
     setReview('')
+    setPhotoUrl('')
   }
 
   const share = () => {
@@ -66,6 +69,8 @@ export default function PublicProfileActions({ targetType, targetId, accent = '#
             </select>
           </label>
           <textarea value={review} onChange={e => setReview(e.target.value)} placeholder="Your experience..." rows={2}
+            style={{ padding: 10, borderRadius: 8, border: `1px solid ${accent}44`, background: 'rgba(0,0,0,0.3)', color: 'inherit' }} />
+          <input value={photoUrl} onChange={e => setPhotoUrl(e.target.value)} placeholder="Optional campus photo URL"
             style={{ padding: 10, borderRadius: 8, border: `1px solid ${accent}44`, background: 'rgba(0,0,0,0.3)', color: 'inherit' }} />
           <button type="submit" style={{ ...pill(accent), width: 'fit-content' }}>Submit Review</button>
         </form>

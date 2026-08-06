@@ -1,16 +1,36 @@
-import PortalCrudPage from '@shared/components/portal/PortalCrudPage'
-import { institutionApi } from '@shared/services/api'
-import { INSTITUTION_THEME } from '../theme'
+import InstCrudPage from '../components/InstCrudPage'
+import { institutionService } from '../services/api'
 
 const F = [
-  { key: 'name', label: 'Name' },
+  { key: 'name', label: 'Full name' },
   { key: 'email', label: 'Email' },
   { key: 'rollNo', label: 'Roll No' },
-  { key: 'year', label: 'Year' },
-  { key: 'status', label: 'Status', type: 'select', options: ['active', 'graduated', 'dropped', 'pending'], default: 'active' },
+  { key: 'year', label: 'Year / Batch' },
+  { key: 'attendancePercent', label: 'Attendance %', type: 'number', default: 0 },
+  { key: 'gpa', label: 'GPA / CGPA', type: 'number', default: 0 },
+  { key: 'academicNotes', label: 'Academic progress', type: 'textarea', required: false },
+  { key: 'performanceReport', label: 'Performance report', type: 'textarea', required: false },
+  { key: 'status', label: 'Enrollment status', type: 'select', options: ['active', 'graduated', 'dropped', 'pending'], default: 'active' },
 ]
-const C = [{ key: 'name', label: 'Name' }, { key: 'email', label: 'Email' }, { key: 'rollNo', label: 'Roll' }, { key: 'year', label: 'Year' }, { key: 'status', label: 'Status' }]
+const C = [
+  { key: 'name', label: 'Name' },
+  { key: 'email', label: 'Email' },
+  { key: 'rollNo', label: 'Roll' },
+  { key: 'year', label: 'Year' },
+  { key: 'attendancePercent', label: 'Attendance' },
+  { key: 'gpa', label: 'GPA' },
+  { key: 'status', label: 'Status' },
+]
 
 export default function Students() {
-  return <PortalCrudPage title="Students" icon="👨‍🎓" theme={INSTITUTION_THEME} api={institutionApi.students} fields={F} columns={C} emptyHint="Manage enrolled students" />
+  return (
+    <InstCrudPage
+      title="Students"
+      subtitle="Enrollment directory — attendance overview, academic progress, and performance notes."
+      api={institutionService.students}
+      fields={F}
+      columns={C}
+      emptyHint="No students enrolled yet. Add enrollment records here."
+    />
+  )
 }

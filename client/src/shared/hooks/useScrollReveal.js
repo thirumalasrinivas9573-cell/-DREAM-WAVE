@@ -20,5 +20,5 @@ export default function useScrollReveal() {
 
     els.forEach(el => observer.observe(el))
     return () => observer.disconnect()
-  })
+  }, [])
 }

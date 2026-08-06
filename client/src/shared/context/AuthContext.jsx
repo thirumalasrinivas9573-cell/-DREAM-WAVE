@@ -1,58 +1,77 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import api, { authApi } from '../services/api'
+import { clearSelectedPortal, PORTAL_DASHBOARD } from '../auth/portalSession'
 
 const AuthContext = createContext()
 const REMEMBER_KEY = 'dw_remember_email'
+const PORTAL_KEY = 'dw_active_portal'
+const SESSION_HINT_KEY = 'dw_has_session'
+
+/** Keep role exactly as returned by the API — never invent "student". */
+function normalizeUser(raw) {
+  if (!raw) return null
+  return { ...raw, role: raw.role || null }
+}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  const persistSession = useCallback((token, refreshToken, nextUser, rememberEmail) => {
-    if (token) localStorage.setItem('token', token)
-    // Refresh primarily lives in HttpOnly cookie; keep local copy for SPA refresh fallback
-    if (refreshToken) localStorage.setItem('refreshToken', refreshToken)
-    if (nextUser) setUser(nextUser)
+  const persistSession = useCallback((token, nextUser, rememberEmail) => {
+    if (token) {
+      localStorage.setItem('token', token)
+      localStorage.setItem(SESSION_HINT_KEY, '1')
+    }
+    if (nextUser) {
+      const normalized = normalizeUser(nextUser)
+      setUser(normalized)
+      if (normalized?.role) localStorage.setItem(PORTAL_KEY, normalized.role)
+    }
     if (rememberEmail) localStorage.setItem(REMEMBER_KEY, rememberEmail)
     else if (rememberEmail === null) localStorage.removeItem(REMEMBER_KEY)
   }, [])
 
   const clearLocalSession = useCallback(() => {
     localStorage.removeItem('token')
-    localStorage.removeItem('refreshToken')
+    localStorage.removeItem(SESSION_HINT_KEY)
+    localStorage.removeItem(PORTAL_KEY)
     setUser(null)
   }, [])
 
   useEffect(() => {
+    let cancelled = false
     const boot = async () => {
       const token = localStorage.getItem('token')
+      const hasSession = localStorage.getItem(SESSION_HINT_KEY) === '1'
       try {
         if (token) {
           const res = await api.get('/auth/me')
-          setUser(res.data.user)
+          if (!cancelled) {
+            const next = normalizeUser(res.data.user)
+            setUser(next)
+            if (next?.role) localStorage.setItem(PORTAL_KEY, next.role)
+          }
+        } else if (hasSession) {
+          const { data } = await api.post('/auth/refresh', {}, { timeout: 8000 })
+          if (!cancelled) persistSession(data.token, data.user)
         } else {
-          // Cookie-based refresh (withCredentials) or body fallback
-          const { data } = await authApi.refresh({})
-          persistSession(data.token, data.refreshToken, data.user)
+          if (!cancelled) clearLocalSession()
         }
       } catch {
-        try {
-          const refresh = localStorage.getItem('refreshToken')
-          if (refresh) {
-            const { data } = await authApi.refresh({ refreshToken: refresh })
-            persistSession(data.token, data.refreshToken, data.user)
-          } else {
-            clearLocalSession()
-          }
-        } catch {
-          clearLocalSession()
-        }
+        if (!cancelled) clearLocalSession()
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
     boot()
+    return () => { cancelled = true }
   }, [persistSession, clearLocalSession])
+
+  useEffect(() => {
+    const handleExpired = () => clearLocalSession()
+    window.addEventListener('dw:session-expired', handleExpired)
+    return () => window.removeEventListener('dw:session-expired', handleExpired)
+  }, [clearLocalSession])
 
   const login = async (emailOrPhone, password, portal, options = {}) => {
     const body = {
@@ -61,16 +80,14 @@ export function AuthProvider({ children }) {
       phone: String(emailOrPhone || '').includes('@') ? undefined : emailOrPhone,
       password,
       remember: options.remember !== false,
+      portal,
     }
-    if (portal) body.portal = portal
     if (options.otpChannel) body.otpChannel = options.otpChannel
-    else if (portal === 'institution' || portal === 'company') body.otpChannel = 'email'
     const { data } = await api.post('/auth/login', body)
     if (data.requiresOtp) return data
     if (data.token) {
       persistSession(
         data.token,
-        data.refreshToken,
         data.user,
         options.remember && String(emailOrPhone).includes('@') ? emailOrPhone : null,
       )
@@ -78,37 +95,57 @@ export function AuthProvider({ children }) {
     return data
   }
 
-  const verifyLoginEmailOtp = async (challengeToken, otp, rememberEmail, remember = true) => {
-    const { data } = await authApi.verifyLoginEmailOtp({
-      challengeToken,
-      otp,
-      remember,
-    })
-    persistSession(data.token, data.refreshToken, data.user, rememberEmail)
+  const verifyLoginEmailOtp = async (challengeToken, otp, rememberEmail, remember = true, portal = null) => {
+    const body = { challengeToken, otp, remember }
+    if (portal) body.portal = portal
+    const { data } = await authApi.verifyLoginEmailOtp(body)
+    persistSession(data.token || data.accessToken, data.user, rememberEmail)
     return data
   }
 
-  const verifyPhoneOtp = async (payload, rememberEmail, remember = true) => {
-    const { data } = await authApi.verifyPhoneOtp({ ...payload, remember })
-    if (data.token) persistSession(data.token, data.refreshToken, data.user, rememberEmail)
+  const verifyPhoneOtp = async (payload, rememberEmail, remember = true, portal = null) => {
+    const body = { ...payload, remember }
+    if (portal) body.portal = portal
+    const { data } = await authApi.verifyPhoneOtp(body)
+    if (data.token || data.accessToken) {
+      persistSession(data.token || data.accessToken, data.user, rememberEmail)
+    }
     return data
+  }
+
+  /**
+   * Enter a portal dashboard by explicit path or authenticated role.
+   * Never falls back to student when role/path is institution or company.
+   */
+  const goToPortal = (userOrRole, portalDashboardPath) => {
+    if (portalDashboardPath) {
+      window.location.assign(portalDashboardPath)
+      return
+    }
+    const role = typeof userOrRole === 'string' ? userOrRole : userOrRole?.role
+    const dest = PORTAL_DASHBOARD[role]
+    if (!dest) {
+      window.location.assign('/')
+      return
+    }
+    window.location.assign(dest)
   }
 
   const signup = async (name, email, password) => {
     const { data } = await api.post('/auth/signup', { name, email, password })
-    // No session until email OTP verification
     return data
   }
 
   const logout = async (allSessions = false) => {
-    const refreshToken = localStorage.getItem('refreshToken')
     try {
-      await authApi.logout({ refreshToken, allSessions })
+      if (allSessions) await authApi.logoutAll()
+      else await authApi.logout()
     } catch { /* ignore */ }
     clearLocalSession()
+    clearSelectedPortal()
   }
 
-  const updateUser = (updates) => setUser(prev => ({ ...prev, ...updates }))
+  const updateUser = (updates) => setUser(prev => normalizeUser({ ...prev, ...updates }))
   const rememberedEmail = () => localStorage.getItem(REMEMBER_KEY) || ''
 
   const listSessions = () => authApi.listSessions()
@@ -117,9 +154,21 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={{
-      user, loading, login, signup, logout, updateUser, applySession: persistSession,
-      verifyLoginEmailOtp, verifyPhoneOtp, rememberedEmail,
-      listSessions, revokeSession, revokeAllSessions,
+      user,
+      loading,
+      isAuthenticated: Boolean(user && localStorage.getItem('token')),
+      login,
+      signup,
+      logout,
+      updateUser,
+      applySession: persistSession,
+      verifyLoginEmailOtp,
+      verifyPhoneOtp,
+      goToPortal,
+      rememberedEmail,
+      listSessions,
+      revokeSession,
+      revokeAllSessions,
     }}>
       {children}
     </AuthContext.Provider>

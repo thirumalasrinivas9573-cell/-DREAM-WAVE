@@ -6,22 +6,11 @@ import { HeroScrollIndicator } from "@/components/landing/hero-scroll-indicator"
 import { CtaButton } from "@/components/shared/cta-button";
 import { APP_DESCRIPTION, APP_NAME, MARKETING_AUTH_ROUTES } from "@/constants";
 import { ANIMATION_DURATION, ANIMATION_EASE } from "@/constants/animation";
-import { lazyClientComponent } from "@/lib/performance";
-
-const HeroCanvas = lazyClientComponent(
-  () => import("@/components/three/hero-canvas"),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="bg-muted/20 absolute inset-0" aria-hidden="true" />
-    ),
-  },
-);
 
 const ease = ANIMATION_EASE.decelerate;
 
 /**
- * Premium marketing hero — brand-led copy over a lazy-loaded R3F canvas.
+ * Marketing hero — brand-led copy over a static gradient (no 3D canvas).
  */
 export function HeroSection() {
   const reduceMotion = useReducedMotion();
@@ -37,10 +26,7 @@ export function HeroSection() {
         className="pointer-events-none absolute inset-0 -z-10"
         aria-hidden="true"
       >
-        <HeroCanvas
-          reducedMotion={Boolean(reduceMotion)}
-          className="absolute inset-0 opacity-90 max-lg:pointer-events-none max-lg:opacity-35 lg:pointer-events-auto"
-        />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_70%_40%,rgba(56,189,248,0.18),transparent_55%),radial-gradient(ellipse_at_20%_80%,rgba(168,85,247,0.14),transparent_50%),linear-gradient(160deg,#020617_0%,#0f172a_50%,#020617_100%)]" />
         <div className="from-background via-background/85 to-background absolute inset-0 bg-gradient-to-r via-40% max-lg:via-60%" />
         <div className="from-background/20 to-background absolute inset-0 bg-gradient-to-b via-transparent" />
       </div>

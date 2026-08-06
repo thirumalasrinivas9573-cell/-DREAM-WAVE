@@ -301,7 +301,7 @@ function sceneExample(ctx,W,H,t,scene,color){
   ctx.shadowBlur=0
   // Chrome bar
   rr(ctx,margin,edY,edW,32,`14 14 0 0`,'#111120',hex2rgba(color,.3))
-  [[14,'#EF4444'],[28,'#F59E0B'],[42,'#10B981']].forEach(([dx,dc])=>{
+  ;[[14,'#EF4444'],[28,'#F59E0B'],[42,'#10B981']].forEach(([dx,dc])=>{
     ctx.beginPath();ctx.arc(margin+dx,edY+16,6,0,Math.PI*2);ctx.fillStyle=dc;ctx.fill()
   })
   ctx.font='500 9.5px Inter,sans-serif';ctx.fillStyle='rgba(255,255,255,.3)'
@@ -493,9 +493,7 @@ function sceneDemo(ctx,W,H,t,scene,color){
 // ─────────────────────────────────────────────────────────────────────────────
 // SCENE: SUMMARY — Trophy celebration + recap grid + XP earned
 // ─────────────────────────────────────────────────────────────────────────────
-function sceneSummary(ctx,W,H,t,scene,color){
-  // Confetti particles (pre-computed stable)
-  const confetti=useRef(null) // not available here, use seeded positions
+function sceneSummary(ctx,W,H,t,scene,_color){
   // Background burst
   const bp=easeOut(p01(t,0,2))
   glow(ctx,W/2,H*.3,200*bp,C.yellow,.2*bp)

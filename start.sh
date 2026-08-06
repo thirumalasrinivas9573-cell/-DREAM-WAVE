@@ -2,32 +2,45 @@
 # ══════════════════════════════════════════════════════
 # DREAM WAVE AI — Start Both Servers
 # Run: bash start.sh
+# Optional: USE_MEMORY_MONGO=1 bash start.sh
 # ══════════════════════════════════════════════════════
 
-# Use local Node v20 if system node is broken
-NODE_DIR="$HOME/node-v20.11.0-darwin-x64/bin"
-if [ -f "$NODE_DIR/node" ]; then
-  export PATH="$NODE_DIR:$PATH"
-fi
+# Prefer a working Node binary (system /usr/local may be broken on older macOS)
+for CANDIDATE in \
+  "$HOME/node20/bin" \
+  "$HOME/node18/bin" \
+  "$HOME/node-v20.11.0-darwin-x64/bin" \
+  "$HOME/.nvm/versions/node/$(ls "$HOME/.nvm/versions/node" 2>/dev/null | tail -1)/bin"
+do
+  if [ -x "$CANDIDATE/node" ]; then
+    export PATH="$CANDIDATE:$PATH"
+    break
+  fi
+done
 
 echo ""
 echo "🌊 Dream Wave AI — Starting servers..."
-echo "   Backend  → http://localhost:5001"
-echo "   Frontend → http://localhost:5173"
+echo "   Node     → $(command -v node) ($(node -v 2>/dev/null))"
+echo "   Backend  → http://127.0.0.1:5001"
+echo "   Frontend → http://127.0.0.1:5173"
 echo ""
 
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Start backend
+# Start backend (memory Mongo fallback when local/Atlas DB is unavailable)
 cd "$ROOT_DIR/server"
-node server.js &
+if [ "${USE_MEMORY_MONGO:-0}" = "1" ]; then
+  node scripts/dev-memory-mongo.js &
+else
+  node server.js &
+fi
 BACKEND_PID=$!
 echo "✅ Backend started (PID: $BACKEND_PID)"
 
 # Wait for backend to be ready
 sleep 3
 
-# Start frontend
+# Start Vite client (primary integration UI)
 cd "$ROOT_DIR/client"
 npm run dev &
 FRONTEND_PID=$!
@@ -35,8 +48,10 @@ echo "✅ Frontend started (PID: $FRONTEND_PID)"
 
 echo ""
 echo "══════════════════════════════════════════"
-echo "  Backend  : http://localhost:5001"
-echo "  Frontend : http://localhost:5173"
+echo "  Backend  : http://127.0.0.1:5001"
+echo "  Frontend : http://127.0.0.1:5173"
+echo "  Enterprise UI (optional): cd web && npm run dev → :3000"
+echo "  Memory Mongo: USE_MEMORY_MONGO=1 bash start.sh"
 echo "  Press Ctrl+C to stop both servers"
 echo "══════════════════════════════════════════"
 echo ""

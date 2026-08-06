@@ -41,7 +41,6 @@ export type {
   TaskPriority,
 } from "@/types/student";
 export type { ResolvedTheme, ThemeConfig, ThemeMode } from "@/types/theme";
-export type { ThreeCameraDefaults, ThreeDpr } from "@/types/three";
 export type {
   Dictionary,
   MaybePromise,

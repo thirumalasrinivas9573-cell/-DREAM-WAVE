@@ -1,193 +1,312 @@
-import { useState, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import StudentLayout from '../layouts/StudentLayout'
 import { useAuth } from '@shared/context/AuthContext'
-import { mentorApi } from '@shared/services/api'
 import MessageRenderer from '../components/MessageRenderer'
 import AIOrb from '@shared/components/animations/AIOrb'
+import useMentor from '../hooks/useMentor'
+import '../styles/mentor.css'
 
-const MODES = [
-  { id: 'general',  label: 'General',  icon: '🧠', color: '#8B5CF6', desc: 'Universal wisdom & career guidance' },
-  { id: 'hindu',    label: 'Vedic',    icon: '🕉️', color: '#F59E0B', desc: 'Wisdom from Bhagavad Gita & Indian philosophy' },
-  { id: 'christian',label: 'Christian',icon: '✝️', color: '#60A5FA', desc: 'Guided by scripture and Christian values' },
-  { id: 'muslim',   label: 'Islamic',  icon: '☪️', color: '#34D399', desc: 'Inspired by Quran and Islamic wisdom' },
+const FAITH_MODES = [
+  { id: 'general', label: 'General', icon: '🧠', color: '#8B5CF6', desc: 'Universal wisdom & career guidance' },
+  { id: 'hindu', label: 'Vedic', icon: '🕉️', color: '#F59E0B', desc: 'Bhagavad Gita & Vedic philosophy' },
+  { id: 'christian', label: 'Christian', icon: '✝️', color: '#60A5FA', desc: 'Scripture and Christian values' },
+  { id: 'muslim', label: 'Islamic', icon: '☪️', color: '#34D399', desc: 'Quran and Islamic wisdom' },
+]
+
+const MENTOR_MODES = [
+  { id: 'general', label: 'General Mentor' },
+  { id: 'study', label: 'Study Mentor' },
+  { id: 'goal', label: 'Goal Coach' },
+  { id: 'career', label: 'Career Guide' },
+  { id: 'learning', label: 'Learning Assistant' },
+  { id: 'project', label: 'Project Guide' },
+  { id: 'research', label: 'Research Assistant' },
+]
+
+const QUICK_ACTIONS = [
+  { id: 'plan-day', label: 'Plan My Day', message: 'Plan my day based on my goals, tasks, and deadlines.' },
+  { id: 'review-progress', label: 'Review My Progress', message: 'Review my learning progress and tell me what is going well and what to improve.' },
+  { id: 'recommend-next', label: 'Recommend Next Step', message: 'What should I do next based on my current goals and tasks?' },
+  { id: 'recommend-books', label: 'Recommend Books', message: 'Recommend books from my library context that fit my goals.' },
+  { id: 'help-career', label: 'Help With Career', message: 'Help me with my career direction using my skills and interests.' },
+  { id: 'break-task', label: 'Break Down a Task', message: 'Help me break my highest priority task into smaller actionable steps.' },
+  { id: 'improve-roadmap', label: 'Improve My Roadmap', message: 'Review my roadmap and suggest the next meaningful stage.' },
+  { id: 'research-topic', label: 'Research a Topic', message: 'Help me research a topic and suggest a learning sequence.' },
 ]
 
 const PROMPTS = [
-  'I feel lost and don\'t know what to do',
-  'I keep procrastinating on my goals',
-  'How do I stay consistent every day?',
-  'I failed today — help me get back up',
   'What should I focus on right now?',
-  'How do I handle fear of failure?',
-  'I completed a milestone — celebrate with me!',
-  'Give me a powerful quote for motivation',
+  'Help me stay consistent every day',
+  'Explain a concept simply',
+  'What am I missing for my top goal?',
 ]
 
 const MENTOR_NAMES = { general: 'Sage', hindu: 'Arjuna', christian: 'Grace', muslim: 'Nur' }
 
 export default function Mentor() {
   const { user } = useAuth()
-  const [mode, setMode] = useState('general')
-  const [messages, setMessages] = useState([])
+  const [faithMode, setFaithMode] = useState('general')
+  const [mentorMode, setMentorMode] = useState('general')
   const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [search, setSearch] = useState('')
   const bottomRef = useRef(null)
-  const inputRef  = useRef(null)
+  const inputRef = useRef(null)
 
-  const mentorName = MENTOR_NAMES[mode]
+  const mentor = useMentor({ faithMode, mentorMode })
+  const currentFaith = FAITH_MODES.find((item) => item.id === faithMode) || FAITH_MODES[0]
+  const mentorName = MENTOR_NAMES[faithMode]
 
-  // Set welcome message when mode changes
-  useEffect(() => {
+  const welcomeFor = useCallback((faith) => {
+    const name = user?.name?.split(' ')[0] || 'there'
     const welcomes = {
-      general:   `Hey ${user?.name?.split(' ')[0] || 'there'} 👋 I'm Sage, your AI mentor. I'm here to guide you through your career journey, help you overcome challenges, and celebrate your wins. What's on your mind?`,
-      hindu:     `Namaste ${user?.name?.split(' ')[0] || ''}! 🕉️ I am Arjuna, your Vedic wisdom guide. Like Krishna guided Arjuna on the battlefield of Kurukshetra, I am here to guide you through your journey. As the Gita says: "You have the right to perform your actions, but not to the fruits of action." Let us begin. What troubles your mind?`,
-      christian: `Peace be with you, ${user?.name?.split(' ')[0] || 'friend'}! ✝️ I am Grace, here to walk alongside you. As Proverbs 3:5-6 says: "Trust in the Lord with all your heart and lean not on your own understanding." How can I support you today?`,
-      muslim:    `Assalamu Alaikum, ${user?.name?.split(' ')[0] || 'friend'}! ☪️ I am Nur, your guide. As the Prophet (PBUH) taught: "The best among you is the one who benefits others most." Let us reflect together. What is on your mind?`,
+      general: `Hey ${name} 👋 I'm Sage, your context-aware AI mentor. I can see your goals, tasks, roadmaps, and learning progress to give personalized guidance.`,
+      hindu: `Namaste ${name}! 🕉️ I am Arjuna. I will guide you with Vedic wisdom and your current learning context.`,
+      christian: `Peace be with you, ${name}! ✝️ I am Grace, here to support you with faith-aligned and practical guidance.`,
+      muslim: `Assalamu Alaikum, ${name}! ☪️ I am Nur. Let us reflect together using your goals and learning journey.`,
     }
-    setMessages([{ role: 'assistant', content: welcomes[mode], mode }])
-  }, [mode, user?.name])
+    return { role: 'assistant', content: welcomes[faith] || welcomes.general }
+  }, [user?.name])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [mentor.messages, mentor.loading])
 
-  const send = async (msg) => {
-    const text = (msg || input).trim()
-    if (!text || loading) return
-    setInput('')
-    setMessages(prev => [...prev, { role: 'user', content: text }])
-    setLoading(true)
-    try {
-      const { data } = await mentorApi.chat(text, mode)
-      setMessages(prev => [...prev, { role: 'assistant', content: data.reply, mode }])
-    } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: "I'm having a moment of silence. Give me a second and try again. 🙏", mode }])
+  useEffect(() => {
+    if (!mentor.activeId && !mentor.bootLoading && mentor.messages.length === 0) {
+      mentor.setMessages([welcomeFor(faithMode)])
     }
-    setLoading(false)
+  }, [faithMode, mentor.activeId, mentor.bootLoading, mentor.messages.length, mentor.setMessages, welcomeFor, mentor])
+
+  const filteredConversations = mentor.conversations.filter((item) => {
+    if (!search.trim()) return true
+    const q = search.toLowerCase()
+    return item.title?.toLowerCase().includes(q) || item.preview?.toLowerCase().includes(q)
+  })
+
+  const handleSend = async (text, action = '') => {
+    const message = String(text || input).trim()
+    if (!message || mentor.loading) return
+    setInput('')
+    await mentor.sendMessage({
+      message,
+      action,
+      faith: faithMode,
+      mode: mentorMode,
+      explanationDepth: mentor.depth,
+    })
     inputRef.current?.focus()
   }
 
-  const currentMode = MODES.find(m => m.id === mode)
+  const handleNewConversation = async () => {
+    mentor.setActiveId(null)
+    mentor.setMessages([welcomeFor(faithMode)])
+    await mentor.startConversation({ faithMode, mentorMode, explanationDepth: mentor.depth })
+  }
+
+  const displayMessages = mentor.messages.length ? mentor.messages : [welcomeFor(faithMode)]
 
   return (
     <StudentLayout>
-      <div className="page-header">
-        <h1>🤖 AI Mentor — <span className="gradient-text">{mentorName}</span></h1>
-        <p>Personal inspiration, career guidance, and emotional support — choose your wisdom tradition</p>
-      </div>
+      <div className="dw-mentor">
+        <header className="page-header">
+          <h1>🤖 AI Mentor — <span className="gradient-text">{mentorName}</span></h1>
+          <p>Context-aware guidance using your goals, tasks, roadmaps, library progress, and career interests.</p>
+        </header>
 
-      {/* Mode selector */}
-      <div className="grid-4" style={{ marginBottom: 20 }}>
-        {MODES.map(m => (
-          <button key={m.id} onClick={() => setMode(m.id)} style={{
-            padding: '14px 12px', borderRadius: 'var(--r-lg)', border: `2px solid ${mode === m.id ? m.color : 'var(--border)'}`,
-            background: mode === m.id ? `${m.color}15` : 'var(--bg-card)', cursor: 'pointer',
-            textAlign: 'center', transition: 'var(--t)', boxShadow: mode === m.id ? `0 4px 20px ${m.color}30` : 'none',
-          }}>
-            <div style={{ fontSize: '1.6rem', marginBottom: 6 }}>{m.icon}</div>
-            <div style={{ fontWeight: 700, fontSize: '0.875rem', color: mode === m.id ? m.color : 'var(--text-primary)', marginBottom: 3 }}>{m.label}</div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>{m.desc}</div>
-          </button>
-        ))}
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 260px', gap: 16 }} className="mentor-layout">
-        {/* Chat */}
-        <div className="card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 520 }}>
-          {/* Header */}
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', background: `${currentMode.color}0d`, display: 'flex', alignItems: 'center', gap: 12 }}>
-            <AIOrb state={loading ? 'thinking' : messages.length > 1 && messages[messages.length - 1]?.role === 'assistant' ? 'neural' : 'idle'} size={44} color={currentMode.color} />
-            <div>
-              <div style={{ fontWeight: 700 }}>{mentorName}</div>
-              <div style={{ fontSize: '0.72rem', color: loading ? currentMode.color : '#34D399' }}>
-                {loading ? '● Thinking...' : '● Always here for you'}
-              </div>
-            </div>
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+        <section aria-label="Wisdom tradition">
+          <div className="dw-mentor__modes">
+            {FAITH_MODES.map((item) => (
               <button
-                onClick={() => mentorApi.clear().then(() => setMessages([messages[0]]))}
-                style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '4px 10px', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.72rem', transition: 'var(--t)', fontFamily: 'inherit' }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor='var(--border-purple)'; e.currentTarget.style.color='var(--text-primary)' }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.color='var(--text-muted)' }}
+                key={item.id}
+                type="button"
+                className={`dw-mentor__mode-btn ${faithMode === item.id ? 'is-active' : ''}`}
+                style={{
+                  borderColor: faithMode === item.id ? item.color : undefined,
+                  background: faithMode === item.id ? `${item.color}15` : undefined,
+                }}
+                onClick={() => setFaithMode(item.id)}
               >
-                Clear
-              </button>
-            </div>
-          </div>
-
-          {/* Messages */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <AnimatePresence initial={false}>
-              {messages.map((m, i) => (
-                <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', gap: 9 }}>
-                  {m.role === 'assistant' && (
-                    <div style={{ flexShrink: 0, alignSelf: 'flex-end' }}>
-                      <AIOrb state="idle" size={28} color={currentMode.color} />
-                    </div>
-                  )}
-                  <div style={{
-                    maxWidth: m.role === 'user' ? '75%' : '92%',
-                    padding: '12px 16px',
-                    borderRadius: m.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                    background: m.role === 'user' ? `linear-gradient(135deg,var(--purple),var(--purple-mid))` : 'rgba(255,255,255,0.05)',
-                    border: m.role === 'user' ? 'none' : '1px solid var(--border)',
-                    fontSize: '0.875rem', lineHeight: 1.68, color: 'var(--text-primary)',
-                  }}>
-                    {m.role === 'user'
-                      ? <span style={{ whiteSpace: 'pre-wrap' }}>{m.content}</span>
-                      : <MessageRenderer content={m.content} />
-                    }
-                  </div>
-                  {m.role === 'user' && (
-                    <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.78rem', flexShrink: 0, alignSelf: 'flex-end', color: 'white' }}>
-                      {user?.name?.[0]?.toUpperCase()}
-                    </div>
-                  )}
-                </motion.div>
-              ))}
-            </AnimatePresence>
-            {loading && (
-              <div style={{ display: 'flex', gap: 9, alignItems: 'flex-end' }}>
-                <AIOrb state="thinking" size={28} color={currentMode.color} />
-                <div style={{ padding: '10px 14px', borderRadius: '16px 16px 16px 4px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)' }}>
-                  <motion.p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}
-                    animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.5, repeat: Infinity }}>
-                    {mentorName} is composing a thoughtful response...
-                  </motion.p>
-                </div>
-              </div>
-            )}
-            <div ref={bottomRef} />
-          </div>
-
-          {/* Input */}
-          <div style={{ padding: '12px 14px', borderTop: '1px solid var(--border)', background: 'rgba(0,0,0,0.2)' }}>
-            <form onSubmit={e => { e.preventDefault(); send() }} style={{ display: 'flex', gap: 8 }}>
-              <input ref={inputRef} className="input" value={input} onChange={e => setInput(e.target.value)} placeholder={`Talk to ${mentorName}...`} disabled={loading} style={{ flex: 1, borderColor: input ? 'var(--border-purple)' : 'var(--border)' }} />
-              <button type="submit" className="btn btn-primary" disabled={loading || !input.trim()} style={{ flexShrink: 0, background: `linear-gradient(135deg,${currentMode.color},${currentMode.color}cc)` }}>
-                {loading ? <div className="spinner" style={{ borderTopColor: 'white' }} /> : '↑'}
-              </button>
-            </form>
-          </div>
-        </div>
-
-        {/* Sidebar — prompts */}
-        <div className="mentor-sidebar" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div className="card" style={{ padding: 14 }}>
-            <div style={{ fontSize: '0.73rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Quick Prompts</div>
-            {PROMPTS.map((p, i) => (
-              <button key={i} onClick={() => send(p)} style={{ width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.8rem', lineHeight: 1.45, marginBottom: 4, transition: 'var(--t)', fontFamily: 'inherit' }}
-                onMouseEnter={e => { e.currentTarget.style.background='rgba(139,92,246,0.1)'; e.currentTarget.style.color='var(--purple-light)' }}
-                onMouseLeave={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.color='var(--text-secondary)' }}>
-                {p}
+                <div style={{ fontSize: '1.4rem', marginBottom: 4 }} aria-hidden="true">{item.icon}</div>
+                <strong>{item.label}</strong>
+                <small>{item.desc}</small>
               </button>
             ))}
           </div>
-          <div className="card card-purple" style={{ padding: 14 }}>
-            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--purple-light)', marginBottom: 6 }}>About {mentorName}</div>
-            <p style={{ fontSize: '0.77rem', lineHeight: 1.6 }}>{currentMode.desc}. Your mentor provides educational guidance and motivation based on this tradition.</p>
+        </section>
+
+        <section aria-label="Mentor mode">
+          <div className="dw-mentor__mentor-modes">
+            {MENTOR_MODES.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`dw-mentor__mentor-mode-btn ${mentorMode === item.id ? 'is-active' : ''}`}
+                style={{ borderColor: mentorMode === item.id ? currentFaith.color : undefined }}
+                onClick={() => setMentorMode(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
           </div>
+        </section>
+
+        {mentor.error && <p className="dw-mentor__error" role="alert">{mentor.error}</p>}
+
+        <div className="dw-mentor__layout">
+          <aside className="dw-mentor__history" aria-label="Conversation history">
+            <div className="dw-mentor__history-header">
+              <h2>Conversations</h2>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={handleNewConversation}>New</button>
+            </div>
+            <div style={{ padding: '8px 10px' }}>
+              <input
+                className="input"
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search conversations"
+                aria-label="Search conversations"
+              />
+            </div>
+            <ul className="dw-mentor__history-list">
+              {filteredConversations.map((item) => (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    className={`dw-mentor__history-item ${mentor.activeId === item.id ? 'is-active' : ''}`}
+                    onClick={() => mentor.openConversation(item.id)}
+                  >
+                    <strong>{item.pinned ? '📌 ' : ''}{item.title}</strong>
+                    <small>{item.preview || `${item.messageCount || 0} messages`}</small>
+                  </button>
+                  <div className="dw-mentor__history-actions">
+                    <button type="button" onClick={() => mentor.pinConversation(item.id, !item.pinned)} aria-label={item.pinned ? 'Unpin conversation' : 'Pin conversation'}>
+                      {item.pinned ? 'Unpin' : 'Pin'}
+                    </button>
+                    <button type="button" onClick={() => {
+                      const title = window.prompt('Rename conversation', item.title)
+                      if (title) mentor.renameConversation(item.id, title)
+                    }}>Rename</button>
+                    <button type="button" onClick={() => mentor.removeConversation(item.id)}>Delete</button>
+                  </div>
+                </li>
+              ))}
+              {!filteredConversations.length && !mentor.bootLoading && (
+                <li><small>No conversations yet. Start a new one.</small></li>
+              )}
+            </ul>
+          </aside>
+
+          <section className="dw-mentor__chat" aria-label="Mentor conversation">
+            <div className="dw-mentor__chat-header" style={{ background: `${currentFaith.color}0d` }}>
+              <AIOrb state={mentor.loading ? 'thinking' : 'idle'} size={44} color={currentFaith.color} />
+              <div className="dw-mentor__chat-header-meta">
+                <strong>{mentorName}</strong>
+                <small>{mentor.loading ? 'Generating response…' : `${MENTOR_MODES.find((m) => m.id === mentorMode)?.label || 'Mentor'} · ${mentor.depth} depth`}</small>
+              </div>
+              <div className="dw-mentor__chat-toolbar">
+                <select value={mentor.depth} onChange={(event) => mentor.setDepth(event.target.value)} aria-label="Explanation depth">
+                  <option value="quick">Quick</option>
+                  <option value="simple">Simple</option>
+                  <option value="standard">Standard</option>
+                  <option value="detailed">Detailed</option>
+                  <option value="deep">Deep dive</option>
+                </select>
+                <button type="button" onClick={() => mentor.saveConversationToMemory(mentor.activeId)} disabled={!mentor.activeId}>Save</button>
+                <button type="button" onClick={mentor.clearActiveConversation} disabled={!mentor.activeId}>Clear</button>
+                {mentor.loading && <button type="button" onClick={mentor.stopGeneration}>Stop</button>}
+              </div>
+            </div>
+
+            <div className="dw-mentor__messages" aria-live="polite">
+              <AnimatePresence initial={false}>
+                {displayMessages.map((message, index) => (
+                  <motion.div
+                    key={`${index}-${message.role}-${message.content?.slice(0, 12)}`}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`dw-mentor__message-row ${message.role === 'user' ? 'is-user' : ''}`}
+                  >
+                    {message.role === 'assistant' && <AIOrb state="idle" size={28} color={currentFaith.color} />}
+                    <div className={`dw-mentor__bubble ${message.role === 'user' ? 'is-user' : 'is-assistant'}`}>
+                      {message.role === 'user'
+                        ? <span style={{ whiteSpace: 'pre-wrap' }}>{message.content}</span>
+                        : <MessageRenderer content={message.content} />}
+                    </div>
+                    {message.role === 'user' && (
+                      <span className="dw-mentor__avatar is-user" aria-hidden="true">{user?.name?.[0]?.toUpperCase()}</span>
+                    )}
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+              {mentor.loading && (
+                <p style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>{mentorName} is composing a thoughtful response…</p>
+              )}
+              <div ref={bottomRef} />
+            </div>
+
+            <div className="dw-mentor__composer">
+              <form onSubmit={(event) => { event.preventDefault(); handleSend() }}>
+                <label className="sr-only" htmlFor="mentor-input">Message {mentorName}</label>
+                <input
+                  id="mentor-input"
+                  ref={inputRef}
+                  className="input"
+                  value={input}
+                  onChange={(event) => setInput(event.target.value)}
+                  placeholder={`Talk to ${mentorName}…`}
+                  disabled={mentor.loading}
+                />
+                <button type="submit" className="btn btn-primary" disabled={mentor.loading || !input.trim()} aria-label="Send message">
+                  {mentor.loading ? '…' : '↑'}
+                </button>
+              </form>
+            </div>
+          </section>
+
+          <aside className="dw-mentor__aside" aria-label="Mentor tools">
+            <div className="dw-mentor-panel">
+              <div className="dw-mentor-panel__header"><h2>Quick Actions</h2></div>
+              <div className="dw-mentor-panel__body dw-mentor__quick-actions">
+                {QUICK_ACTIONS.map((action) => (
+                  <button key={action.id} type="button" onClick={() => handleSend(action.message, action.id)}>
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="dw-mentor-panel">
+              <div className="dw-mentor-panel__header"><h2>Prompts</h2></div>
+              <div className="dw-mentor-panel__body dw-mentor__prompts">
+                {PROMPTS.map((prompt) => (
+                  <button key={prompt} type="button" onClick={() => handleSend(prompt)}>{prompt}</button>
+                ))}
+              </div>
+            </div>
+
+            {mentor.suggestions.length > 0 && (
+              <div className="dw-mentor-panel">
+                <div className="dw-mentor-panel__header"><h2>Suggested Links</h2></div>
+                <div className="dw-mentor-panel__body dw-mentor__suggestions">
+                  {mentor.suggestions.map((item) => (
+                    <Link key={`${item.url}-${item.label}`} to={item.url}>{item.label} →</Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="dw-mentor-panel">
+              <div className="dw-mentor-panel__header"><h2>Memory</h2></div>
+              <div className="dw-mentor-panel__body">
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Save important conversations to your private AI memory from the chat toolbar. View saved items in <Link to="/student/intelligence">AI Home</Link>.
+                </p>
+              </div>
+            </div>
+          </aside>
         </div>
       </div>
     </StudentLayout>

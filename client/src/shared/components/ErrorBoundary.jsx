@@ -1,4 +1,5 @@
 import { Component } from 'react'
+import '../pages/status-pages.css'
 
 export default class ErrorBoundary extends Component {
   constructor(props) {
@@ -18,17 +19,12 @@ export default class ErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{
-          display: 'flex', flexDirection: 'column', alignItems: 'center',
-          justifyContent: 'center', minHeight: '60vh', padding: '40px 20px',
-          gap: 16, textAlign: 'center',
-        }}>
-          <div style={{ fontSize: '3rem' }}>💥</div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Something went wrong</h2>
-          <p style={{ color: 'var(--text-muted)', maxWidth: 400, fontSize: '0.9rem' }}>
-            {this.state.error?.message || 'An unexpected error occurred. Please refresh the page.'}
-          </p>
-          <div style={{ display: 'flex', gap: 10 }}>
+        <main className="status-page" aria-labelledby="fatal-error-title">
+          <section className="status-page__card">
+            <p className="status-page__code">500</p>
+            <h1 id="fatal-error-title">Something went wrong</h1>
+            <p>An unexpected error occurred. Try again or refresh the page.</p>
+            <div className="status-page__actions">
             <button
               className="btn btn-primary"
               onClick={() => this.setState({ hasError: false, error: null })}
@@ -41,23 +37,17 @@ export default class ErrorBoundary extends Component {
             >
               Refresh Page
             </button>
-          </div>
-          {process.env.NODE_ENV === 'development' && (
-            <details style={{ marginTop: 16, textAlign: 'left', maxWidth: 600 }}>
-              <summary style={{ cursor: 'pointer', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            </div>
+          {import.meta.env.DEV && (
+            <details className="status-page__details">
+              <summary>
                 Error details (dev only)
               </summary>
-              <pre style={{
-                marginTop: 8, padding: 12, background: 'rgba(239,68,68,0.08)',
-                border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8,
-                fontSize: '0.75rem', color: '#F87171', overflowX: 'auto',
-                whiteSpace: 'pre-wrap', lineHeight: 1.5,
-              }}>
-                {this.state.error?.stack}
-              </pre>
+              <pre>{this.state.error?.stack}</pre>
             </details>
           )}
-        </div>
+          </section>
+        </main>
       )
     }
     return this.props.children

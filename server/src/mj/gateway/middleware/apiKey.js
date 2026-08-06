@@ -1,5 +1,5 @@
 /**
- * MJ API Key Middleware (architecture only — future enforcement)
+ * MJ API Key Middleware
  * @module mj/gateway/middleware/apiKey
  */
 
@@ -7,10 +7,27 @@ const { MJLogger } = require('../../logger')
 
 /**
  * Validates API key when MJ_API_KEY env var is set.
- * When unset, passes through (development mode).
+ * In production, MJ is disabled unless MJ_API_KEY is configured (fail closed).
  */
 function apiKeyMiddleware(req, res, next) {
   const configuredKey = process.env.MJ_API_KEY
+  const production = process.env.NODE_ENV === 'production'
+
+  if (production && !configuredKey) {
+    return res.status(503).json({
+      success: false,
+      code: 'MJ_DISABLED',
+      message: 'MJ service is not enabled in this environment.',
+      timestamp: Date.now(),
+      requestId: req.mjRequestId,
+      executionTime: 0,
+      mjState: null,
+      payload: null,
+      errors: [{ type: 'configuration', code: 'MJ_DISABLED', message: 'MJ service is not enabled in this environment.' }],
+      warnings: [],
+    })
+  }
+
   if (!configuredKey) return next()
 
   const providedKey = req.headers['x-mj-api-key'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '')

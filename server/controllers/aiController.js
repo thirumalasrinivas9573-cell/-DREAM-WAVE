@@ -1,7 +1,5 @@
-const OpenAI = require('openai')
 const Chat   = require('../models/Chat')
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+const { openai } = require('../utils/openaiClient')
 
 // ── V10 DEEP CONTENT SYSTEM PROMPT ────────────────────────────────────────────
 const SYSTEM = `You are Sage — a world-class AI mentor, career coach, teacher, research guide and productivity expert inside Dream Wave AI.

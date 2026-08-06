@@ -8,8 +8,12 @@
 
 const express = require('express')
 const router = express.Router()
+const auth = require('../middleware/auth')
 const { createMJGatewayRouterHandlers, applyGatewayMiddleware } = require('../src/mj/gateway')
 
+// MJ operates on private user memory and agents; every route requires the
+// canonical Dream Wave session. Gateway API keys are an additional control.
+router.use(auth)
 applyGatewayMiddleware(router)
 
 const handlers = createMJGatewayRouterHandlers()

@@ -32,9 +32,12 @@ export default defineConfig({
 
   server: {
     port: 5173,
-    host: '127.0.0.1',
+    // Listen on IPv4 + IPv6 so both localhost and 127.0.0.1 work
+    host: true,
+    strictPort: true,
     proxy: {
       '/api': {
+        // Always IPv4 — avoids macOS localhost → ::1 ECONNREFUSED
         target: 'http://127.0.0.1:5001',
         changeOrigin: true,
         secure: false,

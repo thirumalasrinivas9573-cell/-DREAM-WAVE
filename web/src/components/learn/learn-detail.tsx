@@ -1,7 +1,6 @@
 "use client";
 
 import { Heart, Play } from "lucide-react";
-import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useMemo } from "react";
 
@@ -31,16 +30,8 @@ import {
   getLearnAnimation,
   getRelatedAnimations,
 } from "@/constants/learn-catalog";
-import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { cn } from "@/lib/utils";
 import { useLearnStore } from "@/store/learn-store";
-
-const LearnCanvas = dynamic(() => import("@/components/three/learn-canvas"), {
-  ssr: false,
-  loading: () => (
-    <div className="bg-muted/30 h-full w-full animate-pulse rounded-2xl" />
-  ),
-});
 
 export function LearnDetailPage({ animationId }: { animationId: string }) {
   const hydrate = useLearnStore((s) => s.hydrate);
@@ -48,7 +39,6 @@ export function LearnDetailPage({ animationId }: { animationId: string }) {
   const favorites = useLearnStore((s) => s.favorites);
   const toggleFavorite = useLearnStore((s) => s.toggleFavorite);
   const progress = useLearnStore((s) => s.progress);
-  const reducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
     if (!hydrated) hydrate();
@@ -154,13 +144,7 @@ export function LearnDetailPage({ animationId }: { animationId: string }) {
           </CardContent>
         </Card>
 
-        <div className="border-border bg-muted/20 relative min-h-56 overflow-hidden rounded-2xl border">
-          <LearnCanvas
-            className="absolute inset-0 h-full w-full"
-            reducedMotion={reducedMotion}
-            subject={animation.subject}
-          />
-        </div>
+        <div className="border-border bg-muted/20 relative min-h-56 overflow-hidden rounded-2xl border bg-[radial-gradient(ellipse_at_center,rgba(168,85,247,0.14),transparent_65%)]" />
       </div>
 
       <Card>

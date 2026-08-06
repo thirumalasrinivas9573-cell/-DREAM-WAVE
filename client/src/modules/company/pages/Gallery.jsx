@@ -1,14 +1,29 @@
-import PortalCrudPage from '@shared/components/portal/PortalCrudPage'
-import { companyApi } from '@shared/services/api'
-import { COMPANY_THEME } from '../theme'
+import CompanyCrudPage from '../components/CompanyCrudPage'
+import { companyService } from '../services/api'
 
-const F = [
-  { key: 'type', label: 'Type', type: 'select', options: ['image', 'video'], default: 'image' },
-  { key: 'url', label: 'URL' },
-  { key: 'caption', label: 'Caption' },
-]
-const C = [{ key: 'type', label: 'Type' }, { key: 'caption', label: 'Caption' }]
+const api = {
+  list: (params) => companyService.gallery.list({ ...params, type: 'image' }),
+  create: (data) => companyService.gallery.create({ ...data, type: 'image' }),
+  delete: companyService.gallery.delete,
+}
 
 export default function Gallery() {
-  return <PortalCrudPage title="Gallery" icon="🖼️" theme={COMPANY_THEME} api={companyApi.gallery} fields={F} columns={C} emptyHint="Photos and videos for public page" />
+  return (
+    <CompanyCrudPage
+      title="Gallery"
+      subtitle="Company image gallery for the public profile."
+      api={api}
+      fields={[
+        { key: 'url', label: 'Image URL' },
+        { key: 'caption', label: 'Caption' },
+        { key: 'order', label: 'Order', type: 'number', default: 0 },
+      ]}
+      columns={[
+        { key: 'caption', label: 'Caption' },
+        { key: 'url', label: 'URL' },
+        { key: 'order', label: 'Order' },
+      ]}
+      emptyHint="No gallery images yet."
+    />
+  )
 }

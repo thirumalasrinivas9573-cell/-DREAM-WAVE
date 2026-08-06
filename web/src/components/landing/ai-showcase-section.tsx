@@ -1,26 +1,14 @@
 "use client";
 
-import { useReducedMotion } from "framer-motion";
-import dynamic from "next/dynamic";
-
 import { ScrollReveal } from "@/components/landing/scroll-reveal";
 import { CtaButton } from "@/components/shared/cta-button";
 import { LANDING_AI_CAPABILITIES } from "@/constants/landing";
 import { MARKETING_AUTH_ROUTES } from "@/constants/navigation";
 
-const LearnCanvas = dynamic(() => import("@/components/three/learn-canvas"), {
-  ssr: false,
-  loading: () => (
-    <div className="bg-muted/30 h-full min-h-48 animate-pulse rounded-2xl" />
-  ),
-});
-
 /**
- * AI showcase — presentation of capabilities with lightweight 3D preview.
+ * AI showcase — capabilities grid (no 3D canvas).
  */
 export function AiShowcaseSection() {
-  const reduceMotion = useReducedMotion();
-
   return (
     <section
       id="ai-showcase"
@@ -54,13 +42,7 @@ export function AiShowcaseSection() {
         </ScrollReveal>
 
         <ScrollReveal delay={0.08} className="flex flex-col gap-4">
-          <div className="border-border relative min-h-48 overflow-hidden rounded-2xl border sm:min-h-56">
-            <LearnCanvas
-              className="absolute inset-0 h-full w-full"
-              reducedMotion={Boolean(reduceMotion)}
-              subject="programming"
-            />
-          </div>
+          <div className="border-border relative min-h-48 overflow-hidden rounded-2xl border bg-[radial-gradient(ellipse_at_center,rgba(56,189,248,0.12),transparent_60%)] sm:min-h-56" />
 
           <ul className="grid gap-3 sm:grid-cols-2">
             {LANDING_AI_CAPABILITIES.map((capability) => {

@@ -17,6 +17,9 @@ exports.createCheckoutSession = async (req, res) => {
     }
 
     const { plan = 'pro' } = req.body
+    if (plan !== 'pro') {
+      return res.status(400).json({ success: false, message: 'Unsupported plan.' })
+    }
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173'
 
     const session = await getStripe().checkout.sessions.create({
@@ -37,14 +40,14 @@ exports.createCheckoutSession = async (req, res) => {
         },
         quantity: 1,
       }],
-      success_url: `${clientUrl}/dashboard?payment=success`,
+      success_url: `${clientUrl}/${req.user.role || 'student'}/dashboard?payment=success`,
       cancel_url:  `${clientUrl}/pricing?payment=cancelled`,
     })
 
     res.json({ success: true, url: session.url })
   } catch (err) {
     console.error('[paymentController.createCheckoutSession]', err.message)
-    res.status(500).json({ message: 'Failed to create checkout session.', error: err.message })
+    res.status(500).json({ success: false, message: 'Failed to create checkout session.' })
   }
 }
 
@@ -53,29 +56,36 @@ exports.createCheckoutSession = async (req, res) => {
 exports.webhook = async (req, res) => {
   const sig    = req.headers['stripe-signature']
   const secret = process.env.STRIPE_WEBHOOK_SECRET
+  if (!secret || !getStripe()) {
+    console.error('[webhook] Stripe webhook is not configured')
+    return res.status(503).json({ success: false, message: 'Payment webhook is not configured.' })
+  }
 
   let event
   try {
-    event = secret
-      ? getStripe().webhooks.constructEvent(req.body, sig, secret)
-      : JSON.parse(req.body)
+    event = getStripe().webhooks.constructEvent(req.body, sig, secret)
   } catch (err) {
     console.error('[webhook] signature error:', err.message)
-    return res.status(400).send(`Webhook Error: ${err.message}`)
+    return res.status(400).json({ success: false, message: 'Invalid webhook signature.' })
   }
 
-  if (event.type === 'checkout.session.completed') {
-    const session = event.data.object
-    const userId  = session.metadata?.userId
-    if (userId) {
-      await User.findByIdAndUpdate(userId, {
-        $set: { plan: 'pro', planActivatedAt: new Date() },
-      })
-      console.log(`[webhook] User ${userId} upgraded to Pro`)
+  try {
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object
+      const userId  = session.metadata?.userId
+      if (userId) {
+        await User.findByIdAndUpdate(userId, {
+          $set: { plan: 'pro', planActivatedAt: new Date() },
+        })
+        console.log('[webhook] Subscription activated')
+      }
     }
+  } catch (error) {
+    console.error('[webhook] processing error:', error.message)
+    return res.status(500).json({ success: false, message: 'Webhook processing failed.' })
   }
 
-  res.json({ received: true })
+  res.json({ success: true, received: true })
 }
 
 // ── GET /api/payment/status ───────────────────────────────────────────────────

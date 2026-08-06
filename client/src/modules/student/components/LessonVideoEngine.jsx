@@ -68,7 +68,6 @@ function renderPhotosynthesis(ctx, W, H, t) {
   ctx.beginPath(); ctx.rect(0, H*0.72, W, H*0.28); ctx.fill()
 
   // ── SUN (3D sphere illusion) ────────────────────────────────────
-  const sunP = eO(p01(t, 0, 2.5))
   const sunX = W * 0.15, sunY = H * 0.18
   const sunR = lerp(0, Math.min(W, H) * 0.1, eSp(p01(t, 0, 1.8)))
   if (sunR > 2) {
@@ -218,8 +217,7 @@ function renderPhotosynthesis(ctx, W, H, t) {
 
   // ── CO2 + H2O arrows going into leaf ────────────────────────────────
   if (t > 9) {
-    const molP = eO(p01(t, 9, 13))
-    [[`CO₂`, W*0.28, H*0.45, C.cyan], [`H₂O`, W*0.32, H*0.62, C.blue]].forEach(([mol, mx, my, mc], i) => {
+    ;[[`CO₂`, W*0.28, H*0.45, C.cyan], [`H₂O`, W*0.32, H*0.62, C.blue]].forEach(([mol, mx, my, mc], i) => {
       const mp = eO(p01(t, 9+i*1.2, 12+i*1.2))
       if (mp <= 0) return
       ctx.save(); ctx.globalAlpha = mp
@@ -239,8 +237,7 @@ function renderPhotosynthesis(ctx, W, H, t) {
 
   // ── O2 + Glucose output ────────────────────────────────────────────
   if (t > 14) {
-    const outP = eO(p01(t, 14, 18))
-    [[`O₂`, W*0.7, H*0.4, C.green], [`Glucose`, W*0.75, H*0.55, C.yellow]].forEach(([mol, ox, oy, oc]) => {
+    ;[[`O₂`, W*0.7, H*0.4, C.green], [`Glucose`, W*0.75, H*0.55, C.yellow]].forEach(([mol, ox, oy, oc]) => {
       const op = eO(p01(t, 14+0.8, 17+0.8))
       if (op <= 0) return
       ctx.save(); ctx.globalAlpha = op
@@ -296,7 +293,7 @@ function renderHTML(ctx, W, H, t) {
     ctx.strokeStyle = h2r(C.purple, 0.5); ctx.lineWidth = 1.5
     ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 10); ctx.stroke()
     // Dots
-    [[16,'#EF4444'],[34,'#F59E0B'],[52,'#10B981']].forEach(([dx,dc])=>{
+    ;[[16,'#EF4444'],[34,'#F59E0B'],[52,'#10B981']].forEach(([dx,dc])=>{
       ctx.fillStyle = dc; ctx.beginPath(); ctx.arc(bx+dx, by+17, 7, 0, Math.PI*2); ctx.fill()
     })
     // URL bar
@@ -373,7 +370,6 @@ function renderHTML(ctx, W, H, t) {
 
   // DOM Tree visualization (18s+)
   if (t > 17) {
-    const dp = eO(p01(t, 17, 20))
     const treeNodes = [
       { label:'html', x:W/2, y:H*0.2, parent:null, color:C.orange },
       { label:'head', x:W*0.38, y:H*0.34, parent:0, color:C.yellow },
@@ -428,7 +424,6 @@ function renderBiology(ctx, W, H, t) {
     const y = startY + i * step
     const a1 = (i/20)*Math.PI*2, a2 = a1 + Math.PI
     const x1 = cx + Math.cos(a1)*W*0.18, x2 = cx + Math.cos(a2)*W*0.18
-    const pair = i % 4 === 0
     const c1 = [C.cyan, C.purple, C.green, C.pink][i%4]
     const c2 = [C.orange, C.yellow, C.red, C.blue][i%4]
     ctx.save(); ctx.globalAlpha = ip
@@ -761,7 +756,7 @@ function useVideoCanvas(canvasRef, lesson, scene, playing, color, onEnd) {
     const renderers = {
       photosynthesis: renderPhotosynthesis,
       html:           renderHTML,
-      code:           (c,w,h,t,s,col) => renderHTML(c,w,h,t),
+      code:           (c,w,h,t) => renderHTML(c,w,h,t),
       biology:        renderBiology,
       space:          renderSpace,
       physics:        renderPhysics,
@@ -818,7 +813,7 @@ function useVoiceNarration(scene, playing) {
     return () => {
       window.speechSynthesis.cancel()
     }
-  }, [scene?.id, playing])
+  }, [scene?.id, scene?.narration, playing])
 
   // Also load voices on first mount
   useEffect(() => {

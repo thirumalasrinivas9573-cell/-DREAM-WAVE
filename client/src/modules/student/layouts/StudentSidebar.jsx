@@ -9,11 +9,20 @@ const NAV = [
   { path: 'goals',        icon: '🎯', label: 'Goals',         group: 'learn'   },
   { path: 'roadmap',      icon: '🗺️', label: 'Roadmap',      group: 'learn'   },
   { path: 'learn',        icon: '🎓', label: 'AI Studio',     group: 'learn'   },
-  { path: 'tasks',        icon: '⚒️', label: 'Learning',      group: 'learn'   },
+  { path: 'tasks',        icon: '✓',  label: 'Tasks',         group: 'learn'   },
+  { path: 'planner',      icon: '📅', label: 'Study Planner', group: 'learn'   },
+  { path: 'academics',    icon: '📘', label: 'Academics',     group: 'learn'   },
+  { path: 'focus',        icon: '◎',  label: 'Focus Mode',    group: 'learn'   },
   { path: 'mentor',       icon: '🤖', label: 'AI Mentor',     group: 'ai'      },
+  { path: 'intelligence', icon: '✨', label: 'AI Home',       group: 'ai'      },
   { path: 'reports',      icon: '📊', label: 'R&D Reports',   group: 'ai'      },
+  { path: 'research',     icon: '🔬', label: 'Research',      group: 'ai'      },
   { path: 'analytics',    icon: '📈', label: 'Analytics',     group: 'ai'      },
-  { path: 'resume',       icon: '📄', label: 'Resume',        group: 'career'  },
+  { path: 'career',       icon: '💼', label: 'Career Hub',    group: 'career'  },
+  { path: 'career/resume', icon: '📄', label: 'Resume Builder', group: 'career' },
+  { path: 'career/jobs',  icon: '◈',  label: 'Jobs',          group: 'career'  },
+  { path: 'career/internships', icon: '◎', label: 'Internships', group: 'career' },
+  { path: 'career/applications', icon: '◫', label: 'Applications', group: 'career' },
   { path: 'certificates', icon: '🏅', label: 'Certificates',  group: 'career'  },
   { path: 'books',        icon: '📚', label: 'Books',         group: 'career'  },
   { path: 'community',    icon: '💬', label: 'Community',     group: 'social'  },
@@ -52,6 +61,7 @@ export default function StudentSidebar({ mobile, onClose }) {
         position: 'sticky', top: 0, height: '100vh',
         overflowY: 'auto', flexShrink: 0,
       }}
+      aria-label="Student portal navigation"
     >
       <div style={{ padding: '22px 18px 16px', borderBottom: `1px solid ${t.sidebarBorder}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -65,6 +75,11 @@ export default function StudentSidebar({ mobile, onClose }) {
             <div style={{ fontWeight: 800, fontSize: '0.875rem', color: '#F8FAFC', letterSpacing: '-0.01em' }}>Dream Wave</div>
             <div style={{ fontSize: '0.68rem', color: t.accentLight, fontWeight: 500 }}>Student Portal</div>
           </div>
+          {mobile && (
+            <button type="button" className="btn btn-ghost btn-icon" onClick={onClose} aria-label="Close navigation menu">
+              ×
+            </button>
+          )}
         </div>
       </div>
 
@@ -102,6 +117,7 @@ export default function StudentSidebar({ mobile, onClose }) {
                 key={path}
                 to={studentPath(path)}
                 onClick={onClose}
+                aria-label={itemLabel}
                 style={({ isActive }) => ({
                   display: 'flex', alignItems: 'center', gap: 9,
                   padding: '8px 10px', borderRadius: 9, marginBottom: 1,

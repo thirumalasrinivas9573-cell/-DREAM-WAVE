@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const LoginHistory = require('../models/LoginHistory');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const {
   OTP_TTL_MS,
   generateOtp,
@@ -11,8 +12,17 @@ const {
 } = require('../utils/otp');
 const { sendOtpEmail, sendWelcomeEmail, sendPasswordResetEmail } = require('../services/emailService');
 const { sendOTP: twilioSendOTP, verifyOTP: twilioVerifyOTP } = require('../services/twilioVerify');
-const { issueSession, rotateRefreshToken, revokeRefreshToken, revokeAllForUser, generateAccessToken, setRefreshCookie, clearRefreshCookie, readRefreshFromReq, listSessions, revokeSessionById } = require('../utils/tokenService');
+const { issueSession, rotateRefreshToken, revokeRefreshToken, revokeAllForUser, setRefreshCookie, clearRefreshCookie, readRefreshFromReq, listSessions, revokeSessionById, ACCESS_TTL } = require('../utils/tokenService');
 const { bootstrapPortalProfile } = require('../utils/portalBootstrap');
+const {
+  PORTAL_ROLES,
+  AUTH_ROLES,
+  portalAlreadyExistsMessage,
+  wrongPortalPayload,
+  findByEmailAndPortal,
+  findUserByIdentifier: findPortalUser,
+  findSiblingRoles,
+} = require('../utils/portalAccounts');
 const {
   assertE164,
   maskPhone,
@@ -35,10 +45,31 @@ const {
   pushPasswordHistory,
 } = require('../utils/authSecurity');
 
-const generateToken = (id) => generateAccessToken(id);
 const CHALLENGE_TTL = '5m';
+const CHALLENGE_SECRET = process.env.AUTH_CHALLENGE_SECRET || process.env.JWT_SECRET;
+const CHALLENGE_VERIFY = { issuer: 'dream-wave-api', audience: 'dream-wave-auth' };
 
 async function completeLoginSession(req, res, user, options = {}) {
+  // Portal from OTP challenge / login body must match this account's role.
+  // Multi-portal: each (email, role) is a separate User — never rewrite role across portals.
+  const portal = options.portal || req.body?.portal || null
+  const portalRole = AUTH_ROLES.includes(portal) ? portal : null
+
+  if (portalRole) {
+    if (!user.role) {
+      user.role = portalRole
+      await user.save()
+    } else if (user.role !== portalRole) {
+      return res.status(403).json(wrongPortalPayload(portalRole, [user.role]))
+    }
+  } else if (!user.role) {
+    return res.status(403).json({
+      success: false,
+      message: 'Account has no portal role. Sign in from Student, Institution, or Company login.',
+      code: 'ROLE_REQUIRED',
+    })
+  }
+
   await bootstrapPortalProfile(user);
   await clearLoginFailures(user);
   const ua = req.headers['user-agent'] || '';
@@ -54,15 +85,17 @@ async function completeLoginSession(req, res, user, options = {}) {
   await recordLoginEvent(req, {
     user,
     success: true,
-    portal: options.portal || req.body?.portal || user.role || '',
+    portal: portalRole || user.role || '',
     identifier: options.identifier || '',
   });
   return res.json({
     success: true,
     message: 'Login successful',
     token,
-    refreshToken,
+    accessToken: token,
+    accessTokenTtl: ACCESS_TTL,
     user: publicUser(user),
+    role: user.role,
   });
 }
 
@@ -98,17 +131,22 @@ const fail = (res, error) => {
   return res.status(status).json(body);
 };
 
-function issueEmailLoginChallenge(user) {
+function issueEmailLoginChallenge(user, portal = null) {
   return jwt.sign(
-    { purpose: 'login_email_otp', userId: String(user._id), email: user.email },
-    process.env.JWT_SECRET,
-    { expiresIn: CHALLENGE_TTL },
+    {
+      purpose: 'login_email_otp',
+      userId: String(user._id),
+      email: user.email,
+      portal: portal || null,
+    },
+    CHALLENGE_SECRET,
+    { expiresIn: CHALLENGE_TTL, ...CHALLENGE_VERIFY },
   );
 }
 
 function readEmailLoginChallenge(token) {
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    const payload = jwt.verify(token, CHALLENGE_SECRET, CHALLENGE_VERIFY);
     if (payload.purpose !== 'login_email_otp' || !payload.userId || !payload.email) return null;
     return payload;
   } catch {
@@ -116,23 +154,59 @@ function readEmailLoginChallenge(token) {
   }
 }
 
-function issueLoginChallenge(user) {
+function issueLoginChallenge(user, portal = null) {
   return jwt.sign(
     {
       purpose: 'login_otp',
       userId: String(user._id),
       phone: user.phone,
+      portal: portal || null,
     },
-    process.env.JWT_SECRET,
-    { expiresIn: CHALLENGE_TTL },
+    CHALLENGE_SECRET,
+    { expiresIn: CHALLENGE_TTL, ...CHALLENGE_VERIFY },
   );
 }
 
 function readLoginChallenge(token) {
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    const payload = jwt.verify(token, CHALLENGE_SECRET, CHALLENGE_VERIFY);
     if (payload.purpose !== 'login_otp' || !payload.userId || !payload.phone) return null;
     return payload;
+  } catch {
+    return null;
+  }
+}
+
+function issueRegistrationChallenge(user, portal) {
+  return jwt.sign(
+    {
+      purpose: 'portal_registration',
+      userId: String(user._id),
+      email: user.email,
+      portal,
+      nonce: crypto.randomBytes(16).toString('hex'),
+    },
+    CHALLENGE_SECRET,
+    { expiresIn: '30m', ...CHALLENGE_VERIFY },
+  );
+}
+
+async function readRegistrationAccount(token, expectedPortal) {
+  if (!token) return null;
+  try {
+    const payload = jwt.verify(token, CHALLENGE_SECRET, CHALLENGE_VERIFY);
+    if (
+      payload.purpose !== 'portal_registration'
+      || payload.portal !== expectedPortal
+      || !payload.userId
+    ) return null;
+    const user = await User.findOne({
+      _id: payload.userId,
+      email: payload.email,
+      role: expectedPortal,
+      registrationComplete: false,
+    });
+    return user ? { user, payload } : null;
   } catch {
     return null;
   }
@@ -146,21 +220,7 @@ async function issueEmailOtp(user, purpose = 'verification') {
   });
 }
 
-async function findUserByIdentifier(identifier) {
-  const raw = String(identifier || '').trim();
-  if (!raw) return null;
-  if (raw.startsWith('+') || /^\d{10,15}$/.test(raw)) {
-    try {
-      const phone = assertE164(raw.startsWith('+') ? raw : `+${raw}`);
-      return User.findOne({ phone });
-    } catch {
-      return null;
-    }
-  }
-  return User.findOne({ email: raw.toLowerCase() });
-}
-
-// @desc    Register user (legacy — still available; email OTP delivered privately)
+// @desc    Register student account (independent of Institution/Company for same email)
 // @route   POST /api/auth/signup | /api/auth/register
 exports.signup = async (req, res) => {
   try {
@@ -173,14 +233,20 @@ exports.signup = async (req, res) => {
       return res.status(400).json({ message: strength.message });
     }
 
-    const userExists = await User.findOne({ email: String(email).toLowerCase().trim() });
-    if (userExists) {
-      return res.status(400).json({ message: 'User already exists' });
+    const normalized = String(email).toLowerCase().trim();
+    const studentExists = await findByEmailAndPortal(normalized, 'student');
+    if (studentExists) {
+      return res.status(400).json({
+        success: false,
+        message: portalAlreadyExistsMessage('student'),
+        code: 'PORTAL_EXISTS',
+        portal: 'student',
+      });
     }
 
     const user = await User.create({
       name: String(name).trim().slice(0, 120),
-      email: String(email).toLowerCase().trim(),
+      email: normalized,
       password,
       emailVerified: false,
       registrationComplete: true,
@@ -218,8 +284,8 @@ exports.signup = async (req, res) => {
 };
 
 /**
- * Login — email or mobile + password.
- * On success: send Twilio Verify OTP (no JWT yet).
+ * Login — email or mobile + password for ONE portal account.
+ * On success: send OTP challenge scoped to that portal user.
  */
 exports.login = async (req, res) => {
   try {
@@ -232,8 +298,22 @@ exports.login = async (req, res) => {
       });
     }
 
-    const user = await findUserByIdentifier(id);
+    const portalRole = AUTH_ROLES.includes(portal) ? portal : null;
+    if (!portalRole) {
+      return res.status(400).json({
+        success: false,
+        message: 'portal is required (student, institution, company, or admin)',
+        code: 'PORTAL_REQUIRED',
+      });
+    }
+
+    const user = await findPortalUser(id, portalRole);
     if (!user) {
+      const siblings = await findSiblingRoles(id, portalRole);
+      if (siblings.length) {
+        await recordLoginEvent(req, { success: false, reason: 'wrong_portal', portal, identifier: id });
+        return res.status(403).json(wrongPortalPayload(portalRole, siblings));
+      }
       await recordLoginEvent(req, { success: false, reason: 'invalid_credentials', portal, identifier: id });
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
@@ -265,21 +345,11 @@ exports.login = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Account suspended. Contact support.' });
     }
 
-    const portalRole = ['institution', 'company', 'student'].includes(portal) ? portal : null;
-    if (portalRole && user.role && user.role !== portalRole && user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: `This account is registered as ${user.role}. Please use the ${user.role} portal.`,
-        role: user.role,
-      });
-    }
-
-    const otpChannel = req.body.otpChannel
-      || (portalRole === 'institution' || portalRole === 'company' ? 'email' : 'phone');
+    const otpChannel = req.body.otpChannel || 'email';
 
     if (otpChannel === 'email') {
       await issueEmailOtp(user, 'login');
-      const challengeToken = issueEmailLoginChallenge(user);
+      const challengeToken = issueEmailLoginChallenge(user, portalRole);
       return res.json({
         success: true,
         requiresOtp: true,
@@ -288,6 +358,7 @@ exports.login = async (req, res) => {
         message: 'Verification code sent to your email.',
         challengeToken,
         email: user.email,
+        portal: portalRole,
         expiresInSeconds: 300,
       });
     }
@@ -301,7 +372,7 @@ exports.login = async (req, res) => {
     }
 
     await twilioSendOTP(user.phone);
-    const challengeToken = issueLoginChallenge(user);
+    const challengeToken = issueLoginChallenge(user, portalRole);
 
     res.json({
       success: true,
@@ -310,6 +381,7 @@ exports.login = async (req, res) => {
       message: 'OTP sent successfully.',
       challengeToken,
       phoneMasked: maskPhone(user.phone),
+      portal: portalRole,
       expiresInSeconds: 300,
     });
   } catch (error) {
@@ -327,8 +399,10 @@ exports.aaidLogin = async (req, res) => {
 
 exports.getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password');
+    const user = await User.findById(req.user._id || req.user.id).select('-password');
     if (!user) return res.status(404).json({ message: 'User not found' });
+    // Do NOT invent a role here — portal login assigns role; fabricating "student"
+    // caused Institution/Company sessions to open the Student portal.
     res.json({ success: true, user: publicUser(user) });
   } catch (error) {
     return fail(res, error);
@@ -337,7 +411,7 @@ exports.getMe = async (req, res) => {
 
 exports.forgotPassword = async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email, portal } = req.body;
     if (!email) return res.status(400).json({ message: 'Email is required' });
 
     const base = {
@@ -345,7 +419,11 @@ exports.forgotPassword = async (req, res) => {
       message: 'If an account exists for that email, a verification code has been sent.',
     };
 
-    const user = await User.findOne({ email: String(email).toLowerCase().trim() });
+    const normalized = String(email).toLowerCase().trim();
+    if (!PORTAL_ROLES.includes(portal)) {
+      return res.status(400).json({ success: false, code: 'PORTAL_REQUIRED', message: 'portal is required for password reset.' });
+    }
+    const user = await findByEmailAndPortal(normalized, portal);
     if (!user) return res.json(base);
 
     await createPasswordReset({
@@ -362,7 +440,7 @@ exports.forgotPassword = async (req, res) => {
 
 exports.resendOtp = async (req, res) => {
   try {
-    const { email, purpose } = req.body;
+    const { email, purpose, portal } = req.body;
     if (!email || !['verify', 'reset'].includes(purpose)) {
       return res.status(400).json({ message: 'Email and purpose (verify|reset) are required' });
     }
@@ -372,7 +450,11 @@ exports.resendOtp = async (req, res) => {
       message: 'If an account exists for that email, a new code has been sent.',
     };
 
-    const user = await User.findOne({ email: String(email).toLowerCase().trim() });
+    const normalized = String(email).toLowerCase().trim();
+    if (!PORTAL_ROLES.includes(portal)) {
+      return res.status(400).json({ success: false, code: 'PORTAL_REQUIRED', message: 'portal is required for OTP resend.' });
+    }
+    const user = await findByEmailAndPortal(normalized, portal);
     if (!user) return res.json(base);
 
     if (purpose === 'verify') {
@@ -393,22 +475,50 @@ exports.resendOtp = async (req, res) => {
 
 exports.verifyOtp = async (req, res) => {
   try {
-    const { email, otp, purpose } = req.body;
+    const { email, otp, purpose, portal, registrationToken } = req.body;
     if (!email || !otp || !['verify', 'reset'].includes(purpose)) {
       return res.status(400).json({
         message: 'Email, otp, and purpose (verify|reset) are required',
       });
     }
 
-    const user = await User.findOne({ email: String(email).toLowerCase().trim() });
+    const normalized = String(email).toLowerCase().trim();
+    if (purpose === 'reset' && !PORTAL_ROLES.includes(portal)) {
+      return res.status(400).json({
+        success: false,
+        code: 'PORTAL_REQUIRED',
+        message: 'portal is required for password reset verification.',
+      });
+    }
+
+    let user = null;
+    if (registrationToken && PORTAL_ROLES.includes(portal)) {
+      const registration = await readRegistrationAccount(registrationToken, portal);
+      user = registration?.user || null;
+    } else if (PORTAL_ROLES.includes(portal)) {
+      user = await findByEmailAndPortal(normalized, portal);
+    }
+
     if (!user) {
       return res.status(400).json({ message: 'Invalid or expired verification code' });
     }
+    if (user.registrationComplete === false && !registrationToken) {
+      return res.status(401).json({
+        success: false,
+        code: 'REGISTRATION_SESSION_REQUIRED',
+        message: 'Registration session expired. Start again.',
+      });
+    }
 
     if (purpose === 'verify') {
-      const checked = await verifySecureEmailOtp({ email, purpose: 'verification', otp });
+      const checked = await verifySecureEmailOtp({
+        email: normalized,
+        purpose: 'verification',
+        otp,
+        userId: user._id,
+      });
       if (!checked.ok) {
-        // Fallback to legacy User fields
+        // Fallback to legacy User fields (portal-scoped user doc)
         assertAttempts(user.emailOtpAttempts);
         if (!isOtpValid(user.verificationOTP, user.verificationOTPExpires, otp)) {
           user.emailOtpAttempts = (user.emailOtpAttempts || 0) + 1;
@@ -422,10 +532,25 @@ exports.verifyOtp = async (req, res) => {
       user.emailOtpAttempts = 0;
       await user.save();
 
-      return completeLoginSession(req, res, user, { remember: req.body?.remember !== false });
+      // Mid-signup for Institution/Company — verify only, do not issue a session yet
+      if (user.registrationComplete === false) {
+        return res.json({
+          success: true,
+          message: 'Email verified successfully',
+          email: user.email,
+          portal: user.role,
+          registrationToken,
+          step: 'verify-phone',
+        });
+      }
+
+      return completeLoginSession(req, res, user, {
+        remember: req.body?.remember !== false,
+        portal: portal || user.role,
+      });
     }
 
-    const resetCheck = await consumePasswordReset({ email, otp });
+    const resetCheck = await consumePasswordReset({ userId: user._id, otp });
     if (!resetCheck.ok) {
       assertAttempts(user.emailOtpAttempts);
       if (!isOtpValid(user.resetPasswordOTP, user.resetPasswordOTPExpires, otp)) {
@@ -440,6 +565,7 @@ exports.verifyOtp = async (req, res) => {
       message: 'Code verified. You can reset your password.',
       resetAllowed: true,
       email: user.email,
+      portal: user.role,
     });
   } catch (error) {
     return fail(res, error);
@@ -448,7 +574,7 @@ exports.verifyOtp = async (req, res) => {
 
 exports.resetPassword = async (req, res) => {
   try {
-    const { email, otp, password } = req.body;
+    const { email, otp, password, portal } = req.body;
     if (!email || !otp || !password) {
       return res.status(400).json({ message: 'Email, otp, and password are required' });
     }
@@ -457,12 +583,16 @@ exports.resetPassword = async (req, res) => {
       return res.status(400).json({ message: strength.message });
     }
 
-    const user = await User.findOne({ email: String(email).toLowerCase().trim() });
+    const normalized = String(email).toLowerCase().trim();
+    if (!PORTAL_ROLES.includes(portal)) {
+      return res.status(400).json({ success: false, code: 'PORTAL_REQUIRED', message: 'portal is required for password reset.' });
+    }
+    const user = await findByEmailAndPortal(normalized, portal);
     if (!user) {
       return res.status(400).json({ message: 'Invalid or expired verification code' });
     }
 
-    const resetCheck = await consumePasswordReset({ email, otp });
+    const resetCheck = await consumePasswordReset({ userId: user._id, otp });
     const legacyOk = isOtpValid(user.resetPasswordOTP, user.resetPasswordOTPExpires, otp);
     if (!resetCheck.ok && !legacyOk) {
       return res.status(400).json({ message: 'Invalid or expired verification code' });
@@ -485,7 +615,6 @@ exports.resetPassword = async (req, res) => {
 };
 
 const VALID_ROLES = ['student', 'institution', 'company', 'admin'];
-const PORTAL_ROLES = ['student', 'institution', 'company'];
 const SELF_ASSIGNABLE_ROLES = ['student', 'institution', 'company'];
 
 exports.completeOnboarding = async (req, res) => {
@@ -500,7 +629,14 @@ exports.completeOnboarding = async (req, res) => {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    user.role = role;
+    if (user.role && user.role !== role) {
+      return res.status(409).json({
+        success: false,
+        code: 'ROLE_IMMUTABLE',
+        message: 'Portal role cannot be changed during onboarding. Create a separate portal account.',
+      });
+    }
+    if (!user.role) user.role = role;
     user.onboardingCompleted = true;
     if (typeof organizationName === 'string') user.organizationName = organizationName.trim();
     if (typeof learningGoal === 'string') user.learningGoal = learningGoal.trim();
@@ -605,7 +741,10 @@ exports.verifyPhoneOtp = async (req, res) => {
       user.phoneOTPExpires = null;
       await user.save();
 
-      return completeLoginSession(req, res, user, { remember: req.body?.remember !== false });
+      return completeLoginSession(req, res, user, {
+        remember: req.body?.remember !== false,
+        portal: challenge.portal || req.body?.portal || null,
+      });
     }
 
     await markVerified(phone);
@@ -623,129 +762,11 @@ exports.verifyPhoneOtp = async (req, res) => {
  * Create account only after Twilio phone verification.
  * POST /api/auth/register-verified
  */
-exports.registerVerified = async (req, res) => {
-  try {
-    const {
-      name,
-      email,
-      phone,
-      password,
-      confirmPassword,
-      portal,
-      organizationName,
-      learningGoal,
-    } = req.body;
-
-    if (!name || !email || !phone || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Name, email, mobile, and password are required',
-      });
-    }
-    if (!PORTAL_ROLES.includes(portal)) {
-      return res.status(400).json({
-        success: false,
-        message: 'portal must be student, institution, or company',
-      });
-    }
-    if (confirmPassword != null && password !== confirmPassword) {
-      return res.status(400).json({ success: false, message: 'Passwords do not match' });
-    }
-    if (String(password).length < 8 || !validatePasswordStrength(password).ok) {
-      return res.status(400).json({
-        success: false,
-        message: validatePasswordStrength(password).message || 'Password must be at least 8 characters',
-      });
-    }
-
-    const e164 = assertE164(phone);
-    if (!(await isPhoneVerified(e164))) {
-      return res.status(400).json({
-        success: false,
-        message: 'Verify your mobile number with OTP before creating an account.',
-        code: 'PHONE_NOT_VERIFIED',
-      });
-    }
-    // Consume verification so it cannot be reused for another signup
-    await consumeVerified(e164);
-
-    const normalized = String(email).toLowerCase().trim();
-    const existingEmail = await User.findOne({ email: normalized });
-    if (existingEmail && existingEmail.registrationComplete !== false) {
-      return res.status(400).json({ success: false, message: 'User already exists. Please sign in.' });
-    }
-    const existingPhone = await User.findOne({ phone: e164, registrationComplete: { $ne: false } });
-    if (existingPhone && String(existingPhone.email) !== normalized) {
-      return res.status(400).json({
-        success: false,
-        message: 'This mobile number is already registered.',
-      });
-    }
-
-    let user = existingEmail;
-    if (!user) {
-      user = new User({
-        name: String(name).trim(),
-        email: normalized,
-        password,
-        phone: e164,
-        phoneVerified: true,
-        emailVerified: true,
-        role: portal,
-        registrationComplete: true,
-        onboardingCompleted: true,
-        organizationName: typeof organizationName === 'string' ? organizationName.trim() : '',
-        learningGoal: typeof learningGoal === 'string' ? learningGoal.trim() : '',
-      });
-    } else {
-      user.name = String(name).trim();
-      user.password = password;
-      user.phone = e164;
-      user.phoneVerified = true;
-      user.emailVerified = true;
-      user.role = portal;
-      user.registrationComplete = true;
-      user.onboardingCompleted = true;
-      if (typeof organizationName === 'string') user.organizationName = organizationName.trim();
-      if (typeof learningGoal === 'string') user.learningGoal = learningGoal.trim();
-    }
-
-    // Clear any legacy hashed phone OTPs
-    user.phoneOTP = null;
-    user.phoneOTPExpires = null;
-    user.phoneOtpAttempts = 0;
-    await user.save();
-
-    try {
-      await sendWelcomeEmail({
-        to: user.email,
-        name: user.name,
-        portal: user.role || 'student',
-      });
-    } catch (mailErr) {
-      console.error('[auth] welcome email failed:', mailErr.message);
-    }
-
-    await bootstrapPortalProfile(user);
-    const ua = req.headers['user-agent'] || '';
-    const remember = req.body?.remember !== false;
-    const { token, refreshToken, ttl } = await issueSession(
-      user._id,
-      { userAgent: ua, ip: clientIp(req) },
-      { remember },
-    );
-    setRefreshCookie(res, refreshToken, ttl);
-    return res.status(201).json({
-      success: true,
-      message: 'Account created successfully',
-      token,
-      refreshToken,
-      user: publicUser(user),
-    });
-  } catch (error) {
-    return fail(res, error);
-  }
-};
+exports.registerVerified = async (_req, res) => res.status(410).json({
+  success: false,
+  code: 'REGISTRATION_FLOW_RETIRED',
+  message: 'Use the portal registration flow with email and mobile verification.',
+});
 
 // ── Portal registration (Twilio Verify for mobile) ────────────────────────────
 
@@ -759,14 +780,20 @@ exports.portalInit = async (req, res) => {
     }
 
     const normalized = String(email).toLowerCase().trim();
-    const existing = await User.findOne({ email: normalized });
+    const existing = await findByEmailAndPortal(normalized, portal);
     if (existing && existing.registrationComplete !== false) {
-      return res.status(400).json({ message: 'User already exists. Please sign in.' });
+      return res.status(400).json({
+        success: false,
+        message: portalAlreadyExistsMessage(portal),
+        code: 'PORTAL_EXISTS',
+        portal,
+      });
     }
 
     const tempPassword = crypto.randomBytes(24).toString('hex');
     let user = existing;
     if (!user) {
+      // Create a NEW portal profile even if the same email already has Student/other portals
       user = new User({
         name: String(name).trim(),
         email: normalized,
@@ -780,18 +807,19 @@ exports.portalInit = async (req, res) => {
       await user.save();
     } else {
       user.name = String(name).trim();
-      user.role = portal;
       user.emailVerified = false;
       await user.save();
     }
 
     await issueEmailOtp(user, 'verification');
+    const registrationToken = issueRegistrationChallenge(user, portal);
 
     res.status(201).json({
       success: true,
       message: 'Verification code sent to your email',
       email: normalized,
       portal,
+      registrationToken,
       step: 'verify-email',
       resendAfterSeconds: 60,
       expiresInSeconds: 300,
@@ -803,12 +831,16 @@ exports.portalInit = async (req, res) => {
 
 exports.portalSendPhone = async (req, res) => {
   try {
-    const { email, phone, countryCode } = req.body;
-    if (!email || !phone) {
-      return res.status(400).json({ message: 'Email and phone are required' });
+    const { phone, countryCode, portal, registrationToken } = req.body;
+    if (!phone || !registrationToken) {
+      return res.status(400).json({ message: 'Registration session and phone are required' });
+    }
+    if (!PORTAL_ROLES.includes(portal)) {
+      return res.status(400).json({ message: 'portal is required for registration' });
     }
 
-    const user = await User.findOne({ email: String(email).toLowerCase().trim() });
+    const registration = await readRegistrationAccount(registrationToken, portal);
+    const user = registration?.user;
     if (!user) {
       return res.status(404).json({ message: 'Registration session not found. Start again.' });
     }
@@ -825,7 +857,6 @@ exports.portalSendPhone = async (req, res) => {
 
     user.phone = e164;
     user.phoneVerified = false;
-    // Clear legacy self-managed OTP fields — Twilio Verify owns the code
     user.phoneOTP = null;
     user.phoneOTPExpires = null;
     user.phoneOtpAttempts = 0;
@@ -839,6 +870,7 @@ exports.portalSendPhone = async (req, res) => {
       message: 'OTP sent successfully.',
       phoneMasked: maskPhone(e164),
       step: 'verify-phone',
+      portal,
       resendAfterSeconds: 45,
       expiresInSeconds: 600,
     });
@@ -849,17 +881,25 @@ exports.portalSendPhone = async (req, res) => {
 
 exports.portalVerifyPhone = async (req, res) => {
   try {
-    const { email, otp, code } = req.body;
+    const { otp, code, portal, registrationToken } = req.body;
     const phoneCode = code || otp;
-    if (!email || !phoneCode) {
+    if (!registrationToken || !phoneCode) {
       return res.status(400).json({
         success: false,
         verified: false,
         message: 'Invalid or expired OTP.',
       });
     }
+    if (!PORTAL_ROLES.includes(portal)) {
+      return res.status(400).json({
+        success: false,
+        verified: false,
+        message: 'portal is required for registration',
+      });
+    }
 
-    const user = await User.findOne({ email: String(email).toLowerCase().trim() });
+    const registration = await readRegistrationAccount(registrationToken, portal);
+    const user = registration?.user;
     if (!user || !user.phone) {
       return res.status(400).json({
         success: false,
@@ -890,6 +930,7 @@ exports.portalVerifyPhone = async (req, res) => {
       verified: true,
       message: 'Mobile verified successfully',
       step: 'create-password',
+      portal,
       user: publicUser(user),
     });
   } catch (error) {
@@ -899,18 +940,23 @@ exports.portalVerifyPhone = async (req, res) => {
 
 exports.portalComplete = async (req, res) => {
   try {
-    const { email, password, confirmPassword, organizationName, learningGoal } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ message: 'Email and password are required' });
+    const { password, confirmPassword, organizationName, learningGoal, portal, registrationToken } = req.body;
+    if (!password) {
+      return res.status(400).json({ message: 'Password is required' });
+    }
+    if (!PORTAL_ROLES.includes(portal)) {
+      return res.status(400).json({ message: 'portal is required for registration' });
     }
     if (confirmPassword != null && password !== confirmPassword) {
       return res.status(400).json({ message: 'Passwords do not match' });
     }
-    if (String(password).length < 8) {
-      return res.status(400).json({ message: 'Password must be at least 8 characters' });
+    const strength = validatePasswordStrength(password);
+    if (!strength.ok) {
+      return res.status(400).json({ message: strength.message });
     }
 
-    const user = await User.findOne({ email: String(email).toLowerCase().trim() });
+    const registration = await readRegistrationAccount(registrationToken, portal);
+    const user = registration?.user;
     if (!user) return res.status(404).json({ message: 'Registration session not found' });
     if (!user.emailVerified || !user.phoneVerified) {
       return res.status(400).json({ message: 'Email and mobile must be verified first' });
@@ -929,13 +975,13 @@ exports.portalComplete = async (req, res) => {
       await sendWelcomeEmail({
         to: user.email,
         name: user.name,
-        portal: user.role || 'student',
+        portal: user.role || portal,
       });
     } catch (mailErr) {
       console.error('[auth] welcome email failed:', mailErr.message);
     }
 
-    return completeLoginSession(req, res, user);
+    return completeLoginSession(req, res, user, { portal });
   } catch (error) {
     return fail(res, error);
   }
@@ -943,9 +989,12 @@ exports.portalComplete = async (req, res) => {
 
 exports.portalResendPhone = async (req, res) => {
   try {
-    const { email } = req.body;
-    const user = await User.findOne({ email: String(email || '').toLowerCase().trim() });
+    const { portal, registrationToken } = req.body;
     const base = { success: true, message: 'If registration is in progress, a new code was sent.' };
+    if (!PORTAL_ROLES.includes(portal)) return res.json(base);
+
+    const registration = await readRegistrationAccount(registrationToken, portal);
+    const user = registration?.user;
     if (!user || !user.phone) return res.json(base);
 
     await twilioSendOTP(user.phone);
@@ -955,6 +1004,7 @@ exports.portalResendPhone = async (req, res) => {
     res.json({
       ...base,
       message: 'OTP sent successfully.',
+      portal,
       resendAfterSeconds: 45,
       expiresInSeconds: 600,
     });
@@ -978,18 +1028,35 @@ exports.verifyLoginEmailOtp = async (req, res) => {
     if (!user || user.email !== challenge.email) {
       return res.status(401).json({ success: false, message: 'Login session expired. Sign in again.' });
     }
-    assertAttempts(user.emailOtpAttempts);
-    if (!isOtpValid(user.verificationOTP, user.verificationOTPExpires, tokenOtp)) {
-      user.emailOtpAttempts = (user.emailOtpAttempts || 0) + 1;
-      await user.save();
-      return res.status(400).json({ success: false, message: 'Invalid or expired verification code' });
+    // Challenge portal must match this account — never mix Student/Institution/Company OTP
+    const portal = challenge.portal || req.body?.portal || null;
+    if (portal && user.role && user.role !== portal && user.role !== 'admin') {
+      return res.status(403).json(wrongPortalPayload(portal, [user.role]));
+    }
+
+    const checked = await verifySecureEmailOtp({
+      email: user.email,
+      purpose: 'login',
+      otp: tokenOtp,
+      userId: user._id,
+    });
+    if (!checked.ok) {
+      assertAttempts(user.emailOtpAttempts);
+      if (!isOtpValid(user.verificationOTP, user.verificationOTPExpires, tokenOtp)) {
+        user.emailOtpAttempts = (user.emailOtpAttempts || 0) + 1;
+        await user.save();
+        return res.status(400).json({ success: false, message: 'Invalid or expired verification code' });
+      }
     }
     user.verificationOTP = null;
     user.verificationOTPExpires = null;
     user.emailOtpAttempts = 0;
     user.emailVerified = true;
     await user.save();
-    return completeLoginSession(req, res, user, { remember: req.body?.remember !== false });
+    return completeLoginSession(req, res, user, {
+      remember: req.body?.remember !== false,
+      portal: portal || user.role,
+    });
   } catch (error) {
     return fail(res, error);
   }
@@ -1018,7 +1085,6 @@ exports.refresh = async (req, res) => {
     res.json({
       success: true,
       token: rotated.accessToken,
-      refreshToken: rotated.refreshToken,
       user: publicUser(user),
     });
   } catch (error) {

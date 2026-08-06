@@ -1,13 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
+import { PORTAL_LOGIN } from '../../auth/portalSession'
+import { Button, Card, Dialog, EmptyState, ErrorState, LoadingState } from '../ui'
+import './device-sessions.css'
 
 export default function DeviceSessions() {
-  const { listSessions, revokeSession, revokeAllSessions, logout } = useAuth()
+  const { user, listSessions, revokeSession, revokeAllSessions, logout } = useAuth()
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [confirmAction, setConfirmAction] = useState(null)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true); setError('')
     try {
       const { data } = await listSessions()
@@ -17,15 +21,13 @@ export default function DeviceSessions() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [listSessions])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
 
   const onRevoke = async (id, isCurrent) => {
     if (isCurrent) {
-      if (!confirm('Sign out this device?')) return
-      await logout(false)
-      window.location.href = '/student/login'
+      setConfirmAction({ type: 'current', id })
       return
     }
     await revokeSession(id)
@@ -33,39 +35,38 @@ export default function DeviceSessions() {
   }
 
   const onRevokeAll = async () => {
-    if (!confirm('Sign out all devices? You will need to sign in again.')) return
-    await revokeAllSessions()
-    await logout(false)
-    window.location.href = '/'
+    setConfirmAction({ type: 'all' })
+  }
+
+  const confirmRevoke = async () => {
+    const action = confirmAction
+    setConfirmAction(null)
+    if (action?.type === 'all') {
+      await revokeAllSessions()
+      await logout(false)
+    } else {
+      await logout(false)
+    }
+    window.location.assign(PORTAL_LOGIN[user?.role] || '/')
   }
 
   return (
-    <div className="card">
-      <h3 style={{ marginBottom: 14 }}>Device sessions</h3>
-      {loading && <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Loading…</p>}
-      {error && <div className="alert alert-error">{error}</div>}
+    <Card className="device-sessions">
+      <h3>Device sessions</h3>
+      {loading && <LoadingState label="Loading sessions…" rows={2} />}
+      {error && <ErrorState message={error} onRetry={load} />}
       {!loading && sessions.length === 0 && (
-        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No active sessions.</p>
+        <EmptyState title="No active sessions" message="Your signed-in devices will appear here." />
       )}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="device-sessions__list">
         {sessions.map((s) => (
-          <div
-            key={s.id}
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              gap: 12,
-              padding: '10px 0',
-              borderBottom: '1px solid var(--border)',
-            }}
-          >
+          <div key={s.id} className="device-sessions__row">
             <div>
-              <div style={{ fontWeight: 500, fontSize: '0.875rem' }}>
+              <div className="device-sessions__name">
                 {s.device || 'Device'} · {s.browser || 'Browser'}
                 {s.current ? ' · This device' : ''}
               </div>
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              <div className="device-sessions__meta">
                 Login {s.loginAt ? new Date(s.loginAt).toLocaleString() : '—'}
                 {' · '}
                 Last activity {s.lastActivity || s.lastUsedAt
@@ -74,17 +75,27 @@ export default function DeviceSessions() {
                 {s.remember ? ' · Remembered' : ' · Short session'}
               </div>
             </div>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => onRevoke(s.id, s.current)}>
-              Revoke
-            </button>
+            <Button variant="ghost" className="btn-sm" onClick={() => onRevoke(s.id, s.current)}>Revoke</Button>
           </div>
         ))}
       </div>
       {sessions.length > 1 && (
-        <button type="button" className="btn btn-secondary btn-sm" style={{ marginTop: 12 }} onClick={onRevokeAll}>
+        <Button variant="secondary" className="btn-sm device-sessions__all" onClick={onRevokeAll}>
           Sign out all devices
-        </button>
+        </Button>
       )}
-    </div>
+      <Dialog
+        open={Boolean(confirmAction)}
+        title={confirmAction?.type === 'all' ? 'Sign out all devices?' : 'Sign out this device?'}
+        description="You will need to sign in again."
+        onClose={() => setConfirmAction(null)}
+        actions={(
+          <>
+            <Button variant="ghost" onClick={() => setConfirmAction(null)}>Cancel</Button>
+            <Button variant="danger" onClick={confirmRevoke}>Sign out</Button>
+          </>
+        )}
+      />
+    </Card>
   )
 }

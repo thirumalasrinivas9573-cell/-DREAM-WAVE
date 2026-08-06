@@ -5,6 +5,14 @@ import '../styles/company.css'
 export default function CompanySignup() {
   const t = COMPANY_THEME
   return (
-    <PortalSignupForm portal="company" portalLabel="Company" icon="🏢" accent={t.accent} accentLight={t.accentLight} loginPath={companyPath('login')} cssClass="company-module" />
+    <PortalSignupForm
+      portal="company"
+      portalLabel="Company"
+      icon="🏢"
+      accent={t.accent}
+      accentLight={t.accentLight}
+      loginPath={companyPath('login')}
+      cssClass="company-module"
+    />
   )
 }

@@ -1,29 +1,61 @@
 import { useEffect, useState } from 'react'
-import { companyApi } from '@shared/services/api'
-import { COMPANY_THEME } from '../theme'
+import CompanyPageHeader from '../components/CompanyPageHeader'
+import { companyService } from '../services/api'
 
 export default function Reports() {
-  const [stats, setStats] = useState(null)
+  const [report, setReport] = useState(null)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    companyApi.dashboard().then(r => setStats(r.data.stats)).catch(() => {})
-  }, [])
+  const load = () => {
+    setLoading(true)
+    companyService.reports()
+      .then((r) => setReport(r.data.report))
+      .catch((err) => setError(err.response?.data?.message || 'Report failed'))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { load() }, [])
+
+  const download = () => {
+    if (!report) return
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `company-report-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const s = report?.summaries || {}
 
   return (
     <div>
-      <h1 style={{ color: COMPANY_THEME.accentLight }}>📋 Reports</h1>
-      <div className="company-glass">
-        {!stats ? <p>Loading...</p> : (
-          <ul style={{ lineHeight: 1.9 }}>
-            <li>Employees: {stats.employees}</li>
-            <li>Open Jobs: {stats.jobs}</li>
-            <li>Internships: {stats.internships}</li>
-            <li>Total Applications: {stats.applications}</li>
-            <li>Departments: {stats.departments}</li>
-            <li>Events: {stats.events}</li>
-          </ul>
+      <CompanyPageHeader
+        title="Reports"
+        subtitle="Hiring, applications, interviews, and internship operational reports."
+        actions={(
+          <>
+            <button type="button" className="company-btn company-btn-secondary" onClick={load}>Regenerate</button>
+            <button type="button" className="company-btn company-btn-primary" onClick={download} disabled={!report}>Download JSON</button>
+          </>
         )}
-      </div>
+      />
+      {error && <div role="alert" style={{ color: '#F87171' }}>{error}</div>}
+      {loading ? <p style={{ color: '#94A3B8' }}>Generating…</p> : report && (
+        <>
+          <p style={{ color: '#94A3B8', fontSize: '0.85rem' }}>{report.company?.name} · {new Date(report.generatedAt).toLocaleString()}</p>
+          <div className="company-stat-grid">
+            {Object.entries(s).map(([k, v]) => (
+              <div key={k} className="company-glass" style={{ padding: 14 }}>
+                <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#60A5FA' }}>{v}</div>
+                <div style={{ fontSize: '0.78rem', color: '#94A3B8' }}>{k}</div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   )
 }

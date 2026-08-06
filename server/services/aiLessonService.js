@@ -1,6 +1,6 @@
 const { robustAiCall } = require('./openaiService')
-const OpenAI = require('openai')
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+const { getOpenAI } = require('../utils/openaiClient')
+const client = new Proxy({}, { get(_t, p) { return getOpenAI()[p]; } })
 
 // ── AI Lesson Generator — Cinematic Learning Engine ───────────────────────────
 // Generates structured video-style lessons with scenes, narration, visuals

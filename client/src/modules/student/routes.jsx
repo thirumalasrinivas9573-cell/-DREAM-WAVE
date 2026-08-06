@@ -6,15 +6,26 @@ const Goals         = lazy(() => import('./pages/Goals'))
 const Roadmap       = lazy(() => import('./pages/Roadmap'))
 const Learn         = lazy(() => import('./pages/Learn'))
 const Tasks         = lazy(() => import('./pages/Tasks'))
+const StudyPlanner  = lazy(() => import('./pages/StudyPlanner'))
+const FocusMode     = lazy(() => import('./pages/FocusMode'))
 const Mentor        = lazy(() => import('./pages/Mentor'))
 const Reports       = lazy(() => import('./pages/Reports'))
 const Resume        = lazy(() => import('./pages/Resume'))
+const CareerHub     = lazy(() => import('../career/pages/CareerDashboard'))
+const JobExplorer   = lazy(() => import('../career/pages/OpportunityExplorer').then((module) => ({ default: module.JobExplorer })))
+const InternshipExplorer = lazy(() => import('../career/pages/OpportunityExplorer').then((module) => ({ default: module.InternshipExplorer })))
+const ApplicationTracker = lazy(() => import('../career/pages/ApplicationTracker'))
 const Books         = lazy(() => import('./pages/Books'))
 const Community     = lazy(() => import('./pages/Community'))
 const Profile       = lazy(() => import('./pages/Profile'))
 const Settings      = lazy(() => import('./pages/Settings'))
 const Certificates  = lazy(() => import('./pages/CertificatesPage'))
 const Analytics     = lazy(() => import('./pages/AnalyticsPage'))
+const IntelligenceHome = lazy(() => import('./pages/IntelligenceHome'))
+const ResearchHome = lazy(() => import('./pages/ResearchHome'))
+const ResearchWorkspace = lazy(() => import('./pages/ResearchWorkspace'))
+const AcademicsHome = lazy(() => import('./pages/AcademicsHome'))
+const SubjectWorkspace = lazy(() => import('./pages/SubjectWorkspace'))
 
 function Loader() {
   return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}><div className="spinner spinner-lg" /></div>
@@ -29,9 +40,21 @@ export default function StudentRoutes() {
         <Route path="roadmap" element={<Roadmap />} />
         <Route path="learn" element={<Learn />} />
         <Route path="tasks" element={<Tasks />} />
+        <Route path="planner" element={<StudyPlanner />} />
+        <Route path="focus" element={<FocusMode />} />
         <Route path="mentor" element={<Mentor />} />
+        <Route path="intelligence" element={<IntelligenceHome />} />
+        <Route path="research" element={<ResearchHome />} />
+        <Route path="research/:id" element={<ResearchWorkspace />} />
+        <Route path="academics" element={<AcademicsHome />} />
+        <Route path="academics/subjects/:id" element={<SubjectWorkspace />} />
         <Route path="reports" element={<Reports />} />
         <Route path="resume" element={<Resume />} />
+        <Route path="career" element={<CareerHub />} />
+        <Route path="career/resume" element={<Resume />} />
+        <Route path="career/jobs" element={<JobExplorer />} />
+        <Route path="career/internships" element={<InternshipExplorer />} />
+        <Route path="career/applications" element={<ApplicationTracker />} />
         <Route path="books" element={<Books />} />
         <Route path="community" element={<Community />} />
         <Route path="profile" element={<Profile />} />

@@ -16,7 +16,7 @@ const otpSchema = new mongoose.Schema({
   },
   channel: { type: String, enum: ['email', 'sms'], default: 'email' },
   codeHash: { type: String, required: true },
-  expiresAt: { type: Date, required: true, index: true },
+  expiresAt: { type: Date, required: true },
   attempts: { type: Number, default: 0 },
   maxAttempts: { type: Number, default: 5 },
   consumedAt: { type: Date, default: null },

@@ -1,10 +1,21 @@
+/**
+ * Institution Portal theme — professional academic (White / Navy / Blue / Emerald).
+ * Independent from Student and Company portals.
+ */
 export const INSTITUTION_THEME = {
   id: 'institution',
-  accent: '#F59E0B',
-  accentLight: '#FCD34D',
-  bg: '#120F08',
-  card: 'rgba(24,18,8,0.92)',
   name: 'institution',
+  accent: '#1E3A5F',
+  accentMid: '#2563EB',
+  accentLight: '#3B82F6',
+  emerald: '#059669',
+  emeraldSoft: '#10B981',
+  bg: '#F8FAFC',
+  bgSoft: '#EEF2FF',
+  card: '#FFFFFF',
+  text: '#0F172A',
+  muted: '#64748B',
+  border: '#E2E8F0',
   css: {
     card: 'inst-card',
     input: 'inst-input',
@@ -13,4 +24,4 @@ export const INSTITUTION_THEME = {
   },
 }
 
-export const institutionPath = (p = '') => `/institution/${p}`.replace(/\/$/, '')
+export const institutionPath = (p = '') => `/institution/${String(p).replace(/^\//, '')}`.replace(/\/$/, '') || '/institution'

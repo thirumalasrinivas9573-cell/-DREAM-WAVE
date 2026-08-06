@@ -2,8 +2,7 @@
 // Each agent has a distinct personality, focus area, and system prompt.
 // The user's tone preference and history summary are injected for personalization.
 
-const OpenAI = require('openai')
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+const { openai } = require('../utils/openaiClient')
 
 // ── Agent definitions ─────────────────────────────────────────────────────────
 const AGENTS = {

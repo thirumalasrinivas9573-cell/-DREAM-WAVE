@@ -1,4 +1,5 @@
 const { robustAiCall } = require("./openaiService");
+const { validateRoadmapPayload } = require("./roadmapValidator");
 
 // ── Fallback used when AI quota is exhausted or call fails ────────────────────
 const FALLBACK_ROADMAP = {
@@ -252,13 +253,31 @@ Requirements:
 
   const result = await robustAiCall(messages, "gpt-4o", FALLBACK_ROADMAP);
 
-  // Validate minimum required structure
   if (!result.nextSteps || !Array.isArray(result.nextSteps)) {
     console.warn("[aiRoadmapService] AI returned invalid structure, using fallback.");
     return FALLBACK_ROADMAP;
   }
 
-  return result;
+  const validated = validateRoadmapPayload(result);
+  if (!validated.valid) {
+    console.warn("[aiRoadmapService] AI roadmap failed validation:", validated.errors.join('; '));
+    return FALLBACK_ROADMAP;
+  }
+
+  return {
+    ...result,
+    nextSteps: validated.data.nextSteps.length ? validated.data.nextSteps : result.nextSteps,
+    learningStages: validated.data.learningStages.length
+      ? validated.data.learningStages
+      : result.nextSteps.map((step, index) => ({
+        title: step.title || `Step ${step.step || index + 1}`,
+        description: step.description || '',
+        order: index + 1,
+        status: index === 0 ? 'available' : 'locked',
+        progress: step.completed ? 100 : 0,
+      })),
+    milestones: validated.data.milestones.length ? validated.data.milestones : result.milestones,
+  };
 };
 
 exports.FALLBACK_ROADMAP = FALLBACK_ROADMAP;

@@ -84,8 +84,9 @@ async function issueSecureEmailOtp({ user, purpose, emailFn }) {
   const codeHash = hashOtp(otp);
   const expiresAt = new Date(Date.now() + OTP_TTL_MS);
 
+  // Scope by userId so Student / Institution / Company OTPs never mix for the same email
   await Otp.updateMany(
-    { email: user.email, purpose, consumedAt: null },
+    { userId: user._id, purpose, consumedAt: null },
     { $set: { consumedAt: new Date() } },
   );
   await Otp.create({
@@ -116,14 +117,17 @@ async function issueSecureEmailOtp({ user, purpose, emailFn }) {
   return { expiresAt };
 }
 
-async function verifySecureEmailOtp({ email, purpose, otp }) {
+async function verifySecureEmailOtp({ email, purpose, otp, userId = null }) {
   const normalized = String(email).toLowerCase().trim();
-  const doc = await Otp.findOne({
-    email: normalized,
+  const query = {
     purpose,
     consumedAt: null,
     expiresAt: { $gt: new Date() },
-  }).sort({ createdAt: -1 });
+  };
+  if (userId) query.userId = userId;
+  else query.email = normalized;
+
+  const doc = await Otp.findOne(query).sort({ createdAt: -1 });
 
   if (!doc) {
     return { ok: false, message: 'Invalid or expired verification code' };
@@ -175,10 +179,10 @@ async function createPasswordReset({ user, req, emailFn }) {
   await emailFn({ to: user.email, name: user.name, otp });
 }
 
-async function consumePasswordReset({ email, otp }) {
-  const normalized = String(email).toLowerCase().trim();
+async function consumePasswordReset({ userId, otp }) {
+  if (!userId) return { ok: false };
   const doc = await PasswordReset.findOne({
-    email: normalized,
+    userId,
     consumedAt: null,
     expiresAt: { $gt: new Date() },
   }).sort({ createdAt: -1 });
@@ -186,13 +190,18 @@ async function consumePasswordReset({ email, otp }) {
   if (!doc) return { ok: false };
   assertAttempts(doc.attempts);
   if (!isOtpValid(doc.codeHash, doc.expiresAt, otp)) {
-    doc.attempts += 1;
-    await doc.save();
+    await PasswordReset.updateOne(
+      { _id: doc._id, consumedAt: null },
+      { $inc: { attempts: 1 } },
+    );
     return { ok: false };
   }
-  doc.consumedAt = new Date();
-  await doc.save();
-  return { ok: true, doc };
+  const consumed = await PasswordReset.findOneAndUpdate(
+    { _id: doc._id, userId, consumedAt: null, expiresAt: { $gt: new Date() } },
+    { $set: { consumedAt: new Date() } },
+    { new: true },
+  );
+  return consumed ? { ok: true, doc: consumed } : { ok: false };
 }
 
 async function assertPasswordNotReused(user, newPassword) {

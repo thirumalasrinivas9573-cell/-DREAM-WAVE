@@ -9,4 +9,7 @@ const phoneOtpStateSchema = new mongoose.Schema({
   verifiedUntil: { type: Date, default: null },
 }, { timestamps: true });
 
+// OTP send/verification state is short lived; prevent unbounded collection growth.
+phoneOtpStateSchema.index({ updatedAt: 1 }, { expireAfterSeconds: 24 * 60 * 60 });
+
 module.exports = mongoose.model('PhoneOtpState', phoneOtpStateSchema);

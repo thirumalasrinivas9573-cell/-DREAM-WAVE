@@ -1,27 +1,32 @@
 const express = require('express')
 const router  = express.Router()
-console.log('Tasks route loading...')
 const auth    = require('../middleware/auth')
 const {
   getTasks,
+  getTask,
+  getAnalytics,
   createTask,
   updateTask,
+  duplicateTask,
   deleteTask,
+  startFocus,
+  stopFocus,
   generateFromRoadmap,
 } = require('../controllers/taskController')
 
 router.get('/',       auth, getTasks)
-router.post('/generate-from-roadmap', auth, (req, res, next) => {
-  console.log('POST /api/tasks/generate-from-roadmap hit!')
-  generateFromRoadmap(req, res, next)
-})
+router.get('/analytics', auth, getAnalytics)
+router.post('/generate-from-roadmap', auth, generateFromRoadmap)
 router.post('/',      auth, createTask)
+router.get('/:id',    auth, getTask)
 router.put('/:id',    auth, updateTask)
+router.post('/:id/duplicate', auth, duplicateTask)
+router.post('/:id/focus/start', auth, startFocus)
+router.post('/:id/focus/stop', auth, stopFocus)
 router.delete('/:id', auth, deleteTask)
 
 router.use('*', (req, res) => {
-  console.log(`Task Router 404 hit for ${req.method} ${req.originalUrl}`)
-  res.status(404).json({ message: `Task Router: Route ${req.originalUrl} not found` })
+  res.status(404).json({ success: false, code: 'NOT_FOUND', message: 'Task route not found.' })
 })
 
 module.exports = router

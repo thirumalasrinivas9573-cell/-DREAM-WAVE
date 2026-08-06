@@ -11,9 +11,11 @@ const userSchema = new mongoose.Schema({
   email: {
     type: String,
     required: true,
-    unique: true,
+    // Not globally unique — one email may own Student + Institution + Company accounts.
+    // Uniqueness is (email, role); see compound index below.
     lowercase: true,
-    trim: true
+    trim: true,
+    index: true,
   },
   password: {
     type: String,
@@ -155,6 +157,9 @@ const userSchema = new mongoose.Schema({
   lockUntil: { type: Date, default: null },
   passwordHistory: { type: [String], default: [] },
 });
+
+// One portal account per email (student / institution / company / admin)
+userSchema.index({ email: 1, role: 1 }, { unique: true });
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {

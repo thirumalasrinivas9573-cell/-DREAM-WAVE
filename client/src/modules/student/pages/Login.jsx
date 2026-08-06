@@ -1,118 +1,14 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '@shared/context/AuthContext'
-import { authApi } from '@shared/services/api'
+import { Link } from 'react-router-dom'
 import NeuralBg from '@shared/components/animations/NeuralBg'
 import OtpInput from '@shared/components/auth/OtpInput'
+import usePortalAuth from '@shared/auth/usePortalAuth'
 
 /**
- * Student login — NeuralBg shell preserved (student portal look).
- * Auth only: email/mobile + password + OTP. No Framer Motion.
+ * Student login — NeuralBg shell preserved.
+ * Auth via shared portal auth (email/mobile + password + email/mobile OTP).
  */
 export default function Login() {
-  const { login, verifyLoginEmailOtp, verifyPhoneOtp, rememberedEmail } = useAuth()
-  const navigate = useNavigate()
-
-  const [identifier, setIdentifier] = useState(rememberedEmail())
-  const [password, setPassword] = useState('')
-  const [remember, setRemember] = useState(Boolean(rememberedEmail()))
-  const [error, setError] = useState('')
-  const [info, setInfo] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [step, setStep] = useState('credentials')
-  const [challenge, setChallenge] = useState(null)
-  const [otp, setOtp] = useState('')
-  const [forgot, setForgot] = useState(false)
-  const [resetEmail, setResetEmail] = useState('')
-  const [resetOtp, setResetOtp] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-
-  const goDashboard = () => navigate('/student/dashboard')
-  const rememberKey = identifier.includes('@') ? identifier : null
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError(''); setInfo(''); setLoading(true)
-    try {
-      let data
-      try {
-        data = await login(identifier, password, 'student', { remember, otpChannel: 'phone' })
-      } catch (err) {
-        if (err.response?.data?.code === 'PHONE_REQUIRED') {
-          data = await login(identifier, password, 'student', { remember, otpChannel: 'email' })
-        } else {
-          throw err
-        }
-      }
-      if (data.requiresOtp) {
-        setChallenge(data)
-        setStep('otp')
-        setInfo(data.requiresEmailOtp
-          ? `Code sent to ${data.email || identifier}`
-          : `Code sent to ${data.phoneMasked || 'your phone'}`)
-        return
-      }
-      goDashboard()
-    } catch (err) {
-      setError(err.response?.data?.message || 'Invalid email/mobile or password.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleOtp = async (e) => {
-    e.preventDefault()
-    if (otp.length < 6) return setError('Enter the 6-digit code')
-    setError(''); setLoading(true)
-    try {
-      if (challenge.requiresEmailOtp || challenge.otpChannel === 'email') {
-        await verifyLoginEmailOtp(challenge.challengeToken, otp, remember ? rememberKey : null, remember)
-      } else {
-        await verifyPhoneOtp({
-          code: otp,
-          challengeToken: challenge.challengeToken,
-        }, remember ? rememberKey : null, remember)
-      }
-      goDashboard()
-    } catch (err) {
-      setError(err.response?.data?.message || 'Invalid or expired code.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleForgot = async (e) => {
-    e.preventDefault()
-    setError(''); setLoading(true)
-    try {
-      await authApi.forgotPassword({ email: resetEmail || (identifier.includes('@') ? identifier : '') })
-      setInfo('If an account exists, a reset code was sent to your email.')
-      setForgot('otp')
-    } catch (err) {
-      setError(err.response?.data?.message || 'Could not send reset code.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleReset = async (e) => {
-    e.preventDefault()
-    setError(''); setLoading(true)
-    try {
-      await authApi.resetPassword({
-        email: resetEmail || identifier,
-        otp: resetOtp,
-        password: newPassword,
-      })
-      setInfo('Password updated. Sign in with your new password.')
-      setForgot(false)
-      setStep('credentials')
-    } catch (err) {
-      setError(err.response?.data?.message || 'Reset failed.')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const auth = usePortalAuth('student')
 
   return (
     <div className="auth-page" style={{ position: 'relative', overflow: 'hidden' }}>
@@ -129,71 +25,98 @@ export default function Login() {
 
         <div className="card" style={{ background: 'rgba(13,13,23,0.9)', border: '1px solid rgba(139,92,246,0.2)' }}>
           <h2 style={{ marginBottom: 22, fontSize: '1.25rem' }}>
-            {forgot ? 'Reset password' : step === 'otp' ? 'Verify code' : 'Welcome back'}
+            {auth.forgot ? 'Reset password' : auth.step === 'otp' ? 'Verify code' : 'Welcome back'}
           </h2>
 
-          {forgot === 'otp' ? (
-            <form onSubmit={handleReset} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {info && <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>{info}</p>}
-              <OtpInput value={resetOtp} onChange={setResetOtp} accent="#8B5CF6" />
+          {auth.forgot === 'otp' ? (
+            <form onSubmit={auth.handleReset} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {auth.info && <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>{auth.info}</p>}
+              <OtpInput value={auth.resetOtp} onChange={auth.setResetOtp} accent="#8B5CF6" />
               <div className="form-group">
                 <label className="label">New password</label>
-                <input type="password" className="input" value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
+                <input type="password" className="input" value={auth.newPassword} onChange={(e) => auth.setNewPassword(e.target.value)}
                   placeholder="Letter + number, 8+" required minLength={8} autoComplete="new-password" />
               </div>
-              {error && <div className="alert alert-error">{error}</div>}
-              <button type="submit" className="btn btn-primary btn-lg" disabled={loading} style={{ width: '100%' }}>
-                {loading ? 'Updating…' : 'Reset Password'}
+              {auth.error && <div className="alert alert-error">{auth.error}</div>}
+              <button type="submit" className="btn btn-primary btn-lg" disabled={auth.loading} style={{ width: '100%' }}>
+                {auth.loading ? 'Updating…' : 'Reset Password'}
               </button>
-              <button type="button" className="btn btn-ghost" onClick={() => setForgot(false)}>← Back to login</button>
+              <button type="button" className="btn btn-ghost" onClick={() => auth.setForgot(false)}>← Back to login</button>
             </form>
-          ) : forgot ? (
-            <form onSubmit={handleForgot} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          ) : auth.forgot ? (
+            <form onSubmit={auth.handleForgot} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div className="form-group">
                 <label className="label">Email address</label>
-                <input type="email" className="input" value={resetEmail || (identifier.includes('@') ? identifier : '')}
-                  onChange={(e) => setResetEmail(e.target.value)} required autoComplete="email" />
+                <input type="email" className="input" value={auth.resetEmail || (String(auth.identifier).includes('@') ? auth.identifier : '')}
+                  onChange={(e) => auth.setResetEmail(e.target.value)} required autoComplete="email" />
               </div>
-              {error && <div className="alert alert-error">{error}</div>}
-              <button type="submit" className="btn btn-primary btn-lg" disabled={loading} style={{ width: '100%' }}>
-                {loading ? 'Sending…' : 'Send Reset Code'}
+              {auth.error && <div className="alert alert-error">{auth.error}</div>}
+              <button type="submit" className="btn btn-primary btn-lg" disabled={auth.loading} style={{ width: '100%' }}>
+                {auth.loading ? 'Sending…' : 'Send Reset Code'}
               </button>
-              <button type="button" className="btn btn-ghost" onClick={() => setForgot(false)}>← Back to login</button>
+              <button type="button" className="btn btn-ghost" onClick={() => auth.setForgot(false)}>← Back to login</button>
             </form>
-          ) : step === 'otp' ? (
-            <form onSubmit={handleOtp} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>{info}</p>
-              <OtpInput value={otp} onChange={setOtp} accent="#8B5CF6" />
-              {error && <div className="alert alert-error">{error}</div>}
-              <button type="submit" className="btn btn-primary btn-lg" disabled={loading || otp.length < 6} style={{ width: '100%' }}>
-                {loading ? 'Verifying…' : 'Verify & Sign In →'}
+          ) : auth.step === 'otp' ? (
+            <form onSubmit={auth.handleOtp} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>{auth.info}</p>
+              <OtpInput value={auth.otp} onChange={auth.setOtp} accent="#8B5CF6" />
+              {auth.error && <div className="alert alert-error">{auth.error}</div>}
+              <button type="submit" className="btn btn-primary btn-lg" disabled={auth.loading || auth.otp.length < 6} style={{ width: '100%' }}>
+                {auth.loading ? 'Verifying…' : 'Verify & Sign In →'}
               </button>
-              <button type="button" className="btn btn-ghost" onClick={() => { setStep('credentials'); setOtp(''); setError('') }}>← Back</button>
+              <button type="button" className="btn btn-ghost" onClick={auth.backToCredentials}>← Back</button>
             </form>
           ) : (
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <form onSubmit={auth.handleCredentials} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div className="form-group">
                 <label className="label">Email or mobile</label>
-                <input type="text" className="input" value={identifier} onChange={(e) => setIdentifier(e.target.value)}
+                <input type="text" className="input" value={auth.identifier} onChange={(e) => auth.setIdentifier(e.target.value)}
                   placeholder="you@example.com or +91…" required autoComplete="username" />
               </div>
               <div className="form-group">
                 <label className="label">Password</label>
-                <input type="password" className="input" value={password} onChange={(e) => setPassword(e.target.value)}
+                <input type="password" className="input" value={auth.password} onChange={(e) => auth.setPassword(e.target.value)}
                   placeholder="••••••••" required autoComplete="current-password" />
               </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className={`btn ${auth.otpChannel === 'email' ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ flex: 1, fontSize: '0.8rem' }}
+                  onClick={() => auth.setOtpChannel('email')}
+                >
+                  Email OTP
+                </button>
+                <button
+                  type="button"
+                  className={`btn ${auth.otpChannel === 'phone' ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ flex: 1, fontSize: '0.8rem' }}
+                  onClick={() => auth.setOtpChannel('phone')}
+                >
+                  Mobile OTP
+                </button>
+              </div>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.845rem', color: 'var(--text-muted)' }}>
-                <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+                <input type="checkbox" checked={auth.remember} onChange={(e) => auth.setRemember(e.target.checked)} />
                 Remember me
               </label>
-              {error && <div className="alert alert-error">{error}</div>}
-              {info && <div className="alert alert-success">{info}</div>}
-              <button type="submit" className="btn btn-primary btn-lg" disabled={loading} style={{ marginTop: 4, width: '100%' }}>
-                {loading ? <><div className="spinner" style={{ borderTopColor: 'white' }} /> Signing in…</> : 'Sign In →'}
+              {auth.error && <div className="alert alert-error">{auth.error}</div>}
+              {auth.signupCta && (
+                <Link
+                  to={auth.signupCta}
+                  className="btn btn-secondary"
+                  style={{ width: '100%', textAlign: 'center', textDecoration: 'none' }}
+                >
+                  Create Student Account
+                </Link>
+              )}
+              {auth.info && <div className="alert alert-success">{auth.info}</div>}
+              <button type="submit" className="btn btn-primary btn-lg" disabled={auth.loading} style={{ marginTop: 4, width: '100%' }}>
+                {auth.loading ? <><div className="spinner" style={{ borderTopColor: 'white' }} /> Signing in…</> : 'Sign In →'}
               </button>
               <button
                 type="button"
-                onClick={() => { setForgot(true); setResetEmail(identifier.includes('@') ? identifier : ''); setError(''); setInfo('') }}
+                onClick={() => { auth.setForgot(true); auth.setResetEmail(String(auth.identifier).includes('@') ? auth.identifier : ''); auth.setError(''); auth.setInfo('') }}
                 style={{ background: 'none', border: 'none', color: 'var(--purple-light)', cursor: 'pointer', fontSize: '0.845rem' }}
               >
                 Forgot password?
@@ -201,10 +124,12 @@ export default function Login() {
             </form>
           )}
 
-          {!forgot && step === 'credentials' && (
+          {!auth.forgot && auth.step === 'credentials' && (
             <p style={{ marginTop: 18, textAlign: 'center', fontSize: '0.845rem', color: 'var(--text-muted)' }}>
               New to Dream Wave?{' '}
               <Link to="/student/signup" style={{ color: 'var(--purple-light)', fontWeight: 600 }}>Create account</Link>
+              <br />
+              <Link to="/" style={{ color: 'var(--purple-light)' }}>← Back to portal selection</Link>
             </p>
           )}
         </div>

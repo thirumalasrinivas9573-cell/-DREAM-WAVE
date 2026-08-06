@@ -1,0 +1,190 @@
+.academics-shell {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 24px 20px 48px;
+  display: grid;
+  gap: 20px;
+}
+
+.academics-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 24px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(139, 92, 246, 0.08));
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.academics-hero span {
+  color: #93c5fd;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.academics-hero h1 {
+  margin: 8px 0;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+}
+
+.academics-hero__stats {
+  display: flex;
+  gap: 16px;
+}
+
+.academics-hero__stats div {
+  min-width: 88px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.55);
+  text-align: center;
+}
+
+.academics-hero__stats strong {
+  display: block;
+  font-size: 1.4rem;
+}
+
+.academics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.academics-panel,
+.academics-setup {
+  padding: 18px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.academics-panel header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.academics-form,
+.academics-inline-form {
+  display: grid;
+  gap: 10px;
+}
+
+.academics-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+
+.academics-form input,
+.academics-form textarea,
+.academics-inline-form input,
+.academics-panel textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(2, 6, 23, 0.55);
+  color: inherit;
+}
+
+.academics-subject-list,
+.academics-syllabus-list,
+.academics-note-list,
+.academics-assignment-list,
+.academics-exam-list,
+.academics-health-list,
+.academics-plan-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: grid;
+  gap: 10px;
+}
+
+.academics-subject-list a {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(30, 41, 59, 0.65);
+  text-decoration: none;
+  color: inherit;
+}
+
+.academics-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.academics-tabs button {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: transparent;
+  color: inherit;
+  border-radius: 999px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.academics-tabs button.is-active {
+  background: rgba(59, 130, 246, 0.18);
+  border-color: rgba(96, 165, 250, 0.45);
+}
+
+.academics-breadcrumb {
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+.academics-subject-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.academics-exam-countdown {
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.25);
+}
+
+.academics-disclaimer,
+.academics-error {
+  font-size: 0.85rem;
+  color: #cbd5e1;
+}
+
+.academics-proposal,
+.academics-analysis pre {
+  max-height: 240px;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(2, 6, 23, 0.65);
+  font-size: 0.78rem;
+}
+
+.academics-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+@media (max-width: 720px) {
+  .academics-hero__stats {
+    width: 100%;
+    justify-content: space-between;
+  }
+}

@@ -1,41 +1,67 @@
 import { useEffect, useState } from 'react'
-import { companyApi } from '@shared/services/api'
-import { COMPANY_THEME, companyPath } from '../theme'
+import CompanyPageHeader from '../components/CompanyPageHeader'
+import { companyService } from '../services/api'
 
 export default function Settings() {
-  const [company, setCompany] = useState(null)
-  const [form, setForm] = useState({ name: '', logo: '', banner: '', contact: { email: '', website: '', linkedin: '' } })
+  const [form, setForm] = useState({ name: '', logo: '', banner: '', contact: { email: '', phone: '', website: '' } })
   const [msg, setMsg] = useState('')
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    companyApi.getMine().then(r => {
-      setCompany(r.data.company)
-      const c = r.data.company
-      setForm({ name: c.name, logo: c.logo || '', banner: c.banner || '', contact: { ...c.contact } })
-    }).catch(() => companyApi.bootstrap())
+    companyService.getMine()
+      .then((r) => {
+        const c = r.data.company
+        setForm({
+          name: c.name || '',
+          logo: c.logo || '',
+          banner: c.banner || '',
+          contact: {
+            email: c.contact?.email || '',
+            phone: c.contact?.phone || '',
+            website: c.contact?.website || '',
+          },
+        })
+      })
+      .catch(() => {})
   }, [])
 
   const save = async (e) => {
     e.preventDefault()
-    const { data } = await companyApi.updateMine(form)
-    setCompany(data.company)
-    setMsg('Saved')
+    try {
+      await companyService.updateMine(form)
+      setMsg('Settings saved')
+    } catch (err) {
+      setError(err.response?.data?.message || 'Save failed')
+    }
   }
 
   return (
     <div>
-      <h1 style={{ color: COMPANY_THEME.accentLight }}>⚙️ Settings</h1>
-      {company?.slug && <p style={{ opacity: 0.6 }}>Public: <a href={`/c/${company.slug}`} style={{ color: '#C084FC' }}>/c/{company.slug}</a></p>}
-      <form onSubmit={save} className="company-glass" style={{ maxWidth: 520, display: 'grid', gap: 12 }}>
-        {['name', 'logo', 'banner'].map(k => (
-          <input key={k} className="company-input" placeholder={k} value={form[k]} onChange={e => setForm({ ...form, [k]: e.target.value })} />
-        ))}
-        <input className="company-input" placeholder="Email" value={form.contact.email} onChange={e => setForm({ ...form, contact: { ...form.contact, email: e.target.value } })} />
-        <input className="company-input" placeholder="Website" value={form.contact.website} onChange={e => setForm({ ...form, contact: { ...form.contact, website: e.target.value } })} />
-        <input className="company-input" placeholder="LinkedIn" value={form.contact.linkedin} onChange={e => setForm({ ...form, contact: { ...form.contact, linkedin: e.target.value } })} />
-        {company && <p style={{ fontSize: '0.82rem' }}>Status: {company.status}</p>}
-        {msg && <p style={{ color: '#C084FC' }}>{msg}</p>}
-        <button type="submit" className="company-btn company-btn-primary">Save</button>
+      <CompanyPageHeader title="Settings" subtitle="Company identity and primary contact. Auth (OTP, password, sessions) stays on the login screen." />
+      <form onSubmit={save} className="company-glass" style={{ maxWidth: 520 }}>
+        <div className="company-form-grid">
+          <label className="full" style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: '0.8rem' }}>
+            Display name
+            <input className="company-input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+          </label>
+          <label className="full" style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: '0.8rem' }}>
+            Logo URL
+            <input className="company-input" value={form.logo} onChange={(e) => setForm({ ...form, logo: e.target.value })} />
+          </label>
+          <label className="full" style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: '0.8rem' }}>
+            Banner URL
+            <input className="company-input" value={form.banner} onChange={(e) => setForm({ ...form, banner: e.target.value })} />
+          </label>
+          {['email', 'phone', 'website'].map((k) => (
+            <label key={k} style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: '0.8rem' }}>
+              {k}
+              <input className="company-input" value={form.contact[k]} onChange={(e) => setForm({ ...form, contact: { ...form.contact, [k]: e.target.value } })} />
+            </label>
+          ))}
+        </div>
+        {msg && <p style={{ color: '#34D399' }}>{msg}</p>}
+        {error && <p role="alert" style={{ color: '#F87171' }}>{error}</p>}
+        <button type="submit" className="company-btn company-btn-primary" style={{ marginTop: 12 }}>Save settings</button>
       </form>
     </div>
   )

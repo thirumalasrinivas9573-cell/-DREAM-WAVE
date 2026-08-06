@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { discoveryApi } from '@shared/services/api'
+import { safeExternalUrl } from '@shared/utils/safeUrl'
 
 export default function PromotionDetail() {
   const { id } = useParams()
@@ -20,7 +21,7 @@ export default function PromotionDetail() {
         <h1 style={{ margin: '12px 0' }}>{item.title}</h1>
         <p style={{ lineHeight: 1.7, opacity: 0.85 }}>{item.content}</p>
         {item.image && <img src={item.image} alt="" style={{ width: '100%', borderRadius: 12, marginTop: 16 }} />}
-        {item.link && <a href={item.link} target="_blank" rel="noreferrer" style={{ color: '#38BDF8', display: 'inline-block', marginTop: 16 }}>Learn more →</a>}
+        {safeExternalUrl(item.link, { allowRelative: true }) && <a href={safeExternalUrl(item.link, { allowRelative: true })} target="_blank" rel="noreferrer" style={{ color: '#38BDF8', display: 'inline-block', marginTop: 16 }}>Learn more →</a>}
         <p style={{ marginTop: 24, fontSize: '0.82rem', opacity: 0.5 }}>{item.views} views · {item.engagement} engagement</p>
       </div>
     </div>

@@ -2,6 +2,7 @@
  * Six-box OTP input — modern, accessible, paste-friendly.
  */
 import { useRef, useEffect } from 'react'
+import './otp-input.css'
 
 export default function OtpInput({
   value = '',
@@ -68,29 +69,20 @@ export default function OtpInput({
   }
 
   return (
-    <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }} onPaste={onPaste}>
+    <div className="otp-input" style={{ '--otp-accent': accent }} onPaste={onPaste}>
       {digits.map((d, i) => (
         <input
           key={i}
           ref={(el) => { refs.current[i] = el }}
           inputMode="numeric"
           autoComplete={i === 0 ? 'one-time-code' : 'off'}
-          maxLength={6}
+          maxLength={1}
           disabled={disabled}
           value={d.trim()}
           onChange={(e) => onDigit(i, e.target.value)}
           onKeyDown={(e) => onKeyDown(i, e)}
           aria-label={`Digit ${i + 1}`}
-          style={{
-            width: 46, height: 54, textAlign: 'center', fontSize: '1.35rem', fontWeight: 700,
-            borderRadius: 12,
-            border: `1.5px solid ${d.trim() ? accent : 'rgba(255,255,255,0.14)'}`,
-            background: 'rgba(0,0,0,0.4)',
-            color: '#F8FAFC',
-            outline: 'none',
-            boxShadow: d.trim() ? `0 0 0 3px ${accent}22` : 'none',
-            transition: 'border 0.15s, box-shadow 0.15s',
-          }}
+          data-filled={Boolean(d.trim())}
         />
       ))}
     </div>

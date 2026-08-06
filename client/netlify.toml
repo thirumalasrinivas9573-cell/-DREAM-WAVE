@@ -4,7 +4,7 @@
   publish = "dist"
 
 [build.environment]
-  NODE_VERSION = "18"
+  NODE_VERSION = "20.19.0"
   NPM_VERSION  = "10"
 
 # ── SPA routing — all client-side routes go to index.html ────────────────────
@@ -22,6 +22,8 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy        = "strict-origin-when-cross-origin"
     Permissions-Policy     = "camera=(), microphone=(), geolocation=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 
 # ── Cache static assets ───────────────────────────────────────────────────────
 [[headers]]

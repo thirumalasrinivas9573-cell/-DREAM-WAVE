@@ -1,13 +1,14 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import StudentLayout from '../layouts/StudentLayout'
-import { lessonApi, goalApi } from '@shared/services/api'
+import { lessonApi } from '@shared/services/api'
 import MessageRenderer from '../components/MessageRenderer'
 import AIOrb from '@shared/components/animations/AIOrb'
 import NeuralBg from '@shared/components/animations/NeuralBg'
 import { ProcessVisual } from '../components/VisualLearning'
-import CinematicPlayer from '../components/CinematicPlayer'
-import LessonVideoEngine from '../components/LessonVideoEngine'
+
+const CinematicPlayer = lazy(() => import('../components/CinematicPlayer'))
+const LessonVideoEngine = lazy(() => import('../components/LessonVideoEngine'))
 
 const SCENE_ICONS = { introduction: '🎬', concept: '💡', example: '⚙️', demo: '🖥️', summary: '✅' }
 const DIFF_COLORS = { Beginner: '#10B981', Intermediate: '#F59E0B', Advanced: '#EF4444', Expert: '#A855F7' }
@@ -319,7 +320,6 @@ function VideoProgressBar({ scene, lessonColor = '#8B5CF6', onComplete }) {
 
 // ── Active Scene Display ───────────────────────────────────────────────────────
 function ActiveScene({ scene, lessonColor = '#8B5CF6', onSceneComplete }) {
-  const [notesOpen, setNotesOpen] = useState(false)
   return (
     <motion.div key={scene.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
       {/* Scene header */}
@@ -411,7 +411,6 @@ export default function Learn() {
   const [error, setError]         = useState('')
   const [activeScene, setScene]   = useState(0)
   const [activeTab, setTab]       = useState('lesson')
-  const [quizDone, setQuizDone]   = useState(false)
   const [quizScore, setQuizScore] = useState(null)
   const [suggestions, setSuggest] = useState([])
   const [orbState, setOrbState]   = useState('idle')
@@ -447,11 +446,6 @@ export default function Learn() {
       setOrbState('idle')
     }
     setGen(false)
-  }
-
-  const generateFromSuggestion = (s) => {
-    setTopic(s.topic); setCategory(s.category || 'Career')
-    setTimeout(() => generate(), 100)
   }
 
   const generateScript = async () => {
@@ -703,25 +697,27 @@ export default function Learn() {
                   Cinematic Player
                 </button>
               </div>
-              {engine === 'cinematic' ? (
-                <CinematicPlayer
-                  lesson={lesson}
-                  color={diffColor}
-                  onComplete={() => { setVideoMode(false); setTab('quiz') }}
-                />
-              ) : (
-                <LessonVideoEngine
-                  lesson={lesson}
-                  color={diffColor}
-                  onComplete={() => { setVideoMode(false); setTab('quiz') }}
-                />
-              )}
+              <Suspense fallback={<div className="spinner" style={{ margin: '24px auto' }} aria-label="Loading video player" />}>
+                {engine === 'cinematic' ? (
+                  <CinematicPlayer
+                    lesson={lesson}
+                    color={diffColor}
+                    onComplete={() => { setVideoMode(false); setTab('quiz') }}
+                  />
+                ) : (
+                  <LessonVideoEngine
+                    lesson={lesson}
+                    color={diffColor}
+                    onComplete={() => { setVideoMode(false); setTab('quiz') }}
+                  />
+                )}
+              </Suspense>
             </motion.div>
           )}
 
           {/* Studio layout — shown in text mode */}
           {!videoMode && (
-          <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 16, alignItems: 'flex-start' }}>
+          <div className="learning-studio-grid">
             {/* Scene list sidebar */}
             <div>
               <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
@@ -754,7 +750,7 @@ export default function Learn() {
                       <p style={{ fontSize: '0.84rem' }}>Test your understanding of "{lesson.title}". {(lesson.quiz || []).length} questions with detailed explanations.</p>
                     </div>
                     {lesson.quiz?.length > 0
-                      ? <QuizEngine questions={lesson.quiz} onComplete={(score) => { setQuizScore(score); setQuizDone(true) }} />
+                      ? <QuizEngine questions={lesson.quiz} onComplete={setQuizScore} />
                       : <div className="empty-state"><span className="icon">❓</span><p>No quiz available for this lesson</p></div>
                     }
                   </motion.div>

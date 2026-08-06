@@ -24,10 +24,6 @@ const nextConfig: NextConfig = {
     optimizePackageImports: [
       "lucide-react",
       "framer-motion",
-      "@react-three/drei",
-      "@react-three/fiber",
-      "three",
-      "gsap",
       "zod",
       "@hookform/resolvers",
       "class-variance-authority",

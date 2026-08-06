@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useEffect } from 'react'
+import { motion } from 'framer-motion'
 
 // ── Micro-confetti burst on task complete ─────────────────────────────────────
 function ConfettiParticle({ x, y, color, angle, velocity }) {

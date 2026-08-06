@@ -3,8 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { authApi } from '../../services/api'
 import OtpInput from './OtpInput'
-
-const STEPS = ['account', 'email-otp', 'phone', 'phone-otp', 'password', 'done']
+import { setSelectedPortal } from '../../auth/portalSession'
 
 export default function PortalSignupForm({
   portal,
@@ -25,6 +24,7 @@ export default function PortalSignupForm({
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [organizationName, setOrganizationName] = useState('')
+  const [registrationToken, setRegistrationToken] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -32,7 +32,9 @@ export default function PortalSignupForm({
     e.preventDefault()
     setError(''); setLoading(true)
     try {
-      await authApi.portalInit({ name, email, portal })
+      setSelectedPortal(portal)
+      const { data } = await authApi.portalInit({ name, email, portal })
+      setRegistrationToken(data.registrationToken)
       setStep('email-otp')
     } catch (err) {
       setError(err.response?.data?.message || 'Could not start registration')
@@ -43,7 +45,7 @@ export default function PortalSignupForm({
     e.preventDefault()
     setError(''); setLoading(true)
     try {
-      await authApi.verifyOtp({ email, otp: emailOtp, purpose: 'verify' })
+      await authApi.verifyOtp({ email, otp: emailOtp, purpose: 'verify', portal, registrationToken })
       setStep('phone')
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid code')
@@ -54,7 +56,7 @@ export default function PortalSignupForm({
     e.preventDefault()
     setError(''); setLoading(true)
     try {
-      await authApi.portalSendPhone({ email, phone, countryCode })
+      await authApi.portalSendPhone({ phone, countryCode, portal, registrationToken })
       setStep('phone-otp')
     } catch (err) {
       setError(err.response?.data?.message || 'Could not send SMS')
@@ -65,7 +67,7 @@ export default function PortalSignupForm({
     e.preventDefault()
     setError(''); setLoading(true)
     try {
-      await authApi.portalVerifyPhone({ email, otp: phoneOtp })
+      await authApi.portalVerifyPhone({ otp: phoneOtp, portal, registrationToken })
       setStep('password')
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid code')
@@ -77,10 +79,10 @@ export default function PortalSignupForm({
     setError(''); setLoading(true)
     try {
       const { data } = await authApi.portalComplete({
-        email, password, confirmPassword, organizationName,
+        password, confirmPassword, organizationName, portal, registrationToken,
       })
       localStorage.setItem('token', data.token)
-      if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken)
+      setSelectedPortal(portal)
       setStep('done')
       window.location.href = portal === 'institution' ? '/institution/dashboard' : '/company/dashboard'
     } catch (err) {
@@ -95,7 +97,9 @@ export default function PortalSignupForm({
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <div style={{ fontSize: '2.5rem' }}>{icon}</div>
           <h1 style={{ margin: '0 0 6px' }}>{portalLabel} Sign Up</h1>
-          <p style={{ margin: 0, opacity: 0.6, fontSize: '0.85rem' }}>Create your organization account</p>
+          <p style={{ margin: 0, opacity: 0.6, fontSize: '0.85rem' }}>
+            Create your {portalLabel.toLowerCase()} account — same email can own Student, Institution, and Company profiles
+          </p>
         </div>
 
         {step === 'account' && (

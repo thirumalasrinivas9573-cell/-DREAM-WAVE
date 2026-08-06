@@ -45,9 +45,9 @@ export default function Signup() {
     if (otp.length < 6) return setError('Enter the 6-digit code')
     setError(''); setLoading(true)
     try {
-      const { data } = await authApi.verifyOtp({ email, otp, purpose: 'verify' })
+      const { data } = await authApi.verifyOtp({ email, otp, purpose: 'verify', portal: 'student' })
       if (data.token) {
-        applySession(data.token, data.refreshToken, data.user, email)
+        applySession(data.token, data.user, email)
         navigate('/student/dashboard')
         return
       }
@@ -92,7 +92,7 @@ export default function Signup() {
                 onClick={async () => {
                   setLoading(true); setError('')
                   try {
-                    await authApi.resendOtp({ email, purpose: 'verify' })
+                    await authApi.resendOtp({ email, purpose: 'verify', portal: 'student' })
                     setInfo('A new code was sent to your email.')
                   } catch (err) {
                     setError(err.response?.data?.message || 'Could not resend code.')

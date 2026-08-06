@@ -1,8 +1,6 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useAuth } from '../../context/AuthContext'
-import { authApi } from '../../services/api'
 import OtpInput from './OtpInput'
+import usePortalAuth from '../../auth/usePortalAuth'
 
 const fieldStyle = (accent) => ({
   padding: '12px 14px',
@@ -16,7 +14,7 @@ const fieldStyle = (accent) => ({
 
 /**
  * Shared production login for Institution & Company (and reusable).
- * Email or mobile + password → OTP. No motion animations.
+ * Email/mobile + password → Email OTP or Mobile OTP. Portal-scoped.
  */
 export default function PortalLoginForm({
   portal,
@@ -24,106 +22,30 @@ export default function PortalLoginForm({
   icon,
   accent,
   accentLight,
-  dashboardPath,
   signupPath,
   cssClass = '',
-  otpChannel = 'email',
 }) {
-  const { login, verifyLoginEmailOtp, verifyPhoneOtp, rememberedEmail } = useAuth()
-  const [identifier, setIdentifier] = useState(rememberedEmail())
-  const [password, setPassword] = useState('')
-  const [remember, setRemember] = useState(Boolean(rememberedEmail()))
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [step, setStep] = useState('credentials')
-  const [challenge, setChallenge] = useState(null)
-  const [otp, setOtp] = useState('')
-  const [forgot, setForgot] = useState(false)
-  const [resetEmail, setResetEmail] = useState('')
-  const [resetOtp, setResetOtp] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [info, setInfo] = useState('')
+  const auth = usePortalAuth(portal)
 
-  const finishLogin = async (data) => {
-    if (data.token) window.location.href = dashboardPath
-  }
-
-  const handleCredentials = async (e) => {
-    e.preventDefault()
-    setError(''); setInfo(''); setLoading(true)
-    try {
-      const data = await login(identifier, password, portal, { otpChannel, remember })
-      if (data.requiresOtp) {
-        setChallenge(data)
-        setStep('otp')
-        setInfo(data.requiresEmailOtp
-          ? `Code sent to ${data.email || identifier}`
-          : `Code sent to ${data.phoneMasked || 'your phone'}`)
-        return
-      }
-      await finishLogin(data)
-    } catch (err) {
-      setError(err.response?.data?.message || 'Invalid credentials.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleOtp = async (e) => {
-    e.preventDefault()
-    if (otp.length < 6) return setError('Enter the 6-digit code')
-    setError(''); setLoading(true)
-    try {
-      let data
-      const rememberEmail = remember && identifier.includes('@') ? identifier : null
-      if (challenge.requiresEmailOtp || challenge.otpChannel === 'email') {
-        data = await verifyLoginEmailOtp(challenge.challengeToken, otp, rememberEmail, remember)
-      } else {
-        data = await verifyPhoneOtp({
-          code: otp,
-          challengeToken: challenge.challengeToken,
-        }, rememberEmail, remember)
-      }
-      await finishLogin(data)
-    } catch (err) {
-      setError(err.response?.data?.message || 'Invalid or expired code.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleForgot = async (e) => {
-    e.preventDefault()
-    setError(''); setLoading(true)
-    try {
-      await authApi.forgotPassword({ email: resetEmail || (identifier.includes('@') ? identifier : '') })
-      setInfo('If an account exists, a reset code was sent to your email.')
-      setForgot('otp')
-    } catch (err) {
-      setError(err.response?.data?.message || 'Could not send reset code.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleReset = async (e) => {
-    e.preventDefault()
-    setError(''); setLoading(true)
-    try {
-      await authApi.resetPassword({
-        email: resetEmail || identifier,
-        otp: resetOtp,
-        password: newPassword,
-      })
-      setInfo('Password updated. Sign in with your new password.')
-      setForgot(false)
-      setStep('credentials')
-    } catch (err) {
-      setError(err.response?.data?.message || 'Reset failed.')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const channelBtn = (channel, label) => (
+    <button
+      type="button"
+      onClick={() => auth.setOtpChannel(channel)}
+      style={{
+        flex: 1,
+        padding: '8px 10px',
+        borderRadius: 8,
+        border: `1px solid ${auth.otpChannel === channel ? accent : `${accent}33`}`,
+        background: auth.otpChannel === channel ? `${accent}22` : 'transparent',
+        color: accentLight,
+        cursor: 'pointer',
+        fontSize: '0.8rem',
+        fontWeight: 600,
+      }}
+    >
+      {label}
+    </button>
+  )
 
   return (
     <div className={cssClass} style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24 }}>
@@ -140,61 +62,63 @@ export default function PortalLoginForm({
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ fontSize: '2.5rem', marginBottom: 8 }}>{icon}</div>
           <h1 style={{ margin: '0 0 6px', fontSize: '1.5rem' }}>{portalLabel}</h1>
-          <p style={{ margin: 0, opacity: 0.6, fontSize: '0.875rem' }}>Email or mobile · password · OTP</p>
+          <p style={{ margin: 0, opacity: 0.6, fontSize: '0.875rem' }}>
+            Email or mobile · password · email/mobile OTP
+          </p>
         </div>
 
-        {forgot === 'otp' ? (
-          <form onSubmit={handleReset} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {info && <div style={{ color: accentLight, fontSize: '0.82rem' }}>{info}</div>}
-            <OtpInput value={resetOtp} onChange={setResetOtp} accent={accent} />
+        {auth.forgot === 'otp' ? (
+          <form onSubmit={auth.handleReset} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {auth.info && <div style={{ color: accentLight, fontSize: '0.82rem' }}>{auth.info}</div>}
+            <OtpInput value={auth.resetOtp} onChange={auth.setResetOtp} accent={accent} />
             <input
               type="password"
               placeholder="New password (letter + number, 8+)"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
+              value={auth.newPassword}
+              onChange={(e) => auth.setNewPassword(e.target.value)}
               required
               minLength={8}
               style={fieldStyle(accent)}
             />
-            {error && <div style={{ color: '#F87171', fontSize: '0.82rem' }}>{error}</div>}
-            <button type="submit" disabled={loading} style={{ padding: '12px', borderRadius: 10, border: 'none', background: accent, color: '#0B1220', fontWeight: 700, cursor: 'pointer' }}>
-              {loading ? 'Updating...' : 'Reset Password'}
+            {auth.error && <div style={{ color: '#F87171', fontSize: '0.82rem' }}>{auth.error}</div>}
+            <button type="submit" disabled={auth.loading} style={{ padding: '12px', borderRadius: 10, border: 'none', background: accent, color: '#0B1220', fontWeight: 700, cursor: 'pointer' }}>
+              {auth.loading ? 'Updating...' : 'Reset Password'}
             </button>
-            <button type="button" onClick={() => setForgot(false)} style={{ background: 'none', border: 'none', color: accentLight, cursor: 'pointer' }}>← Back to login</button>
+            <button type="button" onClick={() => auth.setForgot(false)} style={{ background: 'none', border: 'none', color: accentLight, cursor: 'pointer' }}>← Back to login</button>
           </form>
-        ) : forgot ? (
-          <form onSubmit={handleForgot} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        ) : auth.forgot ? (
+          <form onSubmit={auth.handleForgot} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <input
               type="email"
               placeholder="Account email"
-              value={resetEmail || (identifier.includes('@') ? identifier : '')}
-              onChange={(e) => setResetEmail(e.target.value)}
+              value={auth.resetEmail || (String(auth.identifier).includes('@') ? auth.identifier : '')}
+              onChange={(e) => auth.setResetEmail(e.target.value)}
               required
               style={fieldStyle(accent)}
             />
-            {error && <div style={{ color: '#F87171', fontSize: '0.82rem' }}>{error}</div>}
-            <button type="submit" disabled={loading} style={{ padding: '12px', borderRadius: 10, border: 'none', background: accent, color: '#0B1220', fontWeight: 700, cursor: 'pointer' }}>
-              {loading ? 'Sending...' : 'Send Reset Code'}
+            {auth.error && <div style={{ color: '#F87171', fontSize: '0.82rem' }}>{auth.error}</div>}
+            <button type="submit" disabled={auth.loading} style={{ padding: '12px', borderRadius: 10, border: 'none', background: accent, color: '#0B1220', fontWeight: 700, cursor: 'pointer' }}>
+              {auth.loading ? 'Sending...' : 'Send Reset Code'}
             </button>
-            <button type="button" onClick={() => setForgot(false)} style={{ background: 'none', border: 'none', color: accentLight, cursor: 'pointer' }}>← Back to login</button>
+            <button type="button" onClick={() => auth.setForgot(false)} style={{ background: 'none', border: 'none', color: accentLight, cursor: 'pointer' }}>← Back to login</button>
           </form>
-        ) : step === 'otp' ? (
-          <form onSubmit={handleOtp} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <p style={{ textAlign: 'center', fontSize: '0.85rem', color: accentLight, margin: 0 }}>{info}</p>
-            <OtpInput value={otp} onChange={setOtp} accent={accent} />
-            {error && <div style={{ color: '#F87171', fontSize: '0.82rem', textAlign: 'center' }}>{error}</div>}
-            <button type="submit" disabled={loading || otp.length < 6} style={{ padding: '12px', borderRadius: 10, border: 'none', background: accent, color: '#0B1220', fontWeight: 700, cursor: 'pointer' }}>
-              {loading ? 'Verifying...' : 'Verify & Sign In'}
+        ) : auth.step === 'otp' ? (
+          <form onSubmit={auth.handleOtp} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <p style={{ textAlign: 'center', fontSize: '0.85rem', color: accentLight, margin: 0 }}>{auth.info}</p>
+            <OtpInput value={auth.otp} onChange={auth.setOtp} accent={accent} />
+            {auth.error && <div style={{ color: '#F87171', fontSize: '0.82rem', textAlign: 'center' }}>{auth.error}</div>}
+            <button type="submit" disabled={auth.loading || auth.otp.length < 6} style={{ padding: '12px', borderRadius: 10, border: 'none', background: accent, color: '#0B1220', fontWeight: 700, cursor: 'pointer' }}>
+              {auth.loading ? 'Verifying...' : 'Verify & Sign In'}
             </button>
-            <button type="button" onClick={() => { setStep('credentials'); setOtp(''); setError('') }} style={{ background: 'none', border: 'none', color: accentLight, cursor: 'pointer' }}>← Back</button>
+            <button type="button" onClick={auth.backToCredentials} style={{ background: 'none', border: 'none', color: accentLight, cursor: 'pointer' }}>← Back</button>
           </form>
         ) : (
-          <form onSubmit={handleCredentials} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <form onSubmit={auth.handleCredentials} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <input
               type="text"
               placeholder="Email or mobile (+91…)"
-              value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
+              value={auth.identifier}
+              onChange={(e) => auth.setIdentifier(e.target.value)}
               required
               autoComplete="username"
               style={fieldStyle(accent)}
@@ -202,22 +126,44 @@ export default function PortalLoginForm({
             <input
               type="password"
               placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              value={auth.password}
+              onChange={(e) => auth.setPassword(e.target.value)}
               required
               autoComplete="current-password"
               style={fieldStyle(accent)}
             />
+            <div style={{ display: 'flex', gap: 8 }}>
+              {channelBtn('email', 'Email OTP')}
+              {channelBtn('phone', 'Mobile OTP')}
+            </div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.82rem', color: accentLight }}>
-              <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+              <input type="checkbox" checked={auth.remember} onChange={(e) => auth.setRemember(e.target.checked)} />
               Remember me
             </label>
-            {error && <div style={{ color: '#F87171', fontSize: '0.82rem' }}>{error}</div>}
-            {info && <div style={{ color: accentLight, fontSize: '0.82rem' }}>{info}</div>}
-            <button type="submit" disabled={loading} style={{ padding: '12px', borderRadius: 10, border: 'none', background: accent, color: '#0B1220', fontWeight: 700, cursor: 'pointer' }}>
-              {loading ? 'Signing in...' : 'Sign In'}
+            {auth.error && <div style={{ color: '#F87171', fontSize: '0.82rem' }}>{auth.error}</div>}
+            {auth.signupCta && (
+              <Link
+                to={auth.signupCta}
+                style={{
+                  display: 'block',
+                  textAlign: 'center',
+                  padding: '10px 12px',
+                  borderRadius: 10,
+                  border: `1px solid ${accent}55`,
+                  color: accentLight,
+                  textDecoration: 'none',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                }}
+              >
+                {portal === 'institution' ? 'Create Institution Account' : portal === 'company' ? 'Create Company Account' : 'Create Student Account'}
+              </Link>
+            )}
+            {auth.info && <div style={{ color: accentLight, fontSize: '0.82rem' }}>{auth.info}</div>}
+            <button type="submit" disabled={auth.loading} style={{ padding: '12px', borderRadius: 10, border: 'none', background: accent, color: '#0B1220', fontWeight: 700, cursor: 'pointer' }}>
+              {auth.loading ? 'Signing in...' : 'Sign In'}
             </button>
-            <button type="button" onClick={() => setForgot(true)} style={{ background: 'none', border: 'none', color: accentLight, cursor: 'pointer', fontSize: '0.82rem' }}>
+            <button type="button" onClick={() => auth.setForgot(true)} style={{ background: 'none', border: 'none', color: accentLight, cursor: 'pointer', fontSize: '0.82rem' }}>
               Forgot password?
             </button>
           </form>

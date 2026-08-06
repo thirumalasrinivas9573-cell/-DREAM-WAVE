@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
+const { requireTrustedOrigin } = require('../middleware/requestSecurity');
 const {
   signup,
   login,
@@ -54,9 +55,9 @@ router.post('/portal/verify-phone', portalVerifyPhone);
 router.post('/portal/complete', portalComplete);
 router.post('/portal/resend-phone', portalResendPhone);
 router.post('/verify-login-email-otp', verifyLoginEmailOtp);
-router.post('/refresh', refresh);
-router.post('/logout', logout);
-router.post('/logout-all', auth, logoutAll);
+router.post('/refresh', requireTrustedOrigin, refresh);
+router.post('/logout', requireTrustedOrigin, logout);
+router.post('/logout-all', requireTrustedOrigin, auth, logoutAll);
 router.get('/sessions', auth, listSessions);
 router.delete('/sessions/:id', auth, revokeSession);
 router.delete('/sessions', auth, revokeAllSessions);

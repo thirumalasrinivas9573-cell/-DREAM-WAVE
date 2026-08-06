@@ -1,7 +1,6 @@
-const OpenAI = require("openai");
 const safeJsonParse = require("../utils/safeJsonParse");
-
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const { getOpenAI } = require("../utils/openaiClient");
+const client = new Proxy({}, { get(_t, p) { return getOpenAI()[p]; } });
 
 // ── Retry-based robust AI call ─────────────────────────────────────────────────
 const robustAiCall = async (messages, model = "gpt-4o-mini", fallback = {}) => {

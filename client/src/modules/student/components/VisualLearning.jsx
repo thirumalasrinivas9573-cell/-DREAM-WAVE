@@ -310,8 +310,6 @@ export function AutoVisual({ scene, color = '#8B5CF6' }) {
   // If narration mentions "steps", "process", "how to" — use process visual
   const nar = (scene.narration || '').toLowerCase()
   const isProcess = /step|process|how to|first.*then|sequence/.test(nar)
-  const isComparison = /vs|versus|compare|difference|unlike/.test(nar)
-
   if (isProcess && scene.keyPoints?.length > 1) {
     return (
       <ProcessVisual

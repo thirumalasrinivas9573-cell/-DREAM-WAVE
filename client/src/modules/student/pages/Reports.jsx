@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import StudentLayout from '../layouts/StudentLayout'
 import { reportApi } from '@shared/services/api'
 import MessageRenderer from '../components/MessageRenderer'
-import { AnimatedStat, HBar } from '../components/AnimatedChart'
+import { AnimatedStat } from '../components/AnimatedChart'
 
 const SECTIONS = [
   { key:'executiveSummary',    icon:'📋', label:'Executive Summary',         color:'#8B5CF6', new:true },
@@ -83,6 +83,10 @@ export default function Reports() {
     reportApi.getAll()
       .then(r => { const l = r.data.reports || []; setReports(l); if (l.length) setSelected(l[0]) })
       .catch(() => {}).finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => () => {
+    if (progressRef.current) clearInterval(progressRef.current)
   }, [])
 
   const generate = async (e) => {
@@ -215,7 +219,7 @@ export default function Reports() {
           {/* Sidebar */}
           <div className="card" style={{ padding: 10, position: 'sticky', top: 20 }}>
             <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10, padding: '0 4px' }}>Reports ({reports.length})</div>
-            {reports.map((rep, i) => (
+            {reports.map((rep) => (
               <div key={rep._id} onClick={() => setSelected(rep)} style={{ padding: '9px 10px', borderRadius: 8, cursor: 'pointer', marginBottom: 3, background: selected?._id === rep._id ? 'rgba(139,92,246,0.12)' : 'transparent', borderLeft: selected?._id === rep._id ? '2px solid var(--purple)' : '2px solid transparent', transition: 'var(--t)' }}>
                 <div style={{ fontWeight: 500, fontSize: '0.835rem', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rep.goal}</div>
                 <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{new Date(rep.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</div>

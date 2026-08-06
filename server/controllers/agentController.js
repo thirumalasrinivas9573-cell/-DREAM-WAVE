@@ -133,7 +133,10 @@ exports.getProfile = async (req, res) => {
 // ── PUT /api/ai/user-profile ──────────────────────────────────────────────────
 exports.updateProfile = async (req, res) => {
   try {
-    const allowed = ['tone', 'interests', 'currentRole', 'targetRole', 'skills', 'notifications']
+    const allowed = [
+      'tone', 'interests', 'currentRole', 'targetRole', 'skills', 'notifications',
+      'preferredTopics', 'careerPreferences', 'learningPreferences', 'knowledgeMemory',
+    ]
     const updates = {}
     allowed.forEach(k => { if (req.body[k] !== undefined) updates[k] = req.body[k] })
 

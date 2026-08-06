@@ -1,12 +1,12 @@
-import PortalCrudPage from '@shared/components/portal/PortalCrudPage'
-import { institutionApi } from '@shared/services/api'
-import { INSTITUTION_THEME } from '../theme'
+import InstCrudPage from '../components/InstCrudPage'
+import { institutionService } from '../services/api'
 
 const F = [
   { key: 'title', label: 'Title' },
-  { key: 'category', label: 'Category', type: 'select', options: ['news', 'event', 'seminar', 'workshop', 'competition', 'hackathon', 'admission', 'scholarship', 'result', 'announcement', 'other'], default: 'news' },
+  { key: 'category', label: 'Category', type: 'select', options: ['admission', 'scholarship', 'event', 'workshop', 'hackathon', 'competition', 'seminar', 'research', 'announcement', 'news', 'other'], default: 'admission' },
   { key: 'content', label: 'Content', type: 'textarea' },
-  { key: 'link', label: 'Link URL' },
+  { key: 'link', label: 'Link URL', required: false },
+  { key: 'image', label: 'Image URL', required: false },
 ]
 const C = [
   { key: 'title', label: 'Title' },
@@ -16,5 +16,14 @@ const C = [
 ]
 
 export default function Promotions() {
-  return <PortalCrudPage title="News & Promotions" icon="📢" theme={INSTITUTION_THEME} api={institutionApi.promotions} fields={F} columns={C} emptyHint="Published promotions appear in Dream Wave Discovery" />
+  return (
+    <InstCrudPage
+      title="Promotions"
+      subtitle="Publish admissions, scholarships, events, workshops, and more to Dream Wave Discovery."
+      api={institutionService.promotions}
+      fields={F}
+      columns={C}
+      emptyHint="No promotions yet — publish to appear in Discovery."
+    />
+  )
 }
