@@ -75,6 +75,9 @@ const mentorRoutes    = require('./routes/mentor')
 const profileRoutes   = require('./routes/profile')
 const lessonRoutes    = require('./routes/lesson')
 const mjRoutes        = require('./routes/mj')
+const partnershipRoutes = require('./routes/partnerships')
+const platformNotificationRoutes = require('./routes/platformNotifications')
+const recruitmentRoutes = require('./routes/recruitment')
 
 const app    = express()
 const server = http.createServer(app)
@@ -96,6 +99,8 @@ const corsOrigin = (origin, callback) => {
   )
   const ok =
     localAllowed ||
+    /\.netlify\.app$/.test(origin) ||
+    /\.netlify\.live$/.test(origin) ||
     (process.env.CLIENT_URL && origin === process.env.CLIENT_URL) ||
     extras.includes(origin)
 
@@ -236,6 +241,13 @@ app.use('/api/tasks',     taskRoutes)
 app.use('/api/community', communityRoutes)
 app.use('/api/payment',   paymentRoutes)
 app.use('/api/admin',     adminRoutes)
+// Lasya institution sub-modules (specific paths before general /api/institution)
+app.use('/api/institution/students', require('./routes/institutionStudents'))
+app.use('/api/institution/placements', require('./routes/institutionPlacements'))
+app.use('/api/institution/research', require('./routes/institutionResearch'))
+app.use('/api/institution/incubation', require('./routes/institutionIncubation'))
+app.use('/api/institution/alumni', require('./routes/institutionAlumni'))
+app.use('/api/institution/command-center', require('./routes/institutionCommandCenter'))
 app.use('/api/institution', institutionRoutes)
 app.use('/api/company',   companyRoutes)
 app.use('/api/discovery', discoveryRoutes)
@@ -259,6 +271,9 @@ app.use('/api/planner',   require('./routes/planner'))
 app.use('/api/profile',   profileRoutes)
 app.use('/api/lesson',    lessonRoutes)
 app.use('/api/mj',        mjRoutes)
+app.use('/api/partnerships', partnershipRoutes)
+app.use('/api/platform-notifications', platformNotificationRoutes)
+app.use('/api/recruitment', recruitmentRoutes)
 
 // ── Global error handler ──────────────────────────────────────────────────────
 app.use((err, req, res, _next) => {

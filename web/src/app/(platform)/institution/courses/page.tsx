@@ -3,17 +3,19 @@ import dynamic from "next/dynamic";
 
 import { RouteLoading } from "@/components/common/route-loading";
 
-const CoursesPage = dynamic(
+const AcademicManagementPage = dynamic(
   () =>
-    import("@/components/institution/institution-entities").then((mod) => mod.CoursesPage),
+    import("@/components/institution/academics/academic-management-page").then(
+      (mod) => mod.AcademicManagementPage,
+    ),
   { loading: () => <RouteLoading label="Loading courses" /> },
 );
 
 export const metadata: Metadata = {
   title: "Courses",
-  description: "Manage courses",
+  description: "Manage academic courses",
 };
 
 export default function Page() {
-  return <CoursesPage />;
+  return <AcademicManagementPage initialTab="courses" />;
 }

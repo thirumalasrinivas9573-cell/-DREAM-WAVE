@@ -9,6 +9,8 @@
     "start": "bash start.sh",
     "dev": "bash start.sh",
     "dev:memory": "USE_MEMORY_MONGO=1 bash start.sh",
+    "dev:legacy": "concurrently \"npm run server\" \"npm run client\"",
+    "dev:web": "concurrently \"npm run server\" \"npm run web\"",
     "server": "cd server && node server.js",
     "server:memory": "cd server && npm run dev:memory",
     "client": "cd client && npm run dev",

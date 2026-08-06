@@ -1,19 +1,13 @@
 import type { Metadata } from "next";
-import dynamic from "next/dynamic";
+import { redirect } from "next/navigation";
 
-import { RouteLoading } from "@/components/common/route-loading";
-
-const InstitutionHomePage = dynamic(
-  () =>
-    import("@/components/institution/institution-home").then((mod) => mod.InstitutionHomePage),
-  { loading: () => <RouteLoading label="Loading institution" /> },
-);
+import { INSTITUTION_ROUTES } from "@/constants/institution";
 
 export const metadata: Metadata = {
-  title: "Institution Home",
-  description: "Institution platform home",
+  title: "Institution Portal",
+  description: "Institution operations portal",
 };
 
 export default function Page() {
-  return <InstitutionHomePage />;
+  redirect(INSTITUTION_ROUTES.dashboard);
 }

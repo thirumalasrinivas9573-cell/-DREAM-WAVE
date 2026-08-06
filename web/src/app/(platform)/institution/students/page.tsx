@@ -5,13 +5,15 @@ import { RouteLoading } from "@/components/common/route-loading";
 
 const StudentsPage = dynamic(
   () =>
-    import("@/components/institution/institution-entities").then((mod) => mod.StudentsPage),
-  { loading: () => <RouteLoading label="Loading students" /> },
+    import("@/components/institution/students/student-management-page").then(
+      (module) => module.StudentManagementPage,
+    ),
+  { loading: () => <RouteLoading label="Loading student management" /> },
 );
 
 export const metadata: Metadata = {
   title: "Students",
-  description: "Manage students",
+  description: "Enterprise student management system",
 };
 
 export default function Page() {

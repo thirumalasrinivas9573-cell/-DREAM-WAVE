@@ -1,4 +1,5 @@
 import { INSTITUTION_NAV } from "@/constants/institution";
+import { COMPANY_NAV } from "@/constants/partnership";
 import type { PlatformRole } from "@/constants/roles";
 import { ROUTES } from "@/constants/routes";
 
@@ -36,10 +37,16 @@ const INSTITUTION_NAV_ITEMS: PlatformNavItem[] = INSTITUTION_NAV.map((item) => {
   return entry;
 });
 
-const COMPANY_NAV: PlatformNavItem[] = [
-  { label: "Dashboard", href: ROUTES.dashboard, primary: true },
-  { label: "Settings", href: ROUTES.settings },
-];
+const COMPANY_NAV_ITEMS: PlatformNavItem[] = COMPANY_NAV.map((item) => {
+  const entry: PlatformNavItem = {
+    label: item.label,
+    href: item.href,
+  };
+  if ("primary" in item && item.primary) {
+    entry.primary = true;
+  }
+  return entry;
+});
 
 const ADMIN_NAV: PlatformNavItem[] = [
   { label: "Dashboard", href: ROUTES.dashboard, primary: true },
@@ -53,7 +60,7 @@ export function getPlatformNav(
     case "institution":
       return INSTITUTION_NAV_ITEMS;
     case "company":
-      return COMPANY_NAV;
+      return COMPANY_NAV_ITEMS;
     case "admin":
       return ADMIN_NAV;
     case "student":

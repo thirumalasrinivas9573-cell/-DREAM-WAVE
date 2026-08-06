@@ -28,6 +28,7 @@ export {
 } from "@/constants/landing";
 export { CONTAINER_SIZES, LAYOUT } from "@/constants/layout";
 export {
+  DISCOVERY_ROUTES,
   FOOTER_CONTACT,
   FOOTER_LEGAL_LINKS,
   FOOTER_LINK_GROUPS,
