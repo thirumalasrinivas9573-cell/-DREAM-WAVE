@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Eraser } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -9,7 +10,7 @@ import { CareerIntelNav } from "@/components/ai/career/career-nav";
 import { CareerRoadmapPanel } from "@/components/ai/career/career-roadmap-panel";
 import { AuthAlert } from "@/components/auth/auth-alert";
 import { useAuth } from "@/components/providers/auth-provider";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -20,7 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CAREER_CERTIFICATIONS, CAREER_PROMPTS } from "@/constants/ai-platform";
-import { resolveCareerTargetSkills } from "@/constants/career-intelligence";
+import { CAREER_INTEL_ROUTES, resolveCareerTargetSkills } from "@/constants/career-intelligence";
 import { toUserSafeMessage } from "@/lib/errors";
 import { studentService } from "@/services/student.service";
 import { useAiPlatformStore } from "@/store/ai-platform-store";
@@ -225,15 +226,20 @@ export function AiCareerPage() {
         title="AI Career Intelligence"
         description="Personalized guidance, job matching, interview prep, and placement insights in one place."
         actions={
-          <Button
-            type="button"
-            variant="outline"
-            className="h-10"
-            onClick={() => void clear()}
-          >
-            <Eraser className="size-4" aria-hidden="true" />
-            Clear chat
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Link href={CAREER_INTEL_ROUTES.copilot} className={buttonVariants({ variant: "default", className: "h-10" })}>
+              Career Copilot
+            </Link>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10"
+              onClick={() => void clear()}
+            >
+              <Eraser className="size-4" aria-hidden="true" />
+              Clear chat
+            </Button>
+          </div>
         }
       />
 

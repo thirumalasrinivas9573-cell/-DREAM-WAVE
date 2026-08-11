@@ -34,6 +34,10 @@ import {
 import {
   recruitmentApi,
 } from "@/lib/api/recruitment";
+import {
+  companyBiApi,
+  type CompanyBiDashboard,
+} from "@/lib/api/business-intelligence";
 import type { RecruitmentAnalytics, RecruitmentReportPreview } from "@/types/recruitment";
 
 function downloadFile(filename: string, content: string, mimeType = "text/csv") {
@@ -59,6 +63,7 @@ const REPORT_DEFS = [
 export function RecruitmentAnalyticsPage() {
   const { token } = useAuth();
   const [analytics, setAnalytics] = useState<RecruitmentAnalytics | null>(null);
+  const [biDashboard, setBiDashboard] = useState<CompanyBiDashboard | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [department, setDepartment] = useState("");
@@ -71,13 +76,18 @@ export function RecruitmentAnalyticsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await recruitmentApi.getAnalytics(token, {
+      const params = {
         department: department || undefined,
         stage: stage || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
-      });
+      };
+      const [res, biRes] = await Promise.all([
+        recruitmentApi.getAnalytics(token, params),
+        companyBiApi.getDashboard(token, params),
+      ]);
       setAnalytics(res.analytics);
+      setBiDashboard(biRes.dashboard);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load analytics");
     } finally {
@@ -174,6 +184,64 @@ export function RecruitmentAnalyticsPage() {
               values={Object.values(data.recruitmentSourcePerformance).map((v) => v.hired)}
             />
           </div>
+
+          {biDashboard?.funnel?.hasData ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Recruitment funnel</CardTitle>
+                <CardDescription>
+                  {biDashboard.funnel.description} · Count type: {biDashboard.funnel.countType}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <InstitutionBarChart
+                  title="Pipeline stages"
+                  description="Unique application counts by stage."
+                  labels={Object.keys(biDashboard.funnel.counts).map((k) => k.replace(/_/g, " "))}
+                  values={Object.values(biDashboard.funnel.counts)}
+                />
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {biDashboard?.skills?.hasData ? (
+            <div className="grid gap-4 xl:grid-cols-2">
+              <InstitutionBarChart
+                title="Required skills (demand)"
+                description="Skills from job and internship listings."
+                labels={biDashboard.skills.demand.slice(0, 8).map((s) => s.skill)}
+                values={biDashboard.skills.demand.slice(0, 8).map((s) => s.count)}
+              />
+              <Card>
+                <CardHeader>
+                  <CardTitle>Skill gaps</CardTitle>
+                  <CardDescription>
+                    In-demand skills not evidenced in candidate snapshots (aggregate).
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {biDashboard.skills.gaps.length > 0 ? (
+                    <ul className="space-y-1 text-sm">
+                      {biDashboard.skills.gaps.slice(0, 10).map((g) => (
+                        <li key={g.skill}>
+                          <span className="font-medium capitalize">{g.skill}</span> — demand count: {g.count}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No aggregate skill gaps detected.</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          ) : null}
+
+          {biDashboard?.dataQuality?.hasIssues ? (
+            <Alert>
+              Data quality: {biDashboard.dataQuality.warnings.length} warning(s). Review records before
+              relying on derived metrics.
+            </Alert>
+          ) : null}
         </>
       )}
     </div>

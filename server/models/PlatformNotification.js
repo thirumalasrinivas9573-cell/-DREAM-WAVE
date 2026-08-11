@@ -29,5 +29,8 @@ const platformNotificationSchema = new mongoose.Schema(
 )
 
 platformNotificationSchema.index({ recipientUserId: 1, createdAt: -1 })
+platformNotificationSchema.index({ recipientUserId: 1, read: 1 })
+platformNotificationSchema.index({ recipientUserId: 1, type: 1 })
+platformNotificationSchema.index({ 'metadata.idempotencyKey': 1 }, { sparse: true })
 
 module.exports = mongoose.model('PlatformNotification', platformNotificationSchema)

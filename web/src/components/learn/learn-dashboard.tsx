@@ -179,6 +179,12 @@ export function LearnDashboardPage() {
         actions={
           <>
             <Link
+              href="/learn/intelligence"
+              className={cn(buttonVariants(), "h-10")}
+            >
+              Skill Intelligence
+            </Link>
+            <Link
               href={LEARN_ROUTES.library}
               className={cn(buttonVariants({ variant: "outline" }), "h-10")}
             >

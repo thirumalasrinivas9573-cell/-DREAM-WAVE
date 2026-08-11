@@ -702,3 +702,97 @@ exports.listPartners = async (req, res) => {
     res.status(e.statusCode || 500).json({ success: false, message: e.message })
   }
 }
+
+const recruitmentAiService = require('../services/recruitmentAiService')
+const {
+  buildSafeCandidateProfile,
+  buildRuleBasedCandidateSummary,
+} = require('../services/recruitmentIntelligenceService')
+const InstitutionStudent = require('../models/InstitutionStudent')
+const RecruitmentJob = require('../models/RecruitmentJob')
+
+exports.getCandidateIntelligence = async (req, res) => {
+  try {
+    const cid = companyId(req)
+    const detail = await recruitmentService.getApplicationDetail(cid, req.params.id)
+    let student = null
+    if (detail.application?.institutionStudentId) {
+      student = await InstitutionStudent.findById(detail.application.institutionStudentId)
+    }
+    const profile = student
+      ? buildSafeCandidateProfile(student, detail.application)
+      : { snapshot: detail.application?.candidateSnapshot || {} }
+    res.json({ success: true, profile })
+  } catch (e) {
+    res.status(e.statusCode || 500).json({ success: false, message: e.message })
+  }
+}
+
+exports.getCandidateAiSummary = async (req, res) => {
+  try {
+    const cid = companyId(req)
+    const app = await recruitmentService.assertCompanyApplication(cid, req.params.id)
+    const student = app.institutionStudentId
+      ? await InstitutionStudent.findById(app.institutionStudentId)
+      : null
+    const job = app.jobId ? await RecruitmentJob.findById(app.jobId).lean() : null
+    const summary = student
+      ? await recruitmentAiService.generateCandidateSummary(student, app, job)
+      : buildRuleBasedCandidateSummary({ fullName: app.candidateSnapshot?.name, sharedSkills: app.candidateSnapshot?.skills || [] }, app, job)
+    res.json({ success: true, summary })
+  } catch (e) {
+    res.status(e.statusCode || 500).json({ success: false, message: e.message })
+  }
+}
+
+exports.analyzeJob = async (req, res) => {
+  try {
+    const job = await recruitmentService.getJob(companyId(req), req.params.id)
+    const analysis = await recruitmentAiService.analyzeJobDescription(job)
+    res.json({ success: true, analysis })
+  } catch (e) {
+    res.status(e.statusCode || 500).json({ success: false, message: e.message })
+  }
+}
+
+exports.suggestInterviewQuestions = async (req, res) => {
+  try {
+    const cid = companyId(req)
+    const app = await recruitmentService.assertCompanyApplication(cid, req.params.id)
+    const student = app.institutionStudentId
+      ? await InstitutionStudent.findById(app.institutionStudentId)
+      : { sharedSkills: app.candidateSnapshot?.skills || [], sharedProjects: [] }
+    const job = app.jobId
+      ? await RecruitmentJob.findById(app.jobId).lean()
+      : { title: app.roleTitle, requiredSkills: (app.skillsSummary || '').split(',').map((s) => s.trim()) }
+    const suggestions = await recruitmentAiService.suggestInterviewQuestions(job, student)
+    res.json({ success: true, suggestions })
+  } catch (e) {
+    res.status(e.statusCode || 500).json({ success: false, message: e.message })
+  }
+}
+
+exports.compareCandidates = async (req, res) => {
+  try {
+    const cid = companyId(req)
+    const ids = Array.isArray(req.body.applicationIds) ? req.body.applicationIds.slice(0, 5) : []
+    const comparisons = []
+    for (const id of ids) {
+      const app = await recruitmentService.assertCompanyApplication(cid, id)
+      const student = app.institutionStudentId
+        ? await InstitutionStudent.findById(app.institutionStudentId)
+        : null
+      const job = app.jobId ? await RecruitmentJob.findById(app.jobId).lean() : null
+      comparisons.push({
+        applicationId: id,
+        candidateName: app.candidateSnapshot?.name || student?.fullName || 'Candidate',
+        summary: student
+          ? buildRuleBasedCandidateSummary(student, app, job)
+          : buildRuleBasedCandidateSummary({ fullName: app.candidateSnapshot?.name, sharedSkills: app.candidateSnapshot?.skills || [] }, app, job),
+      })
+    }
+    res.json({ success: true, comparisons })
+  } catch (e) {
+    res.status(e.statusCode || 500).json({ success: false, message: e.message })
+  }
+}

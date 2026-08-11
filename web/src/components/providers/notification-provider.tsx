@@ -1,64 +1,47 @@
 "use client";
 
-import { Bell } from "lucide-react";
+import Link from "next/link";
+import { Bell, Wifi, WifiOff } from "lucide-react";
 import {
   createContext,
   memo,
   type ReactNode,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from "react";
 
-import { Button } from "@/components/ui/button";
+import { useAuth } from "@/components/providers/auth-provider";
+import { useSocketEvent } from "@/components/providers/socket-provider";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Z_INDEX } from "@/constants";
+import { platformNotificationsApi } from "@/lib/api/platform-notifications";
+import { formatNotificationTime, resolveNotificationHref } from "@/lib/notifications/deep-links";
+import type { PlatformNotification } from "@/types/partnership";
 import { cn } from "@/lib/utils";
 
-export type AppNotification = {
-  id: string;
-  title: string;
-  body: string;
-  createdAt: string;
-  read?: boolean;
+export type AppNotification = PlatformNotification & {
+  href?: string;
+  metadata?: Record<string, unknown>;
 };
 
 type NotificationContextValue = {
   notifications: AppNotification[];
   unreadCount: number;
-  pushNotification: (input: { title: string; body: string }) => void;
-  markAllRead: () => void;
-  clearNotifications: () => void;
+  loading: boolean;
+  connectionState: "connected" | "disconnected" | "connecting" | "reconnecting";
+  refresh: () => Promise<void>;
+  markRead: (id: string) => Promise<void>;
+  markAllRead: () => Promise<void>;
+  pushNotification: (input: AppNotification) => void;
 };
 
-const NotificationContext = createContext<NotificationContextValue | null>(
-  null,
-);
+const NotificationContext = createContext<NotificationContextValue | null>(null);
 
-const SEED: AppNotification[] = [
-  {
-    id: "n1",
-    title: "Welcome to Dream Wave",
-    body: "Explore AI Studio, Learn, and Books from your dashboard.",
-    createdAt: new Date().toISOString(),
-    read: false,
-  },
-  {
-    id: "n2",
-    title: "Tip: Global search",
-    body: "Press Ctrl/⌘ + K to jump across platform modules.",
-    createdAt: new Date(Date.now() - 3600000).toISOString(),
-    read: false,
-  },
-];
-
-/** Isolate notification state updates from the app tree. */
-const StableTree = memo(function StableTree({
-  children,
-}: {
-  children: ReactNode;
-}) {
+const StableTree = memo(function StableTree({ children }: { children: ReactNode }) {
   return children;
 });
 
@@ -68,53 +51,114 @@ export function useNotifications() {
     return {
       notifications: [] as AppNotification[],
       unreadCount: 0,
+      loading: false,
+      connectionState: "disconnected" as const,
+      refresh: async () => undefined,
+      markRead: async () => undefined,
+      markAllRead: async () => undefined,
       pushNotification: () => undefined,
-      markAllRead: () => undefined,
-      clearNotifications: () => undefined,
     };
   }
   return ctx;
 }
 
+type RealtimePayload = {
+  id: string;
+  type: string;
+  title: string;
+  body?: string;
+  read?: boolean;
+  metadata?: Record<string, unknown>;
+  createdAt?: string;
+  href?: string;
+};
+
 export function NotificationProvider({ children }: { children: ReactNode }) {
-  const [notifications, setNotifications] = useState<AppNotification[]>(SEED);
+  const { token, isAuthenticated } = useAuth();
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [connectionState, setConnectionState] = useState<NotificationContextValue["connectionState"]>("disconnected");
 
-  const pushNotification = useCallback(
-    (input: { title: string; body: string }) => {
-      setNotifications((prev) => [
-        {
-          id: `n-${Date.now()}`,
-          title: input.title,
-          body: input.body,
-          createdAt: new Date().toISOString(),
-          read: false,
-        },
-        ...prev,
-      ].slice(0, 20));
-    },
-    [],
-  );
+  const refresh = useCallback(async () => {
+    if (!token || !isAuthenticated) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await platformNotificationsApi.list(token, { limit: 30 });
+      setNotifications(res.notifications);
+      setUnreadCount(res.unreadCount);
+    } catch {
+      /* keep existing state on failure */
+    } finally {
+      setLoading(false);
+    }
+  }, [token, isAuthenticated]);
 
-  const markAllRead = useCallback(() => {
-    setNotifications((prev) => prev.map((item) => ({ ...item, read: true })));
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const pushNotification = useCallback((input: AppNotification) => {
+    setNotifications((prev) => {
+      const exists = prev.some((n) => n._id === input._id);
+      if (exists) return prev;
+      return [input, ...prev].slice(0, 50);
+    });
+    if (!input.read) setUnreadCount((c) => c + 1);
   }, []);
 
-  const clearNotifications = useCallback(() => setNotifications([]), []);
+  useSocketEvent<RealtimePayload>("platform:notification", (payload) => {
+    if (!payload?.id) return;
+    pushNotification({
+      _id: payload.id,
+      type: payload.type,
+      title: payload.title,
+      body: payload.body || "",
+      read: payload.read ?? false,
+      createdAt: payload.createdAt || new Date().toISOString(),
+      ...(payload.metadata ? { metadata: payload.metadata } : {}),
+      ...(payload.href ? { href: payload.href } : {}),
+    });
+    setConnectionState("connected");
+  });
 
-  const unreadCount = useMemo(
-    () => notifications.filter((item) => !item.read).length,
-    [notifications],
+  useEffect(() => {
+    if (!isAuthenticated) setConnectionState("disconnected");
+  }, [isAuthenticated]);
+
+  const markRead = useCallback(
+    async (id: string) => {
+      if (!token) return;
+      await platformNotificationsApi.markRead(token, id);
+      setNotifications((prev) => prev.map((n) => (n._id === id ? { ...n, read: true } : n)));
+      setUnreadCount((c) => Math.max(0, c - 1));
+    },
+    [token],
   );
+
+  const markAllRead = useCallback(async () => {
+    if (!token) return;
+    await platformNotificationsApi.markAllRead(token);
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setUnreadCount(0);
+  }, [token]);
 
   const value = useMemo(
     () => ({
       notifications,
       unreadCount,
-      pushNotification,
+      loading,
+      connectionState,
+      refresh,
+      markRead,
       markAllRead,
-      clearNotifications,
+      pushNotification,
     }),
-    [clearNotifications, markAllRead, notifications, pushNotification, unreadCount],
+    [connectionState, loading, markAllRead, markRead, notifications, pushNotification, refresh, unreadCount],
   );
 
   return (
@@ -125,12 +169,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 }
 
 export function NotificationBell() {
-  const {
-    notifications,
-    unreadCount,
-    markAllRead,
-    clearNotifications,
-  } = useNotifications();
+  const { notifications, unreadCount, markRead, markAllRead, connectionState, refresh } =
+    useNotifications();
   const [open, setOpen] = useState(false);
 
   return (
@@ -139,15 +179,11 @@ export function NotificationBell() {
         type="button"
         size="icon-sm"
         variant="ghost"
-        aria-label={
-          unreadCount
-            ? `Notifications, ${unreadCount} unread`
-            : "Notifications"
-        }
+        aria-label={unreadCount ? `Notifications, ${unreadCount} unread` : "Notifications"}
         className="relative"
         onClick={() => {
           setOpen(true);
-          markAllRead();
+          void refresh();
         }}
       >
         <Bell className="size-4" />
@@ -155,8 +191,9 @@ export function NotificationBell() {
           <span
             className="bg-primary text-primary-foreground fade-in absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full text-[10px]"
             style={{ zIndex: Z_INDEX.toast }}
+            aria-hidden="true"
           >
-            {unreadCount}
+            {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         ) : null}
       </Button>
@@ -165,37 +202,91 @@ export function NotificationBell() {
         open={open}
         onOpenChange={setOpen}
         title="Notifications"
-        description="Platform updates and learning tips."
+        description="Important updates from your Dream Wave activity."
       >
-        <div className="space-y-2">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
+            {connectionState === "connected" ? (
+              <>
+                <Wifi className="size-3.5" aria-hidden="true" />
+                <span>Live updates</span>
+              </>
+            ) : (
+              <>
+                <WifiOff className="size-3.5" aria-hidden="true" />
+                <span>Offline — showing saved notifications</span>
+              </>
+            )}
+          </div>
+          <div className="flex gap-2">
+            {unreadCount > 0 ? (
+              <Button type="button" size="sm" variant="outline" className="h-8" onClick={() => void markAllRead()}>
+                Mark all read
+              </Button>
+            ) : null}
+            <Link href="/notifications" className={buttonVariants({ size: "sm", variant: "ghost", className: "h-8" })}>
+              View all
+            </Link>
+          </div>
+        </div>
+
+        <div className="max-h-[60vh] space-y-2 overflow-y-auto">
           {notifications.length === 0 ? (
-            <p className="text-muted-foreground text-sm">You&apos;re all caught up.</p>
+            <p className="text-muted-foreground py-8 text-center text-sm">You&apos;re all caught up.</p>
           ) : (
-            notifications.map((item) => (
-              <article
-                key={item.id}
-                className={cn(
-                  "border-border interactive-surface rounded-xl border px-3 py-2",
-                  !item.read && "bg-muted/40",
-                )}
-              >
-                <p className="text-sm font-medium">{item.title}</p>
-                <p className="text-muted-foreground mt-1 text-xs text-pretty">
-                  {item.body}
-                </p>
-              </article>
-            ))
+            notifications.slice(0, 10).map((item) => {
+              const href = resolveNotificationHref(item);
+              return (
+                <article
+                  key={item._id}
+                  className={cn(
+                    "border-border interactive-surface rounded-xl border px-3 py-2",
+                    !item.read && "bg-muted/40 border-primary/20",
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-medium">{item.title}</p>
+                      {item.body ? (
+                        <p className="text-muted-foreground mt-1 text-xs text-pretty">{item.body}</p>
+                      ) : null}
+                      <p className="text-muted-foreground mt-1 text-[11px]">
+                        {formatNotificationTime(item.createdAt)}
+                      </p>
+                    </div>
+                    {!item.read ? (
+                      <span className="bg-primary mt-1 size-2 shrink-0 rounded-full" aria-label="Unread" />
+                    ) : null}
+                  </div>
+                  <div className="mt-2 flex gap-2">
+                    {href ? (
+                      <Link
+                        href={href}
+                        className={buttonVariants({ size: "sm", variant: "outline", className: "h-7 text-xs" })}
+                        onClick={() => {
+                          void markRead(item._id);
+                          setOpen(false);
+                        }}
+                      >
+                        Open
+                      </Link>
+                    ) : null}
+                    {!item.read ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs"
+                        onClick={() => void markRead(item._id)}
+                      >
+                        Mark read
+                      </Button>
+                    ) : null}
+                  </div>
+                </article>
+              );
+            })
           )}
-          {notifications.length > 0 ? (
-            <Button
-              type="button"
-              variant="outline"
-              className="mt-2 h-9 w-full"
-              onClick={() => clearNotifications()}
-            >
-              Clear all
-            </Button>
-          ) : null}
         </div>
       </Dialog>
     </>

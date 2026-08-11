@@ -3,8 +3,13 @@ import type { CareerIntelligenceState } from "@/types/career-intelligence";
 
 export const CAREER_INTEL_ROUTES = {
   root: AI_ROUTES.career,
+  commandCenter: AI_ROUTES.careerCommandCenter,
+  today: AI_ROUTES.careerToday,
+  copilot: AI_ROUTES.careerCopilot,
+  intelligence: AI_ROUTES.careerIntelligence,
   jobs: AI_ROUTES.careerJobs,
   interview: AI_ROUTES.careerInterview,
+  readiness: AI_ROUTES.careerReadiness,
   analytics: AI_ROUTES.careerAnalytics,
   resume: AI_ROUTES.resume,
   roadmap: AI_ROUTES.roadmap,
@@ -12,7 +17,12 @@ export const CAREER_INTEL_ROUTES = {
 
 export const CAREER_NAV = [
   { label: "Overview", href: CAREER_INTEL_ROUTES.root },
+  { label: "Command Center", href: CAREER_INTEL_ROUTES.commandCenter },
+  { label: "Today", href: CAREER_INTEL_ROUTES.today },
+  { label: "Career Copilot", href: CAREER_INTEL_ROUTES.copilot },
+  { label: "Placement Intel", href: CAREER_INTEL_ROUTES.intelligence },
   { label: "Jobs", href: CAREER_INTEL_ROUTES.jobs },
+  { label: "Readiness", href: CAREER_INTEL_ROUTES.readiness },
   { label: "Interview", href: CAREER_INTEL_ROUTES.interview },
   { label: "Resume", href: CAREER_INTEL_ROUTES.resume },
   { label: "Analytics", href: CAREER_INTEL_ROUTES.analytics },

@@ -1,86 +1,203 @@
-const Post = require('../models/Post')
+const communityService = require('../services/communityService')
 
-// ── GET /api/community/posts ──────────────────────────────────────────────────
+exports.getFeed = async (req, res) => {
+  try {
+    const feed = await communityService.listFeed(req.user, req.query)
+    res.json({ success: true, ...feed })
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ success: false, message: err.message })
+  }
+}
+
 exports.getPosts = async (req, res) => {
   try {
-    const posts = await Post.find()
-      .sort({ createdAt: -1 })
-      .limit(50)
-      .lean()
-
-    // Attach likedByMe flag
-    const userId = req.user._id.toString()
-    const mapped = posts.map(p => ({
-      ...p,
-      likeCount: p.likes.length,
-      likedByMe: p.likes.map(id => id.toString()).includes(userId),
-    }))
-
-    res.json({ success: true, posts: mapped })
+    const feed = await communityService.listFeed(req.user, { ...req.query, mode: req.query.mode || 'for_you' })
+    res.json({ success: true, posts: feed.posts, total: feed.total, page: feed.page, limit: feed.limit })
   } catch (err) {
-    console.error('[communityController.getPosts]', err.message)
-    res.status(500).json({ message: 'Server error.' })
+    res.status(err.statusCode || 500).json({ success: false, message: err.message })
   }
 }
 
-// ── POST /api/community/posts ─────────────────────────────────────────────────
+exports.getPost = async (req, res) => {
+  try {
+    const post = await communityService.getPost(req.user, req.params.id)
+    res.json({ success: true, post })
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ success: false, message: err.message })
+  }
+}
+
 exports.createPost = async (req, res) => {
   try {
-    const { content, tag } = req.body
-    if (!content?.trim()) return res.status(400).json({ message: 'Content is required.' })
-
-    const initials = req.user.name
-      .split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-
-    const post = await Post.create({
-      userId:         req.user._id,
-      authorName:     req.user.name,
-      authorInitials: initials,
-      content:        content.trim(),
-      tag:            tag || 'General',
-    })
-
-    res.status(201).json({
-      success: true,
-      post: { ...post.toObject(), likeCount: 0, likedByMe: false },
-    })
+    const post = await communityService.createPost(req.user, req.body)
+    res.status(201).json({ success: true, post })
   } catch (err) {
-    console.error('[communityController.createPost]', err.message)
-    res.status(500).json({ message: 'Server error.' })
+    res.status(err.statusCode || 500).json({ success: false, message: err.message })
   }
 }
 
-// ── PUT /api/community/posts/:id/like ─────────────────────────────────────────
-exports.toggleLike = async (req, res) => {
+exports.updatePost = async (req, res) => {
   try {
-    const post   = await Post.findById(req.params.id)
-    if (!post) return res.status(404).json({ message: 'Post not found.' })
-
-    const uid    = req.user._id
-    const liked  = post.likes.some(id => id.equals(uid))
-
-    if (liked) {
-      post.likes = post.likes.filter(id => !id.equals(uid))
-    } else {
-      post.likes.push(uid)
-    }
-    await post.save()
-
-    res.json({ success: true, likeCount: post.likes.length, likedByMe: !liked })
+    const post = await communityService.updatePost(req.user, req.params.id, req.body)
+    res.json({ success: true, post })
   } catch (err) {
-    console.error('[communityController.toggleLike]', err.message)
-    res.status(500).json({ message: 'Server error.' })
+    res.status(err.statusCode || 500).json({ success: false, message: err.message })
   }
 }
 
-// ── DELETE /api/community/posts/:id ──────────────────────────────────────────
 exports.deletePost = async (req, res) => {
   try {
-    const post = await Post.findOneAndDelete({ _id: req.params.id, userId: req.user._id })
-    if (!post) return res.status(404).json({ message: 'Post not found or not yours.' })
+    await communityService.deletePost(req.user, req.params.id)
     res.json({ success: true })
   } catch (err) {
-    console.error('[communityController.deletePost]', err.message)
-    res.status(500).json({ message: 'Server error.' })
+    res.status(err.statusCode || 500).json({ success: false, message: err.message })
+  }
+}
+
+exports.toggleLike = async (req, res) => {
+  try {
+    const result = await communityService.toggleReaction(req.user, req.params.id, 'like')
+    res.json({
+      success: true,
+      likeCount: result.likeCount,
+      likedByMe: result.likedByMe,
+    })
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ success: false, message: err.message })
+  }
+}
+
+exports.toggleReaction = async (req, res) => {
+  try {
+    const type = req.params.type || 'like'
+    const result = await communityService.toggleReaction(req.user, req.params.id, type)
+    res.json({ success: true, ...result })
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ success: false, message: err.message })
+  }
+}
+
+exports.addComment = async (req, res) => {
+  try {
+    const result = await communityService.addComment(req.user, req.params.id, req.body.content)
+    res.status(201).json({ success: true, ...result })
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ success: false, message: err.message })
+  }
+}
+
+exports.deleteComment = async (req, res) => {
+  try {
+    const result = await communityService.deleteComment(req.user, req.params.id, req.params.commentId)
+    res.json({ success: true, ...result })
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ success: false, message: err.message })
+  }
+}
+
+exports.toggleBookmark = async (req, res) => {
+  try {
+    const result = await communityService.toggleBookmark(req.user, req.params.id)
+    res.json({ success: true, ...result })
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ success: false, message: err.message })
+  }
+}
+
+exports.listBookmarks = async (req, res) => {
+  try {
+    const bookmarks = await communityService.listBookmarks(req.user, req.query)
+    res.json({ success: true, ...bookmarks })
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ success: false, message: err.message })
+  }
+}
+
+exports.follow = async (req, res) => {
+  try {
+    const result = await communityService.follow(req.user, req.body.targetType, req.body.targetId)
+    res.json({ success: true, ...result })
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ success: false, message: err.message })
+  }
+}
+
+exports.unfollow = async (req, res) => {
+  try {
+    const result = await communityService.unfollow(
+      req.user,
+      req.params.targetType,
+      req.params.targetId,
+    )
+    res.json({ success: true, ...result })
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ success: false, message: err.message })
+  }
+}
+
+exports.listFollowing = async (req, res) => {
+  try {
+    const following = await communityService.listFollowing(req.user)
+    res.json({ success: true, ...following })
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ success: false, message: err.message })
+  }
+}
+
+exports.createCollaborationRequest = async (req, res) => {
+  try {
+    const request = await communityService.createCollaborationRequest(req.user, req.body)
+    res.status(201).json({ success: true, request })
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ success: false, message: err.message })
+  }
+}
+
+exports.respondCollaborationRequest = async (req, res) => {
+  try {
+    const request = await communityService.respondCollaborationRequest(
+      req.user,
+      req.params.id,
+      req.body.action,
+    )
+    res.json({ success: true, request })
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ success: false, message: err.message })
+  }
+}
+
+exports.listCollaborationRequests = async (req, res) => {
+  try {
+    const result = await communityService.listCollaborationRequests(req.user, req.query.role)
+    res.json({ success: true, ...result })
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ success: false, message: err.message })
+  }
+}
+
+exports.reportPost = async (req, res) => {
+  try {
+    const result = await communityService.reportPost(req.user, req.params.id, req.body)
+    res.json({ success: true, ...result })
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ success: false, message: err.message })
+  }
+}
+
+exports.search = async (req, res) => {
+  try {
+    const result = await communityService.searchCommunity(req.user, req.query.q, req.query)
+    res.json({ success: true, ...result })
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ success: false, message: err.message })
+  }
+}
+
+exports.getAiSuggestions = async (req, res) => {
+  try {
+    const result = await communityService.getPostAiSuggestions(req.user, req.params.id)
+    res.json({ success: true, ...result })
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ success: false, message: err.message })
   }
 }

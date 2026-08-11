@@ -50,9 +50,22 @@ function serializeAchievement(a, i) {
   }
 }
 
+function isProjectVisible(project) {
+  if (!project) return false
+  return project.visibility !== 'private'
+}
+
+function isAchievementVisible(achievement) {
+  if (!achievement) return false
+  if (typeof achievement === 'string') return true
+  return achievement.visibility !== 'private'
+}
+
 module.exports = {
   isCertificateVisible,
   isDocumentVisible,
+  isProjectVisible,
+  isAchievementVisible,
   serializeVisibleCertificate,
   serializeAchievement,
 }

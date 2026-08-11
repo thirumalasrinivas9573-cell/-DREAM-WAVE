@@ -78,6 +78,10 @@ const institutionCompanyPartnershipSchema = new mongoose.Schema(
     linkedJobIds: [{ type: String }],
     linkedInternshipIds: [{ type: String }],
     linkedEventIds: [{ type: String }],
+    /** Explicit sharing scopes granted when partnership is active */
+    sharingScopes: [{ type: String, trim: true }],
+    /** Scopes requested at partnership initiation (review on accept) */
+    requestedScopes: [{ type: String, trim: true }],
   },
   { timestamps: true },
 )

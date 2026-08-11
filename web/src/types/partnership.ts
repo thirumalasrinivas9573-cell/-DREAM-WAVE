@@ -93,8 +93,99 @@ export type Partnership = {
   objectives?: string;
   description?: string;
   responseMessage?: string;
+  sharingScopes?: SharingScope[];
+  requestedScopes?: SharingScope[];
   createdAt: string;
   updatedAt: string;
+};
+
+export type SharingScope =
+  | "events"
+  | "opportunities"
+  | "recruitment"
+  | "placement"
+  | "projects"
+  | "skills"
+  | "programs"
+  | "research"
+  | "analytics"
+  | "community";
+
+export type SharedJob = {
+  _id: string;
+  title: string;
+  department?: string;
+  location?: string;
+  workMode?: string;
+  status: string;
+  deadline?: string | null;
+};
+
+export type SharedInternship = {
+  _id: string;
+  title: string;
+  department?: string;
+  location?: string;
+  duration?: string;
+  status: string;
+  deadline?: string | null;
+};
+
+export type SharedDrive = {
+  _id: string;
+  title: string;
+  type?: string;
+  status: string;
+  startDate?: string | null;
+  endDate?: string | null;
+};
+
+export type SharedEvent = {
+  id: string;
+  source: string;
+  title: string;
+  type?: string;
+  status: string;
+  startDate?: string | null;
+  endDate?: string | null;
+};
+
+export type PartnershipWorkspace = {
+  partnership: Partnership;
+  sharingScopes: SharingScope[];
+  requestedScopes: SharingScope[];
+  availableScopes: SharingScope[];
+  shared: {
+    jobs: SharedJob[];
+    internships: SharedInternship[];
+    drives: SharedDrive[];
+    events: SharedEvent[];
+    projects: unknown[];
+    research: unknown[];
+  };
+  analytics: Record<string, number> | null;
+  recentActivity: PartnershipActivity[];
+  scopeAccess: Record<SharingScope, boolean>;
+};
+
+export type CollaborationDashboard = {
+  activePartners: Array<{
+    id: string;
+    status: string;
+    relationshipType: string;
+    sharingScopes: SharingScope[];
+    institution?: OrgSummary;
+    company?: OrgSummary;
+    updatedAt: string;
+  }>;
+  pendingIncoming: Partnership[];
+  pendingOutgoing: Partnership[];
+  recentActivity: PartnershipActivity[];
+  counts: {
+    active: number;
+    pendingIncoming: number;
+    pendingOutgoing: number;
+  };
 };
 
 export type PartnershipStats = {
@@ -152,6 +243,7 @@ export type CreatePartnershipRequestPayload = {
   contactPerson?: PartnershipContact;
   startDate?: string;
   expectedDuration?: string;
+  requestedScopes?: SharingScope[];
 };
 
 export type PartnershipRespondAction = "accept" | "decline" | "info_requested";

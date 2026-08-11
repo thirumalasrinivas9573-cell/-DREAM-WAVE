@@ -48,6 +48,10 @@ import {
   INSTITUTION_RECENT_ACTIVITY,
 } from "@/constants/institution-dashboard";
 import { institutionStudentsApi, type StudentStats } from "@/lib/api/institution-students";
+import {
+  institutionFoundationApi,
+  type InstitutionFoundationDashboard,
+} from "@/lib/api/institution-foundation";
 import { isInstitutionDemoDataEnabled } from "@/lib/institution-data-mode";
 import { cn } from "@/lib/utils";
 import { useInstitutionStore } from "@/store/institution-store";
@@ -64,6 +68,7 @@ export function InstitutionDashboardPage() {
 
   const useLiveApi = Boolean(token) && !isInstitutionDemoDataEnabled();
   const [liveStats, setLiveStats] = useState<StudentStats | null>(null);
+  const [foundationDashboard, setFoundationDashboard] = useState<InstitutionFoundationDashboard | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
 
   useEffect(() => {
@@ -73,9 +78,14 @@ export function InstitutionDashboardPage() {
   useEffect(() => {
     if (!useLiveApi || !token) return;
     setStatsLoading(true);
-    void institutionStudentsApi
-      .getStats(token)
-      .then((res) => setLiveStats(res.stats))
+    void Promise.all([
+      institutionStudentsApi.getStats(token),
+      institutionFoundationApi.getDashboard(token),
+    ])
+      .then(([statsRes, dashboardRes]) => {
+        setLiveStats(statsRes.stats);
+        setFoundationDashboard(dashboardRes.dashboard);
+      })
       .finally(() => setStatsLoading(false));
   }, [useLiveApi, token]);
 
@@ -126,68 +136,72 @@ export function InstitutionDashboardPage() {
   const metrics = [
     {
       label: "Total Students",
-      value: totals.students.toLocaleString(),
+      value: (foundationDashboard?.students.total ?? totals.students).toLocaleString(),
       hint: useLiveApi ? "Live institution records" : "Across all active programs",
-      ...(liveStats ? {} : { trend: "+6.8%" }),
+      ...(useLiveApi && foundationDashboard ? {} : liveStats ? {} : { trend: "+6.8%" }),
       icon: GraduationCap,
     },
     {
       label: "Total Faculty",
-      value: totals.faculty,
-      hint: "Academic and visiting faculty",
-      trend: "+4",
+      value: (foundationDashboard?.faculty?.total ?? (useLiveApi ? 0 : totals.faculty)).toLocaleString(),
+      hint: useLiveApi ? "Institution members with faculty roles" : "Academic and visiting faculty",
+      ...(useLiveApi ? {} : { trend: "+4" }),
       icon: Users,
     },
     {
       label: "Departments",
-      value: departments.length,
+      value: foundationDashboard?.organization.departments ?? departments.length,
       hint: "Academic units",
       icon: Building2,
     },
     {
-      label: "Courses",
-      value: totals.activeCourses,
-      hint: "Active programs",
+      label: "Programs",
+      value: foundationDashboard?.organization.programs ?? totals.activeCourses,
+      hint: useLiveApi ? "Registered institution programs" : "Active programs",
       icon: BookOpen,
     },
     {
       label: "Admissions",
-      value: INSTITUTION_DASHBOARD_METRICS.admissions,
-      hint: "Current intake cycle",
-      trend: "+12.4%",
+      value: foundationDashboard?.admissions.totalApplications ?? (useLiveApi ? 0 : INSTITUTION_DASHBOARD_METRICS.admissions),
+      hint: useLiveApi ? "Enrolled student records" : "Current intake cycle",
+      ...(useLiveApi ? {} : { trend: "+12.4%" }),
       icon: UserCheck,
     },
     {
       label: "Placement Rate",
-      value: liveStats?.placedStudents && liveStats.total
-        ? `${Math.round((liveStats.placedStudents / liveStats.total) * 100)}%`
-        : `${INSTITUTION_DASHBOARD_METRICS.placementRate}%`,
-      hint: liveStats ? "From student intelligence API" : "Graduating cohort",
-      ...(liveStats ? {} : { trend: "+3.2%" }),
+      value: foundationDashboard?.students.placementRate !== undefined
+        ? `${foundationDashboard.students.placementRate}%`
+        : liveStats?.placedStudents && liveStats.total
+          ? `${Math.round((liveStats.placedStudents / liveStats.total) * 100)}%`
+          : useLiveApi
+            ? "0%"
+            : `${INSTITUTION_DASHBOARD_METRICS.placementRate}%`,
+      hint: useLiveApi ? "From live student and placement records" : "Graduating cohort",
+      ...(useLiveApi ? {} : liveStats ? {} : { trend: "+3.2%" }),
       icon: TrendingUp,
     },
     {
       label: "Internships",
-      value: INSTITUTION_DASHBOARD_METRICS.internships,
-      hint: "Active student placements",
+      value: foundationDashboard?.placements.internships ?? (useLiveApi ? 0 : INSTITUTION_DASHBOARD_METRICS.internships),
+      hint: "Active internship opportunities",
       icon: BriefcaseBusiness,
     },
     {
-      label: "Upcoming Events",
-      value: INSTITUTION_DASHBOARD_METRICS.upcomingEvents,
-      hint: "Next 30 days",
+      label: "Research Projects",
+      value: foundationDashboard?.research.activeProjects ?? (useLiveApi ? 0 : INSTITUTION_DASHBOARD_METRICS.upcomingEvents),
+      hint: "Active research initiatives",
       icon: CalendarDays,
     },
     {
-      label: "Announcements",
-      value: INSTITUTION_DASHBOARD_METRICS.announcements,
-      hint: "Published this month",
+      label: "Active Startups",
+      value: foundationDashboard?.incubation.activeStartups ?? (useLiveApi ? 0 : INSTITUTION_DASHBOARD_METRICS.announcements),
+      hint: "Incubation portfolio",
       icon: Megaphone,
     },
     {
-      label: "Active Recruiters",
-      value: INSTITUTION_DASHBOARD_METRICS.activeRecruiters,
-      hint: "Current hiring partners",
+      label: "Hiring Partners",
+      value: foundationDashboard?.placements.activePartnerships ?? (useLiveApi ? 0 : INSTITUTION_DASHBOARD_METRICS.activeRecruiters),
+      hint: "Active company partnerships",
       icon: BellRing,
     },
   ] as const;

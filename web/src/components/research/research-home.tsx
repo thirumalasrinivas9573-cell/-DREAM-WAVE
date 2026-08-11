@@ -94,6 +94,20 @@ export function ResearchHomePage() {
           <p className="text-muted-foreground mt-1 max-w-2xl text-sm text-pretty">
             Research, organize, learn, and collaborate from one modern interface.
           </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              href="/research/workspace"
+              className={cn(buttonVariants({ size: "sm" }))}
+            >
+              Evidence-first workspaces
+            </Link>
+            <Link
+              href="/search/research"
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            >
+              Research Mode
+            </Link>
+          </div>
         </div>
       </header>
 

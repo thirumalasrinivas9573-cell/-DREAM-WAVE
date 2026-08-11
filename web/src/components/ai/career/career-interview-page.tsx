@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { AiPageHeader } from "@/components/ai/ai-shared";
 import { CareerIntelNav } from "@/components/ai/career/career-nav";
@@ -18,96 +18,100 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { INTERVIEW_PROMPTS } from "@/constants/career-intelligence";
+import {
+  careerReadinessApi,
+  type AnswerEvaluation,
+  type InterviewQuestion,
+  type InterviewSession,
+} from "@/lib/api/career-readiness";
 import { toUserSafeMessage } from "@/lib/errors";
-import { studentService } from "@/services/student.service";
-import { useCareerIntelStore } from "@/store/career-intel-store";
-import type { InterviewMode } from "@/types/career-intelligence";
 
-const MODES: Array<{ id: InterviewMode; label: string; detail: string }> = [
-  {
-    id: "technical",
-    label: "Technical",
-    detail: "Concepts, systems, and role depth",
-  },
-  {
-    id: "hr",
-    label: "HR / Behavioral",
-    detail: "STAR stories and communication",
-  },
-  {
-    id: "coding",
-    label: "Coding",
-    detail: "Problem prompts and reasoning",
-  },
-];
+const MODES = [
+  { id: "TECHNICAL", label: "Technical", detail: "Concepts, systems, and role depth" },
+  { id: "BEHAVIORAL", label: "Behavioral", detail: "STAR stories and communication" },
+  { id: "HR", label: "HR", detail: "Communication and situational questions" },
+  { id: "PROJECT", label: "Project", detail: "Questions about your portfolio projects" },
+  { id: "SYSTEM_DESIGN", label: "System Design", detail: "Architecture and trade-offs" },
+  { id: "CODING", label: "Coding", detail: "Problem prompts and reasoning" },
+  { id: "MIXED", label: "Mixed", detail: "Combined practice round" },
+] as const;
+
+const DIFFICULTIES = ["BEGINNER", "INTERMEDIATE", "ADVANCED"] as const;
 
 export function CareerInterviewPage() {
   const { token } = useAuth();
-  const hydrate = useCareerIntelStore((s) => s.hydrate);
-  const hydrated = useCareerIntelStore((s) => s.hydrated);
-  const interviews = useCareerIntelStore((s) => s.interviews);
-  const addInterviewSession = useCareerIntelStore((s) => s.addInterviewSession);
-  const interviewReadiness = useCareerIntelStore((s) => s.interviewReadiness);
-
-  const [mode, setMode] = useState<InterviewMode>("technical");
-  const [question, setQuestion] = useState("");
+  const [mode, setMode] = useState<string>("TECHNICAL");
+  const [difficulty, setDifficulty] = useState<string>("INTERMEDIATE");
+  const [session, setSession] = useState<InterviewSession | null>(null);
+  const [currentQuestion, setCurrentQuestion] = useState<InterviewQuestion | null>(null);
   const [answer, setAnswer] = useState("");
-  const [feedback, setFeedback] = useState("");
+  const [evaluation, setEvaluation] = useState<AnswerEvaluation | null>(null);
+  const [report, setReport] = useState<InterviewSession["report"] | null>(null);
+  const [history, setHistory] = useState<Array<{
+    sessionId: string;
+    mode: string;
+    targetRole: string;
+    reportSummary?: string;
+    createdAt: string;
+  }>>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!hydrated) hydrate();
-  }, [hydrate, hydrated]);
+  const loadHistory = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await careerReadinessApi.history(token);
+      setHistory(res.history);
+    } catch {
+      /* history optional on first load */
+    }
+  }, [token]);
 
-  const startQuestion = async () => {
+  useEffect(() => {
+    void loadHistory();
+  }, [loadHistory]);
+
+  const startInterview = async () => {
     if (!token) return;
     setLoading(true);
     setError(null);
-    setFeedback("");
+    setEvaluation(null);
+    setReport(null);
     setAnswer("");
     try {
-      const data = await studentService.ai.agent(
-        INTERVIEW_PROMPTS[mode],
-        "career",
-        token,
-      );
-      setQuestion(data.reply || "Describe a challenging project you led.");
+      const res = await careerReadinessApi.startInterview(token, {
+        mode,
+        difficulty,
+        questionCount: 3,
+      });
+      setSession(res.session);
+      setCurrentQuestion(res.currentQuestion);
     } catch (err) {
       setError(toUserSafeMessage(err));
-      setQuestion("Describe a challenging project you led recently.");
     } finally {
       setLoading(false);
     }
   };
 
   const submitAnswer = async () => {
-    if (!token || !answer.trim() || !question.trim()) return;
+    if (!token || !session || !currentQuestion || !answer.trim()) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await studentService.ai.agent(
-        `Interview mode: ${mode}. Question: ${question}\nCandidate answer: ${answer}\nProvide concise AI feedback and a score out of 100.`,
-        "career",
-        token,
-      );
-      const reply = data.reply || "Good structure. Add more measurable outcomes.";
-      const scoreMatch = reply.match(
-        /(\d{1,3})\s*\/\s*100|score[:\s]*(\d{1,3})/i,
-      );
-      const score = Math.min(
-        100,
-        Number(scoreMatch?.[1] || scoreMatch?.[2] || 70),
-      );
-      setFeedback(reply);
-      addInterviewSession({
-        mode,
-        question,
-        answer: answer.trim(),
-        feedback: reply,
-        score: Number.isFinite(score) ? score : 70,
+      const res = await careerReadinessApi.submitAnswer(token, session._id, {
+        questionId: currentQuestion.questionId,
+        answerText: answer.trim(),
       });
+      setEvaluation(res.evaluation);
+      if (res.sessionComplete) {
+        setReport(res.report);
+        setCurrentQuestion(null);
+        await loadHistory();
+      } else if (res.nextQuestion) {
+        setCurrentQuestion(res.nextQuestion);
+        setAnswer("");
+        setEvaluation(null);
+      }
     } catch (err) {
       setError(toUserSafeMessage(err));
     } finally {
@@ -115,49 +119,42 @@ export function CareerInterviewPage() {
     }
   };
 
-  if (!hydrated) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <Spinner label="Loading interview studio" />
-      </div>
-    );
-  }
-
   return (
     <div className="container-app page-stack flex flex-1 flex-col py-8 md:py-10">
       <AiPageHeader
-        title="Interview experience"
-        description="Mock technical, HR, and coding interviews with AI feedback and history."
+        title="AI Mock Interview"
+        description="Practice technical, behavioral, project, and system design interviews with structured feedback."
       />
       <CareerIntelNav />
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardDescription>Interview readiness</CardDescription>
-            <CardTitle className="text-2xl">{interviewReadiness}%</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader>
             <CardDescription>Sessions completed</CardDescription>
-            <CardTitle className="text-2xl">{interviews.length}</CardTitle>
+            <CardTitle className="text-2xl">{history.length}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader>
             <CardDescription>Active mode</CardDescription>
-            <CardTitle className="text-lg capitalize">{mode}</CardTitle>
+            <CardTitle className="text-lg">{mode}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardDescription>Difficulty</CardDescription>
+            <CardTitle className="text-lg">{difficulty}</CardTitle>
           </CardHeader>
         </Card>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-3">
+      <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
         {MODES.map((item) => (
           <button
             key={item.id}
             type="button"
             onClick={() => setMode(item.id)}
+            disabled={!!session && session.status === "IN_PROGRESS"}
             className={
               mode === item.id
                 ? "border-border bg-muted/50 ring-ring rounded-2xl border p-4 text-left ring-2"
@@ -171,6 +168,21 @@ export function CareerInterviewPage() {
         ))}
       </div>
 
+      <div className="flex flex-wrap gap-2">
+        {DIFFICULTIES.map((d) => (
+          <Button
+            key={d}
+            type="button"
+            size="sm"
+            variant={difficulty === d ? "default" : "outline"}
+            onClick={() => setDifficulty(d)}
+            disabled={!!session && session.status === "IN_PROGRESS"}
+          >
+            {d}
+          </Button>
+        ))}
+      </div>
+
       {error ? (
         <AuthAlert variant="error" title="Interview notice" description={error} />
       ) : null}
@@ -178,91 +190,152 @@ export function CareerInterviewPage() {
       <Card>
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0">
           <div>
-            <CardTitle>Mock interview dashboard</CardTitle>
+            <CardTitle>Mock interview</CardTitle>
             <CardDescription>
-              Generate a question, answer, then receive AI feedback.
+              Configure type and difficulty, then start your practice session.
             </CardDescription>
           </div>
           <Button
             type="button"
-            onClick={() => void startQuestion()}
-            disabled={loading}
+            onClick={() => void startInterview()}
+            disabled={loading || (!!session && session.status === "IN_PROGRESS" && !!currentQuestion)}
           >
-            {loading && !question ? "Generating…" : "New question"}
+            {loading && !currentQuestion ? "Starting…" : session?.status === "IN_PROGRESS" ? "Session active" : "Start interview"}
           </Button>
         </CardHeader>
         <CardContent className="space-y-3">
-          {loading && !question ? (
+          {loading && !currentQuestion && !report ? (
             <div className="flex justify-center py-8">
-              <Spinner label="Preparing question" />
+              <Spinner label="Preparing session" />
             </div>
           ) : null}
-          {question ? (
+
+          {currentQuestion ? (
             <div className="border-border rounded-xl border px-4 py-3 text-sm">
-              <p className="text-muted-foreground mb-1 text-xs uppercase">
-                Question
-              </p>
-              <p className="whitespace-pre-wrap">{question}</p>
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <p className="text-muted-foreground text-xs uppercase">Question</p>
+                <Badge variant="outline">{currentQuestion.sourceLabel}</Badge>
+              </div>
+              <p className="whitespace-pre-wrap">{currentQuestion.text}</p>
             </div>
-          ) : (
+          ) : !report ? (
             <EmptyState
               title="Start a practice round"
-              description="Choose a mode and generate your first interview question."
+              description="Choose mode and difficulty, then start your mock interview."
             />
-          )}
-          <Textarea
-            value={answer}
-            onChange={(event) => setAnswer(event.target.value)}
-            placeholder="Type your answer…"
-            className="min-h-28"
-            aria-label="Interview answer"
-            disabled={!question || loading}
-          />
-          <Button
-            type="button"
-            disabled={!question || !answer.trim() || loading}
-            onClick={() => void submitAnswer()}
-          >
-            {loading && question ? "Evaluating…" : "Get AI feedback"}
-          </Button>
-          {feedback ? (
-            <div className="border-border bg-muted/30 rounded-xl border px-4 py-3 text-sm whitespace-pre-wrap">
-              {feedback}
+          ) : null}
+
+          {currentQuestion ? (
+            <>
+              <Textarea
+                value={answer}
+                onChange={(event) => setAnswer(event.target.value)}
+                placeholder="Type your answer…"
+                className="min-h-28"
+                aria-label="Interview answer"
+                disabled={loading}
+              />
+              <Button
+                type="button"
+                disabled={!answer.trim() || loading}
+                onClick={() => void submitAnswer()}
+              >
+                {loading ? "Evaluating…" : "Submit answer"}
+              </Button>
+            </>
+          ) : null}
+
+          {evaluation ? (
+            <div className="border-border bg-muted/30 space-y-2 rounded-xl border px-4 py-3 text-sm">
+              {evaluation.strengths.length ? (
+                <div>
+                  <p className="font-medium">Strengths</p>
+                  <ul className="text-muted-foreground list-inside list-disc">
+                    {evaluation.strengths.map((s) => (
+                      <li key={s}>{s}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {evaluation.missing.length ? (
+                <div>
+                  <p className="font-medium">Missing</p>
+                  <ul className="text-muted-foreground list-inside list-disc">
+                    {evaluation.missing.map((s) => (
+                      <li key={s}>{s}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {evaluation.improve.length ? (
+                <div>
+                  <p className="font-medium">How to improve</p>
+                  <ul className="text-muted-foreground list-inside list-disc">
+                    {evaluation.improve.map((s) => (
+                      <li key={s}>{s}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {evaluation.modelStructure ? (
+                <p className="text-muted-foreground text-xs">
+                  Model structure: {evaluation.modelStructure}
+                </p>
+              ) : null}
+              {evaluation.followUp ? (
+                <p className="text-xs">
+                  Follow-up: <span className="italic">{evaluation.followUp}</span>
+                </p>
+              ) : null}
+              {evaluation.flags?.length ? (
+                <p className="text-amber-600 text-xs">{evaluation.flags.join(". ")}</p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {report ? (
+            <div className="border-border space-y-2 rounded-xl border px-4 py-3 text-sm">
+              <p className="font-medium">Session report</p>
+              <p>{report.summary}</p>
+              {report.weakAreas?.length ? (
+                <p className="text-muted-foreground">
+                  Weak areas: {report.weakAreas.join(", ")}
+                </p>
+              ) : null}
+              <Button type="button" variant="outline" size="sm" onClick={() => void startInterview()}>
+                New session
+              </Button>
             </div>
           ) : null}
         </CardContent>
       </Card>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold tracking-tight">
-          Interview history
-        </h2>
-        {interviews.length === 0 ? (
+        <h2 className="text-lg font-semibold tracking-tight">Interview history</h2>
+        {history.length === 0 ? (
           <EmptyState
             title="No sessions yet"
             description="Completed mock interviews will appear here."
           />
         ) : (
           <div className="space-y-2">
-            {interviews.map((session) => (
-              <Card key={session.id}>
+            {history.map((item) => (
+              <Card key={item.sessionId}>
                 <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2 space-y-0">
                   <div>
                     <CardTitle className="text-base capitalize">
-                      {session.mode} interview
+                      {item.mode.toLowerCase()} — {item.targetRole}
                     </CardTitle>
                     <CardDescription>
-                      {new Date(session.createdAt).toLocaleString()}
+                      {new Date(item.createdAt).toLocaleString()}
                     </CardDescription>
                   </div>
-                  <Badge>{session.score}/100</Badge>
                 </CardHeader>
-                <CardContent className="space-y-2 text-sm">
-                  <p className="font-medium">{session.question}</p>
-                  <p className="text-muted-foreground line-clamp-3">
-                    {session.feedback}
-                  </p>
-                </CardContent>
+                {item.reportSummary ? (
+                  <CardContent className="text-muted-foreground text-sm">
+                    {item.reportSummary}
+                  </CardContent>
+                ) : null}
               </Card>
             ))}
           </div>

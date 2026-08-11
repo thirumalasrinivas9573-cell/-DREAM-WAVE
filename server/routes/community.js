@@ -1,16 +1,29 @@
 const express = require('express')
-const router  = express.Router()
-const auth    = require('../middleware/auth')
-const {
-  getPosts,
-  createPost,
-  toggleLike,
-  deletePost,
-} = require('../controllers/communityController')
+const router = express.Router()
+const auth = require('../middleware/auth')
+const communityController = require('../controllers/communityController')
 
-router.get('/',           auth, getPosts)
-router.post('/',          auth, createPost)
-router.put('/:id/like',   auth, toggleLike)
-router.delete('/:id',     auth, deletePost)
+router.get('/feed', auth, communityController.getFeed)
+router.get('/search', auth, communityController.search)
+router.get('/bookmarks', auth, communityController.listBookmarks)
+router.get('/following', auth, communityController.listFollowing)
+router.get('/collaboration', auth, communityController.listCollaborationRequests)
+router.post('/collaboration', auth, communityController.createCollaborationRequest)
+router.post('/collaboration/:id/respond', auth, communityController.respondCollaborationRequest)
+router.post('/follow', auth, communityController.follow)
+router.delete('/follow/:targetType/:targetId', auth, communityController.unfollow)
+
+router.get('/', auth, communityController.getPosts)
+router.post('/', auth, communityController.createPost)
+router.get('/:id/ai-suggestions', auth, communityController.getAiSuggestions)
+router.post('/:id/comments', auth, communityController.addComment)
+router.delete('/:id/comments/:commentId', auth, communityController.deleteComment)
+router.post('/:id/bookmark', auth, communityController.toggleBookmark)
+router.post('/:id/report', auth, communityController.reportPost)
+router.put('/:id/like', auth, communityController.toggleLike)
+router.put('/:id/reactions/:type', auth, communityController.toggleReaction)
+router.get('/:id', auth, communityController.getPost)
+router.patch('/:id', auth, communityController.updatePost)
+router.delete('/:id', auth, communityController.deletePost)
 
 module.exports = router

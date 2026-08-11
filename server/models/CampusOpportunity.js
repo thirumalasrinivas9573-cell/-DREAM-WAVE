@@ -17,6 +17,35 @@ const workflowStageSchema = new mongoose.Schema(
   { _id: false },
 )
 
+const hackathonDetailsSchema = new mongoose.Schema(
+  {
+    teamSizeMin: { type: Number, default: 1, min: 1 },
+    teamSizeMax: { type: Number, default: 4, min: 1 },
+    submissionDeadline: { type: Date, default: null },
+    problemStatements: [{ title: String, description: String }],
+    themes: [{ type: String, trim: true }],
+    tracks: [{ type: String, trim: true }],
+    rules: { type: String, trim: true, default: '' },
+    judgingCriteria: [{ name: String, weight: Number }],
+    prizes: [{ label: String, description: String }],
+    website: { type: String, trim: true, default: '' },
+    city: { type: String, trim: true, default: '' },
+    country: { type: String, trim: true, default: '' },
+  },
+  { _id: false },
+)
+
+const campusRegistrationSchema = new mongoose.Schema(
+  {
+    registrantUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    registrantName: { type: String, trim: true, required: true },
+    registrantEmail: { type: String, trim: true, default: '' },
+    status: { type: String, enum: ['registered', 'cancelled'], default: 'registered' },
+    registeredAt: { type: Date, default: Date.now },
+  },
+  { _id: true },
+)
+
 const shortlistSchema = new mongoose.Schema(
   {
     status: { type: String, enum: ['draft', 'pending_approval', 'published'], default: 'draft' },
@@ -61,6 +90,12 @@ const campusOpportunitySchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'InstitutionCompanyPartnership',
       default: null,
+    },
+    programId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'InstitutionProgram',
+      default: null,
+      index: true,
     },
     linkedJobId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -107,6 +142,9 @@ const campusOpportunitySchema = new mongoose.Schema(
       index: true,
     },
     openPositions: { type: Number, default: 1, min: 0 },
+    capacity: { type: Number, default: null, min: 0 },
+    hackathonDetails: { type: hackathonDetailsSchema, default: null },
+    registrations: [campusRegistrationSchema],
     createdByUserId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

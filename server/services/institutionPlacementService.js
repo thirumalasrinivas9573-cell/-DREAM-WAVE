@@ -18,6 +18,7 @@ const {
 } = require('../constants/institutionPlacements')
 const { STAGE_ALIASES } = require('../constants/recruitment')
 const { evaluateEligibility } = require('./institutionPlacementEligibilityService')
+const { jobToEligibilityRules, buildEligibilityChecklist } = require('./recruitmentIntelligenceService')
 const { buildListQuery } = require('./institutionStudentService')
 const { recordAudit } = require('./institutionAuditService')
 const institutionCache = require('./institutionCache')
@@ -214,12 +215,50 @@ function serializeApplication(doc, student = null) {
   }
 }
 
-async function getActivePartnershipIds(institutionId) {
+async function getActivePartnershipIds(institutionId, requiredScope = null) {
   const partnerships = await InstitutionCompanyPartnership.find({
     institutionId: oid(institutionId),
     status: 'active',
   }).lean()
-  return partnerships
+  if (!requiredScope) return partnerships
+  return partnerships.filter(
+    (p) => Array.isArray(p.sharingScopes) && p.sharingScopes.includes(requiredScope),
+  )
+}
+
+async function assertInstitutionRecruitmentAccess(institutionId, { job, internship, partnershipId, companyId }) {
+  const partnerships = await getActivePartnershipIds(institutionId, 'recruitment')
+  const partnerCompanyIds = new Set(partnerships.map((p) => p.companyId.toString()))
+  const partnerIds = new Set(partnerships.map((p) => p._id.toString()))
+
+  if (partnershipId && !partnerIds.has(String(partnershipId))) {
+    throw err('Opportunity is not linked to an active institution partnership', 403)
+  }
+
+  const targetCompanyId = companyId?.toString()
+  if (targetCompanyId && !partnerCompanyIds.has(targetCompanyId)) {
+    throw err('Company is not an active institution partner', 403)
+  }
+
+  if (job) {
+    if (job.status !== 'open') throw err('Job is not open for applications', 400)
+    if (job.partnershipId && !partnerIds.has(job.partnershipId.toString())) {
+      throw err('Job is not available through your institution partnerships', 403)
+    }
+    if (!job.partnershipId && !partnerCompanyIds.has(job.companyId.toString())) {
+      throw err('Job company is not an active institution partner', 403)
+    }
+  }
+
+  if (internship) {
+    if (internship.status !== 'open') throw err('Internship is not open for applications', 400)
+    if (internship.partnershipId && !partnerIds.has(internship.partnershipId.toString())) {
+      throw err('Internship is not available through your institution partnerships', 403)
+    }
+    if (!internship.partnershipId && !partnerCompanyIds.has(internship.companyId.toString())) {
+      throw err('Internship company is not an active institution partner', 403)
+    }
+  }
 }
 
 async function getStats(institutionId) {
@@ -428,6 +467,16 @@ async function listApplications(institutionId, filters = {}) {
   }
 }
 
+function assertOpportunityOpen(record) {
+  if (!record) return
+  if (['closed', 'draft', 'archived', 'paused'].includes(record.status)) {
+    throw err('This opportunity is not accepting applications', 400)
+  }
+  if (record.deadline && new Date() > new Date(record.deadline)) {
+    throw err('Application deadline has passed', 400)
+  }
+}
+
 async function submitApplication(institutionId, actorUserId, payload) {
   const student = await InstitutionStudent.findOne({
     _id: payload.institutionStudentId,
@@ -450,9 +499,7 @@ async function submitApplication(institutionId, actorUserId, payload) {
       institutionId: oid(institutionId),
     })
     if (!opportunity) throw err('Opportunity not found', 404)
-    if (opportunity.deadline && new Date() > opportunity.deadline) {
-      throw err('Application deadline has passed', 400)
-    }
+    assertOpportunityOpen(opportunity)
     const eligibility = evaluateEligibility(student, opportunity.eligibilityRules || {})
     if (!eligibility.eligible) {
       throw err(`Not eligible: ${eligibility.reasons.join('; ')}`, 400)
@@ -465,6 +512,12 @@ async function submitApplication(institutionId, actorUserId, payload) {
   } else if (payload.jobId) {
     const job = await RecruitmentJob.findById(payload.jobId)
     if (!job) throw err('Job not found', 404)
+    assertOpportunityOpen(job)
+    await assertInstitutionRecruitmentAccess(institutionId, { job })
+    const eligibility = evaluateEligibility(student, jobToEligibilityRules(job))
+    if (!eligibility.eligible) {
+      throw err(`Not eligible: ${eligibility.reasons.join('; ')}`, 400)
+    }
     jobId = job._id
     companyId = job.companyId
     roleTitle = job.title
@@ -473,6 +526,12 @@ async function submitApplication(institutionId, actorUserId, payload) {
   } else if (payload.internshipId) {
     const internship = await RecruitmentInternship.findById(payload.internshipId)
     if (!internship) throw err('Internship not found', 404)
+    assertOpportunityOpen(internship)
+    await assertInstitutionRecruitmentAccess(institutionId, { internship })
+    const eligibility = evaluateEligibility(student, jobToEligibilityRules(internship))
+    if (!eligibility.eligible) {
+      throw err(`Not eligible: ${eligibility.reasons.join('; ')}`, 400)
+    }
     internshipId = internship._id
     companyId = internship.companyId
     roleTitle = internship.title
@@ -609,6 +668,16 @@ async function getEligibility(institutionId, opportunityId, studentId, source = 
     if (!opp) throw err('Opportunity not found', 404)
     rules = opp.eligibilityRules || {}
     opportunityRef = opp._id
+  } else if (source === 'job') {
+    const job = await RecruitmentJob.findById(opportunityId)
+    if (!job) throw err('Job not found', 404)
+    rules = jobToEligibilityRules(job)
+    opportunityRef = job._id
+  } else if (source === 'internship') {
+    const internship = await RecruitmentInternship.findById(opportunityId)
+    if (!internship) throw err('Internship not found', 404)
+    rules = jobToEligibilityRules(internship)
+    opportunityRef = internship._id
   }
 
   const application = await RecruitmentApplication.findOne({
@@ -620,11 +689,13 @@ async function getEligibility(institutionId, opportunityId, studentId, source = 
   })
 
   const result = evaluateEligibility(student, rules, application)
+  const detailed = buildEligibilityChecklist(student, rules, application)
   return {
     studentId: student._id.toString(),
     studentName: student.fullName,
     opportunityId: opportunityRef?.toString() || opportunityId,
     ...result,
+    ...detailed,
   }
 }
 
@@ -780,6 +851,9 @@ module.exports = {
   listOffers,
   listPools,
   getWorkspace,
+  buildStudentSnapshot,
+  assertInstitutionRecruitmentAccess,
+  getActivePartnershipIds,
   OPPORTUNITY_TYPES,
   OPPORTUNITY_STATUSES,
 }

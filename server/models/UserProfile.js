@@ -68,6 +68,19 @@ const userProfileSchema = new mongoose.Schema({
   notifications: {
     dailyNudge:    { type: Boolean, default: true },
     weeklyReport:  { type: Boolean, default: true },
+    emailEnabled:  { type: Boolean, default: true },
+    inAppEnabled:  { type: Boolean, default: true },
+    categories: {
+      community:   { type: Boolean, default: true },
+      projects:    { type: Boolean, default: true },
+      research:    { type: Boolean, default: true },
+      learning:    { type: Boolean, default: true },
+      events:      { type: Boolean, default: true },
+      recruitment: { type: Boolean, default: true },
+      institution: { type: Boolean, default: true },
+      company:     { type: Boolean, default: true },
+      system:      { type: Boolean, default: true },
+    },
   },
 
 }, { timestamps: true })

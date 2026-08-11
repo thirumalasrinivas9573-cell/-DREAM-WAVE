@@ -34,5 +34,6 @@ const institutionSchema = new mongoose.Schema(
 )
 
 institutionSchema.index({ name: 'text', city: 'text', country: 'text' })
+institutionSchema.index({ isPublic: 1, name: 1 })
 
 module.exports = mongoose.model('Institution', institutionSchema)

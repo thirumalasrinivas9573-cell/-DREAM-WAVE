@@ -1,4 +1,5 @@
 const { searchCompanies, searchInstitutions } = require('../services/partnershipService')
+const { PUBLIC_COMPANY_FIELDS, PUBLIC_INSTITUTION_FIELDS } = require('../constants/ecosystemProfiles')
 
 /** GET /api/discovery/companies */
 exports.searchCompanies = async (req, res) => {
@@ -72,7 +73,9 @@ exports.searchInstitutions = async (req, res) => {
 exports.getCompany = async (req, res) => {
   try {
     const Company = require('../models/Company')
-    const company = await Company.findOne({ _id: req.params.id, isPublic: true }).lean()
+    const company = await Company.findOne({ _id: req.params.id, isPublic: true })
+      .select(PUBLIC_COMPANY_FIELDS)
+      .lean()
     if (!company) {
       return res.status(404).json({ success: false, message: 'Company not found' })
     }
@@ -86,7 +89,9 @@ exports.getCompany = async (req, res) => {
 exports.getInstitution = async (req, res) => {
   try {
     const Institution = require('../models/Institution')
-    const institution = await Institution.findOne({ _id: req.params.id, isPublic: true }).lean()
+    const institution = await Institution.findOne({ _id: req.params.id, isPublic: true })
+      .select(PUBLIC_INSTITUTION_FIELDS)
+      .lean()
     if (!institution) {
       return res.status(404).json({ success: false, message: 'Institution not found' })
     }

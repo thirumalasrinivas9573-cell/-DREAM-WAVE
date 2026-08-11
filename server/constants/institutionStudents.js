@@ -30,7 +30,7 @@ const SCHOLARSHIP_STATUSES = ['none', 'applied', 'approved']
 
 const PROFILE_STATUSES = ['complete', 'partial', 'pending']
 
-const PROJECT_VISIBILITY = ['shared', 'public', 'academic', 'institution-managed']
+const PROJECT_VISIBILITY = ['shared', 'public', 'academic', 'institution-managed', 'private']
 
 const PROJECT_STATUSES = ['completed', 'in-progress', 'planned']
 

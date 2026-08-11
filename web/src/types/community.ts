@@ -42,6 +42,11 @@ export type DiscussionPost = {
   comments: DiscussionComment[];
   saved?: boolean;
   aiSuggestions: string[];
+  postType?: string;
+  visibility?: string;
+  linkedEntity?: { entityType: string; entityId: string; snapshot?: Record<string, unknown> } | null;
+  relevanceReason?: string | null;
+  likedByMe?: boolean;
 };
 
 export type CommunityMentor = {

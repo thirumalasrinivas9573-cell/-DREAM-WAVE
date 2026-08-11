@@ -54,6 +54,30 @@ const taskSchema = new mongoose.Schema({
   completedAt: {
     type: Date,
   },
+  dependsOn: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Task',
+  }],
+  proposed: {
+    type: Boolean,
+    default: false,
+  },
+  snoozedUntil: {
+    type: Date,
+  },
+  failed: {
+    type: Boolean,
+    default: false,
+  },
+  milestoneKey: {
+    type: String,
+    trim: true,
+  },
+  executionPlanId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ExecutionPlan',
+    index: true,
+  },
 }, { timestamps: true })
 
 module.exports = mongoose.model('Task', taskSchema)

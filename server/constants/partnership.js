@@ -67,6 +67,7 @@ const ACTIVITY_TYPES = [
   'partnership_activated',
   'partnership_paused',
   'partnership_terminated',
+  'partnership_scope_changed',
   'mou_uploaded',
   'document_added',
   'document_updated',
@@ -77,11 +78,50 @@ const ACTIVITY_TYPES = [
   'partnership_expiring',
 ]
 
+/** Explicit data-sharing scopes — Lasya V3 Prompt 9 */
+const SHARING_SCOPES = [
+  'events',
+  'opportunities',
+  'recruitment',
+  'placement',
+  'projects',
+  'skills',
+  'programs',
+  'research',
+  'analytics',
+  'community',
+]
+
+const DEFAULT_SCOPES_BY_RELATIONSHIP = {
+  'Recruitment Partner': ['events', 'opportunities', 'recruitment', 'placement'],
+  'Internship Partner': ['events', 'opportunities', 'recruitment', 'placement'],
+  'Placement Partner': ['events', 'opportunities', 'recruitment', 'placement'],
+  'Industry Partner': ['events', 'opportunities'],
+  'Training Partner': ['events', 'programs', 'skills'],
+  'Research Partner': ['research', 'events'],
+  'Innovation Partner': ['events', 'projects', 'opportunities'],
+  'Technology Partner': ['events', 'projects', 'skills'],
+  'Academic Partner': ['programs', 'skills'],
+  'Mentorship Partner': ['community', 'skills'],
+}
+
+const ENTITY_LINK_TYPES = ['job', 'internship', 'drive', 'event']
+
 const NOTIFICATION_TYPES = [
   'partnership_request',
   'partnership_accepted',
   'partnership_declined',
   'partnership_info_requested',
+  'partnership_scope_changed',
+  'partnership_paused',
+  'partnership_cancelled',
+  'program_registration_received',
+  'program_registration_approved',
+  'program_registration_rejected',
+  'program_starting',
+  'program_milestone_due',
+  'program_completed',
+  'program_cancelled',
   'new_internship',
   'new_job',
   'campus_drive_invitation',
@@ -125,6 +165,24 @@ const NOTIFICATION_TYPES = [
   'alumni_career_application_received',
   'alumni_career_application_updated',
   'alumni_community_announcement',
+  'community_post_like',
+  'community_post_comment',
+  'community_new_follower',
+  'community_collaboration_request',
+  'community_collaboration_accepted',
+  'community_collaboration_declined',
+  'community_opportunity_shared',
+  'event_team_invitation',
+  'event_registration_confirmed',
+  'event_updated',
+  'event_cancelled',
+  'event_submission_deadline',
+  'application_status_changed',
+  'learning_milestone_completed',
+  'project_updated',
+  'research_shared',
+  'system_alert',
+  'security_alert',
 ]
 
 const ACTIVE_OR_PENDING_STATUSES = ['invited', 'pending', 'active', 'paused']
@@ -149,6 +207,9 @@ module.exports = {
   EVENT_TYPES,
   ACTIVITY_TYPES,
   NOTIFICATION_TYPES,
+  SHARING_SCOPES,
+  DEFAULT_SCOPES_BY_RELATIONSHIP,
+  ENTITY_LINK_TYPES,
   ACTIVE_OR_PENDING_STATUSES,
   VALID_STATUS_TRANSITIONS,
 }

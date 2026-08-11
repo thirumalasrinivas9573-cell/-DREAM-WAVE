@@ -17,7 +17,11 @@ async function resolveCompanyMember(req, res, next) {
       (m) => m.userId && m.userId.toString() === req.user._id.toString(),
     )
 
-    const role = isOwner ? 'recruitment_admin' : member?.role || 'recruitment_admin'
+    if (!isOwner && !member) {
+      return res.status(403).json({ success: false, message: 'Company membership required' })
+    }
+
+    const role = isOwner ? 'recruitment_admin' : member.role
     req.companyMember = {
       role,
       permissions: permissionsForRole(role),

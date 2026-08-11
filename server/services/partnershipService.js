@@ -1,4 +1,9 @@
 const mongoose = require('mongoose')
+const { escapeRegex, sanitizeTextSearch } = require('../utils/escapeRegex')
+const {
+  PUBLIC_COMPANY_FIELDS,
+  PUBLIC_INSTITUTION_FIELDS,
+} = require('../constants/ecosystemProfiles')
 const InstitutionCompanyPartnership = require('../models/InstitutionCompanyPartnership')
 const PartnershipDocument = require('../models/PartnershipDocument')
 const PartnershipActivity = require('../models/PartnershipActivity')
@@ -11,6 +16,11 @@ const {
   VALID_STATUS_TRANSITIONS,
   ACTIVE_OR_PENDING_STATUSES,
 } = require('../constants/partnership')
+const {
+  normalizeScopes,
+  resolveDefaultScopes,
+  emitPartnershipRealtime,
+} = require('../utils/partnershipScope')
 const {
   recordActivity,
   notifyOrgCounterparty,
@@ -74,9 +84,11 @@ async function createPartnershipRequest({
   startDate = null,
   expectedDuration = '',
   supportingDocuments = [],
+  requestedScopes = [],
   io = null,
 }) {
   assertValidRelationshipType(relationshipType)
+  const normalizedRequested = normalizeScopes(requestedScopes)
 
   const [institution, company] = await Promise.all([
     Institution.findById(institutionId),
@@ -116,6 +128,9 @@ async function createPartnershipRequest({
     startDate,
     expectedDuration,
     supportingDocuments,
+    requestedScopes: normalizedRequested.length
+      ? normalizedRequested
+      : resolveDefaultScopes(relationshipType),
   })
 
   await recordActivity({
@@ -137,6 +152,8 @@ async function createPartnershipRequest({
     initiatorRole: initiatedBy,
     io,
   })
+
+  await emitPartnershipRealtime('PARTNERSHIP_REQUESTED', partnership)
 
   return populatePartnership(InstitutionCompanyPartnership.findById(partnership._id))
 }
@@ -171,6 +188,10 @@ async function respondToRequest({
     assertStatusTransition(partnership.status, 'active')
     partnership.status = 'active'
     partnership.requestStatus = 'accepted'
+    partnership.sharingScopes = resolveDefaultScopes(
+      partnership.relationshipType,
+      partnership.requestedScopes,
+    )
 
     await recordActivity({
       partnershipId: partnership._id,
@@ -201,6 +222,10 @@ async function respondToRequest({
       initiatorRole: responderRole === 'institution' ? 'company' : 'institution',
       io,
     })
+
+    await emitPartnershipRealtime('PARTNERSHIP_ACCEPTED', partnership, {
+      sharingScopes: partnership.sharingScopes,
+    })
   } else if (action === 'decline') {
     partnership.status = 'declined'
     partnership.requestStatus = 'declined'
@@ -224,6 +249,8 @@ async function respondToRequest({
       initiatorRole: responderRole === 'institution' ? 'company' : 'institution',
       io,
     })
+
+    await emitPartnershipRealtime('PARTNERSHIP_REJECTED', partnership)
   } else if (action === 'info_requested') {
     partnership.requestStatus = 'info_requested'
 
@@ -490,20 +517,26 @@ async function addPartnershipDocument({
 async function listPartnershipDocuments(partnershipId, actor) {
   const partnership = await getPartnershipById(partnershipId)
   await assertPartnershipAccess(partnership, actor)
-  return PartnershipDocument.find({ partnershipId }).sort({ createdAt: -1 }).lean()
+  return PartnershipDocument.find({
+    partnershipId,
+    $or: [{ isPrivate: { $ne: true } }, { uploadedByUserId: actor.userId }],
+  })
+    .sort({ createdAt: -1 })
+    .lean()
 }
 
 async function searchCompanies(filters = {}) {
   const query = { isPublic: true }
-  if (filters.industry && filters.industry !== 'all') query.industry = new RegExp(filters.industry, 'i')
-  if (filters.location && filters.location !== 'all') {
-    query.$or = [
-      { location: new RegExp(filters.location, 'i') },
-      { city: new RegExp(filters.location, 'i') },
-    ]
+  if (filters.industry && filters.industry !== 'all') {
+    query.industry = new RegExp(escapeRegex(filters.industry), 'i')
   }
-  if (filters.q) {
-    query.$text = { $search: filters.q }
+  if (filters.location && filters.location !== 'all') {
+    const loc = escapeRegex(filters.location)
+    query.$or = [{ location: new RegExp(loc, 'i') }, { city: new RegExp(loc, 'i') }]
+  }
+  const searchText = sanitizeTextSearch(filters.q)
+  if (searchText) {
+    query.$text = { $search: searchText }
   }
 
   const page = Math.max(1, parseInt(filters.page, 10) || 1)
@@ -511,7 +544,12 @@ async function searchCompanies(filters = {}) {
   const skip = (page - 1) * limit
 
   const [items, total] = await Promise.all([
-    Company.find(query).sort(filters.q ? { score: { $meta: 'textScore' } } : { name: 1 }).skip(skip).limit(limit).lean(),
+    Company.find(query)
+      .select(PUBLIC_COMPANY_FIELDS)
+      .sort(searchText ? { score: { $meta: 'textScore' } } : { name: 1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
     Company.countDocuments(query),
   ])
 
@@ -522,19 +560,18 @@ async function searchInstitutions(filters = {}) {
   const query = { isPublic: true }
   if (filters.type && filters.type !== 'all') query.type = filters.type
   if (filters.location && filters.location !== 'all') {
-    query.$or = [
-      { city: new RegExp(filters.location, 'i') },
-      { country: new RegExp(filters.location, 'i') },
-    ]
+    const loc = escapeRegex(filters.location)
+    query.$or = [{ city: new RegExp(loc, 'i') }, { country: new RegExp(loc, 'i') }]
   }
   if (filters.department && filters.department !== 'all') {
-    query.departments = new RegExp(filters.department, 'i')
+    query.departments = new RegExp(escapeRegex(filters.department), 'i')
   }
   if (filters.program && filters.program !== 'all') {
-    query.programs = new RegExp(filters.program, 'i')
+    query.programs = new RegExp(escapeRegex(filters.program), 'i')
   }
-  if (filters.q) {
-    query.$text = { $search: filters.q }
+  const searchText = sanitizeTextSearch(filters.q)
+  if (searchText) {
+    query.$text = { $search: searchText }
   }
 
   const page = Math.max(1, parseInt(filters.page, 10) || 1)
@@ -542,7 +579,12 @@ async function searchInstitutions(filters = {}) {
   const skip = (page - 1) * limit
 
   const [items, total] = await Promise.all([
-    Institution.find(query).sort(filters.q ? { score: { $meta: 'textScore' } } : { name: 1 }).skip(skip).limit(limit).lean(),
+    Institution.find(query)
+      .select(PUBLIC_INSTITUTION_FIELDS)
+      .sort(searchText ? { score: { $meta: 'textScore' } } : { name: 1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
     Institution.countDocuments(query),
   ])
 

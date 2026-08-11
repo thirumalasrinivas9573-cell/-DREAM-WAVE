@@ -321,7 +321,7 @@ exports.resetPassword = async (req, res) => {
   }
 };
 
-const VALID_ROLES = ['student', 'institution', 'company', 'admin'];
+const VALID_ROLES = ['student', 'institution', 'company'];
 
 // @desc    Complete onboarding (role + profile details)
 // @route   POST /api/auth/onboarding
@@ -331,7 +331,7 @@ exports.completeOnboarding = async (req, res) => {
 
     if (!role || !VALID_ROLES.includes(role)) {
       return res.status(400).json({
-        message: 'A valid role is required (student, institution, company, admin)',
+        message: 'A valid role is required (student, institution, company)',
       });
     }
 

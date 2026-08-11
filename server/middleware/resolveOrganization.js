@@ -1,5 +1,6 @@
 const Institution = require('../models/Institution')
 const Company = require('../models/Company')
+const InstitutionMember = require('../models/InstitutionMember')
 
 async function ensureInstitutionProfile(user) {
   let institution = await Institution.findOne({ ownerUserId: user._id })
@@ -25,6 +26,34 @@ async function ensureCompanyProfile(user) {
   return company
 }
 
+async function resolveInstitutionForUser(user) {
+  const owned = await Institution.findOne({ ownerUserId: user._id })
+  if (owned) return owned
+
+  const membership = await InstitutionMember.findOne({
+    userId: user._id,
+    active: { $ne: false },
+  })
+  if (membership) {
+    const institution = await Institution.findById(membership.institutionId)
+    if (institution) return institution
+  }
+
+  return ensureInstitutionProfile(user)
+}
+
+async function resolveCompanyForUser(user) {
+  const owned = await Company.findOne({ ownerUserId: user._id })
+  if (owned) return owned
+
+  const memberCompany = await Company.findOne({
+    'recruiterTeam.userId': user._id,
+  })
+  if (memberCompany) return memberCompany
+
+  return ensureCompanyProfile(user)
+}
+
 /**
  * Resolves organization from authenticated session — never trust client-supplied org IDs.
  */
@@ -35,9 +64,9 @@ async function resolveOrganization(req, res, next) {
     }
 
     if (req.user.role === 'institution') {
-      req.institution = await ensureInstitutionProfile(req.user)
+      req.institution = await resolveInstitutionForUser(req.user)
     } else if (req.user.role === 'company') {
-      req.company = await ensureCompanyProfile(req.user)
+      req.company = await resolveCompanyForUser(req.user)
     }
 
     next()
@@ -50,4 +79,6 @@ module.exports = {
   resolveOrganization,
   ensureInstitutionProfile,
   ensureCompanyProfile,
+  resolveInstitutionForUser,
+  resolveCompanyForUser,
 }

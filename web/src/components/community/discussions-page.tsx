@@ -21,12 +21,19 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { mapCommunityApiPost } from "@/lib/community/map-post";
+import { communityApi } from "@/lib/api/community";
 import { toUserSafeMessage } from "@/lib/errors";
-import { studentService } from "@/services/student.service";
 import { useCommunityStore } from "@/store/community-store";
 import type { DiscussionPost } from "@/types/community";
 
 const TAGS = ["General", "Achievement", "Books", "Goals", "Habits"] as const;
+const FEED_MODES = [
+  { id: "for_you", label: "For You" },
+  { id: "following", label: "Following" },
+  { id: "projects", label: "Projects" },
+  { id: "research", label: "Research" },
+  { id: "opportunities", label: "Opportunities" },
+] as const;
 
 export function DiscussionsPage() {
   const { token } = useAuth();
@@ -48,6 +55,7 @@ export function DiscussionsPage() {
     {},
   );
   const [sharedId, setSharedId] = useState<string | null>(null);
+  const [feedMode, setFeedMode] = useState<(typeof FEED_MODES)[number]["id"]>("for_you");
 
   useEffect(() => {
     if (!hydrated) hydrate();
@@ -66,7 +74,7 @@ export function DiscussionsPage() {
     }
 
     try {
-      const data = await studentService.community.list(token);
+      const data = await communityApi.getFeed(token, { mode: feedMode });
       const mapped = (data.posts ?? []).map(mapCommunityApiPost);
       setPosts(mapped);
       setLiked(
@@ -82,7 +90,7 @@ export function DiscussionsPage() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, feedMode]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -115,8 +123,8 @@ export function DiscussionsPage() {
     setPublishing(true);
     setError(null);
     try {
-      const data = await studentService.community.create(
-        { content, tag },
+      const data = await communityApi.create(
+        { content, title: title.trim(), tag, postType: "DISCUSSION", visibility: "public" },
         token,
       );
       setPosts((prev) => [mapCommunityApiPost(data.post), ...prev]);
@@ -137,7 +145,7 @@ export function DiscussionsPage() {
     }
 
     try {
-      const data = await studentService.community.toggleLike(postId, token);
+      const data = await communityApi.toggleLike(postId, token);
       setLiked((prev) => ({ ...prev, [postId]: data.likedByMe }));
       setPosts((prev) =>
         prev.map((post) =>
@@ -177,6 +185,23 @@ export function DiscussionsPage() {
         }
       />
       <CommunityNav />
+
+      {usingLiveFeed ? (
+        <div className="flex flex-wrap gap-2" role="tablist" aria-label="Feed filters">
+          {FEED_MODES.map((mode) => (
+            <Button
+              key={mode.id}
+              type="button"
+              size="sm"
+              variant={feedMode === mode.id ? "default" : "outline"}
+              aria-pressed={feedMode === mode.id}
+              onClick={() => setFeedMode(mode.id)}
+            >
+              {mode.label}
+            </Button>
+          ))}
+        </div>
+      ) : null}
 
       {error ? (
         <AuthAlert
@@ -250,6 +275,21 @@ export function DiscussionsPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm whitespace-pre-wrap">{post.body}</p>
+                {post.linkedEntity?.snapshot ? (
+                  <div className="bg-muted/40 rounded-xl border p-3 text-sm">
+                    <p className="font-medium">
+                      {(post.linkedEntity.snapshot.title as string) ||
+                        (post.linkedEntity.snapshot.topic as string) ||
+                        "Linked content"}
+                    </p>
+                    {post.linkedEntity.snapshot.description ? (
+                      <p className="text-muted-foreground mt-1">{String(post.linkedEntity.snapshot.description)}</p>
+                    ) : null}
+                  </div>
+                ) : null}
+                {post.relevanceReason ? (
+                  <p className="text-muted-foreground text-xs">{post.relevanceReason}</p>
+                ) : null}
                 <div className="flex flex-wrap gap-1.5">
                   {post.tags.map((item) => (
                     <Badge key={item} variant="secondary">
@@ -282,7 +322,23 @@ export function DiscussionsPage() {
                     size="sm"
                     variant="ghost"
                     aria-pressed={Boolean(post.saved)}
-                    onClick={() => toggleSavePost(post.id)}
+                    onClick={async () => {
+                      if (usingLiveFeed && token) {
+                        try {
+                          const data = await communityApi.toggleBookmark(post.id, token);
+                          setPosts((prev) =>
+                            prev.map((item) =>
+                              item.id === post.id ? { ...item, saved: data.bookmarkedByMe } : item,
+                            ),
+                          );
+                        } catch (err) {
+                          setError(toUserSafeMessage(err));
+                        }
+                        return;
+                      }
+                      toggleSavePost(post.id);
+                      setPosts(useCommunityStore.getState().posts);
+                    }}
                   >
                     <Bookmark className="size-3.5" aria-hidden="true" />
                     {post.saved ? "Saved" : "Save"}
@@ -360,9 +416,35 @@ export function DiscussionsPage() {
                     />
                     <Button
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
                         const draft = commentDrafts[post.id] || "";
-                        if (usingLiveFeed) {
+                        if (!draft.trim()) return;
+                        if (usingLiveFeed && token) {
+                          try {
+                            const data = await communityApi.addComment(post.id, draft.trim(), token);
+                            setPosts((prev) =>
+                              prev.map((item) =>
+                                item.id === post.id
+                                  ? {
+                                      ...item,
+                                      comments: [
+                                        ...item.comments,
+                                        {
+                                          id: data.comment?.id || `local-${Date.now()}`,
+                                          author: data.comment?.name || "You",
+                                          body: data.comment?.content || draft.trim(),
+                                          createdAt: data.comment?.createdAt || new Date().toISOString(),
+                                          replies: [],
+                                        },
+                                      ],
+                                    }
+                                  : item,
+                              ),
+                            );
+                          } catch (err) {
+                            setError(toUserSafeMessage(err));
+                          }
+                        } else if (usingLiveFeed) {
                           setPosts((prev) =>
                             prev.map((item) =>
                               item.id === post.id
