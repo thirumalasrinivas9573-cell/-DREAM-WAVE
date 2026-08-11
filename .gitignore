@@ -50,3 +50,18 @@ public/
 
 # ── Render cache ────────────────────────────────────────────────────────────────
 .render-buildpacks.json
+
+# ── Uploads & reports (keep folders via .gitkeep) ───────────────────────────────
+server/uploads/*
+!server/uploads/.gitkeep
+server/reports/*
+!server/reports/.gitkeep
+
+# ── Local caches / binary downloads (never commit mongod) ───────────────────────
+.vite
+coverage
+server/tests/.cache/
+server/.cache/
+**/.cache/
+**/mongodb-memory-server/
+*.node
