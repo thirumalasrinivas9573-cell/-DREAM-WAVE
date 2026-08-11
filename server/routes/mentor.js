@@ -1,25 +1,27 @@
-const express = require('express');
-const ctrl = require('../controllers/mentorController');
-const { protect } = require('../middleware/auth');
-const { requireVerifiedEmail } = require('../middleware/requireVerifiedEmail');
-const { uploadFile } = require('../middleware/upload');
-const { zodValidate } = require('../middleware/validate');
-const schemas = require('../config/schemas');
+const express = require('express')
+const router = express.Router()
+const auth = require('../middleware/auth')
+const controller = require('../controllers/mentorController')
 
-const router = express.Router();
-router.use(protect);
-router.get('/', ctrl.list);
-router.post('/', zodValidate(schemas.mentorCreate), ctrl.create);
-router.get('/:id', ctrl.getOne);
-router.patch('/:id', zodValidate(schemas.mentorUpdate), ctrl.rename);
-router.get('/:id/export', ctrl.exportChat);
-router.post(
-  '/:id/messages',
-  requireVerifiedEmail,
-  uploadFile.array('files', 5),
-  zodValidate(schemas.mentorMessage),
-  ctrl.sendMessage
-);
-router.delete('/:id', ctrl.remove);
+const requireStudent = (req, res, next) => {
+  if (req.user?.role !== 'student') {
+    return res.status(403).json({ success: false, code: 'STUDENT_ONLY', message: 'Student mentor access only.' })
+  }
+  return next()
+}
 
-module.exports = router;
+router.get('/conversations', auth, requireStudent, controller.listConversations)
+router.post('/conversations', auth, requireStudent, controller.createConversation)
+router.get('/conversations/search', auth, requireStudent, controller.searchConversations)
+router.get('/conversations/:id', auth, requireStudent, controller.getConversation)
+router.patch('/conversations/:id', auth, requireStudent, controller.updateConversation)
+router.delete('/conversations/:id', auth, requireStudent, controller.deleteConversation)
+router.get('/context-preview', auth, requireStudent, controller.getContextPreview)
+router.delete('/memory/saved/:index', auth, requireStudent, controller.removeSavedMemory)
+
+router.post('/', auth, requireStudent, controller.getMentorAdvice)
+router.post('/chat', auth, requireStudent, controller.mentorChat)
+router.get('/history', auth, requireStudent, controller.getMentorHistory)
+router.delete('/history', auth, requireStudent, controller.clearMentorHistory)
+
+module.exports = router

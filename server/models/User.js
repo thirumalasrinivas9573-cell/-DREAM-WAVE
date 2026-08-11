@@ -1,149 +1,190 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { ROLES, PLANS } = require('../config/constants');
 
-const userSchema = new mongoose.Schema(
-  {
-    name: { type: String, required: true, trim: true },
-    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    password: { type: String, required: true, minlength: 8, select: false },
-    aaid: {
-      type: String,
-      unique: true,
-      default: () => 'AA' + crypto.randomBytes(4).toString('hex').toUpperCase(),
-    },
-    role: { type: String, enum: Object.values(ROLES), default: ROLES.USER },
-    profileImage: { type: String, default: '' },
-    bio: { type: String, default: '', maxlength: 500 },
-    level: { type: Number, default: 1 },
-    credits: { type: Number, default: 100 },
-    streak: { type: Number, default: 0 },
-    learningStreak: { type: Number, default: 0 },
-    lastActiveDate: { type: Date },
-    lastStudyDate: { type: Date },
-    plan: { type: String, enum: Object.values(PLANS), default: PLANS.FREE },
-    organizationId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Organization',
-      default: null,
-      index: true,
-    },
-    stripeCustomerId: { type: String, default: '', index: true },
-    stripeSubscriptionId: { type: String, default: '' },
-    targetCareer: { type: String, default: '' },
-    isEmailVerified: { type: Boolean, default: false },
-    isActive: { type: Boolean, default: true, index: true },
-    passwordChangedAt: { type: Date },
-    emailVerificationToken: String,
-    emailVerificationExpire: Date,
-    emailOtpHash: String,
-    emailOtpExpire: Date,
-    emailOtpAttempts: { type: Number, default: 0 },
-    emailOtpLockedUntil: Date,
-    resetPasswordToken: String,
-    resetPasswordExpire: Date,
-    refreshTokens: [
-      {
-        tokenHash: String,
-        expiresAt: Date,
-        userAgent: String,
-        createdAt: { type: Date, default: Date.now },
-      },
-    ],
-    certificates: [
-      {
-        title: String,
-        skill: String,
-        issuedAt: { type: Date, default: Date.now },
-        credentialId: String,
-      },
-    ],
-    preferences: {
-      theme: { type: String, enum: ['light', 'dark', 'system'], default: 'system' },
-      language: { type: String, default: 'en' },
-      notifications: { type: Boolean, default: true },
-      emailUpdates: { type: Boolean, default: true },
-      focusMinutes: { type: Number, default: 25 },
-    },
+const userSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+    trim: true
   },
-  { timestamps: true }
-);
-
-userSchema.index({ role: 1, createdAt: -1 });
-userSchema.index({ isActive: 1, email: 1 });
-userSchema.index({ isActive: 1, updatedAt: -1 });
-userSchema.index({ 'refreshTokens.expiresAt': 1 });
-userSchema.index({ resetPasswordToken: 1 }, { unique: true, sparse: true });
-userSchema.index({ emailVerificationToken: 1 }, { unique: true, sparse: true });
-userSchema.index({ emailOtpLockedUntil: 1 }, { sparse: true });
-
-userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
-  this.password = await bcrypt.hash(this.password, 12);
-  if (!this.isNew) this.passwordChangedAt = new Date(Date.now() - 1000);
-  next();
+  email: {
+    type: String,
+    required: true,
+    // Not globally unique — one email may own Student + Institution + Company accounts.
+    // Uniqueness is (email, role); see compound index below.
+    lowercase: true,
+    trim: true,
+    index: true,
+  },
+  password: {
+    type: String,
+    required: true,
+    minlength: 8
+  },
+  aaid: {
+    type: String,
+    unique: true,
+    default: () => 'AAID' + crypto.randomBytes(6).toString('hex').toUpperCase(),
+  },
+  profileImage: {
+    type: String,
+    default: ''
+  },
+  level: {
+    type: Number,
+    default: 1
+  },
+  credits: {
+    type: Number,
+    default: 0
+  },
+  streak: {
+    type: Number,
+    default: 0
+  },
+  tasks: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Task'
+  }],
+  goals: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Goal'
+  }],
+  certificates: [{
+    type: {
+      type: String,
+      default: 'completion',
+    },
+    title: {
+      type: String,
+      required: true,
+    },
+    url: {
+      type: String,
+      default: '',
+    },
+    issuedAt: {
+      type: Date,
+      default: Date.now,
+    },
+  }],
+  friends: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  plan: {
+    type: String,
+    enum: ['free', 'pro'],
+    default: 'free',
+  },
+  planActivatedAt: {
+    type: Date,
+  },
+  emailVerified: {
+    type: Boolean,
+    default: false,
+  },
+  verificationOTP: {
+    type: String,
+    default: null,
+  },
+  verificationOTPExpires: {
+    type: Date,
+    default: null,
+  },
+  resetPasswordOTP: {
+    type: String,
+    default: null,
+  },
+  resetPasswordOTPExpires: {
+    type: Date,
+    default: null,
+  },
+  role: {
+    type: String,
+    enum: ['student', 'institution', 'company', 'admin'],
+    required: false,
+  },
+  suspended: {
+    type: Boolean,
+    default: false,
+  },
+  onboardingCompleted: {
+    type: Boolean,
+    default: false,
+  },
+  organizationName: {
+    type: String,
+    default: '',
+    trim: true,
+  },
+  learningGoal: {
+    type: String,
+    default: '',
+    trim: true,
+  },
+  phone: {
+    type: String,
+    default: '',
+    trim: true,
+  },
+  phoneVerified: {
+    type: Boolean,
+    default: false,
+  },
+  phoneOTP: {
+    type: String,
+    default: null,
+  },
+  phoneOTPExpires: {
+    type: Date,
+    default: null,
+  },
+  registrationComplete: {
+    type: Boolean,
+    default: true, // legacy users are complete; portal wizard sets false until finish
+  },
+  emailOtpAttempts: { type: Number, default: 0 },
+  emailOtpSentAt: { type: Date, default: null },
+  phoneOtpAttempts: { type: Number, default: 0 },
+  phoneOtpSentAt: { type: Date, default: null },
+  failedLoginAttempts: { type: Number, default: 0 },
+  lockUntil: { type: Date, default: null },
+  passwordHistory: { type: [String], default: [] },
 });
 
-userSchema.methods.changedPasswordAfter = function (jwtIat) {
-  if (!this.passwordChangedAt) return false;
-  const changed = Math.floor(this.passwordChangedAt.getTime() / 1000);
-  return changed > jwtIat;
+// One portal account per email (student / institution / company / admin)
+userSchema.index({ email: 1, role: 1 }, { unique: true });
+
+// Hash password before saving
+userSchema.pre('save', async function(next) {
+  if (!this.isModified('password')) return next();
+  
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Compare password method
+userSchema.methods.comparePassword = async function(candidatePassword) {
+  return await bcrypt.compare(candidatePassword, this.password);
 };
 
-userSchema.methods.comparePassword = function (candidate) {
-  return bcrypt.compare(candidate, this.password);
-};
-
-userSchema.methods.getSignedJwtToken = function () {
-  return jwt.sign({ id: this._id, role: this.role, type: 'access' }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_ACCESS_EXPIRE || '15m',
-    algorithm: 'HS256',
-  });
-};
-
-userSchema.methods.getRefreshToken = function () {
-  return jwt.sign(
-    {
-      id: this._id,
-      type: 'refresh',
-      jti: crypto.randomBytes(16).toString('hex'),
-    },
-    process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_REFRESH_EXPIRE || '7d', algorithm: 'HS256' }
-  );
-};
-
-userSchema.methods.getResetPasswordToken = function () {
-  const resetToken = crypto.randomBytes(32).toString('hex');
-  this.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-  this.resetPasswordExpire = Date.now() + 30 * 60 * 1000;
-  return resetToken;
-};
-
-userSchema.methods.getEmailVerificationToken = function () {
-  const token = crypto.randomBytes(32).toString('hex');
-  this.emailVerificationToken = crypto.createHash('sha256').update(token).digest('hex');
-  this.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 1000;
-  return token;
-};
-
-/** 6-digit email OTP (hashed). TTL 10 minutes. */
-userSchema.methods.issueEmailOtp = function () {
-  const code = String(crypto.randomInt(100000, 1000000));
-  this.emailOtpHash = crypto.createHash('sha256').update(code).digest('hex');
-  this.emailOtpExpire = Date.now() + 10 * 60 * 1000;
-  this.emailOtpAttempts = 0;
-  this.emailOtpLockedUntil = undefined;
-  return code;
-};
-
-userSchema.methods.verifyEmailOtp = function (code) {
-  if (!this.emailOtpHash || !this.emailOtpExpire) return false;
-  if (this.emailOtpExpire < Date.now()) return false;
-  const hash = crypto.createHash('sha256').update(String(code || '').trim()).digest('hex');
-  return hash === this.emailOtpHash;
-};
+// Generate AAID fallback (default handles this — kept for backward compat)
+userSchema.pre('save', function(next) {
+  if (!this.aaid) {
+    this.aaid = 'AAID' + Math.random().toString(36).substr(2, 9).toUpperCase();
+  }
+  next();
+});
 
 module.exports = mongoose.model('User', userSchema);

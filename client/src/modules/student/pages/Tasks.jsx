@@ -158,7 +158,7 @@ export default function Tasks() {
     const completed = !task.completed
     const updated = await handleUpdate(task, { completed })
     if (updated && completed) {
-        const id = Date.now()
+      const id = Date.now()
       setEffects((current) => [...current, { id, type: 'confetti' }, { id: id + 1, type: 'xp' }])
     }
   }
@@ -266,7 +266,7 @@ export default function Tasks() {
               <select className="select" value={generateGoalId} onChange={(event) => setGenerateGoalId(event.target.value)} aria-label="Goal for roadmap task generation">
                 <option value="">Select goal</option>
                 {goals.filter((goal) => !goal.completed && goal.status !== 'archived').map((goal) => <option value={goal._id} key={goal._id}>{goal.title}</option>)}
-            </select>
+              </select>
               <Button variant="secondary" disabled={!generateGoalId || generating} onClick={() => setGenerateConfirm(true)}>{generating ? 'Generating…' : 'Generate learning plan'}</Button>
             </div>
           </header>

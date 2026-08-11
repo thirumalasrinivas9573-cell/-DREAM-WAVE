@@ -1,11 +1,12 @@
 const express = require('express');
-const { protect } = require('../middleware/auth');
-const { zodValidate } = require('../middleware/validate');
-const schemas = require('../config/schemas');
-const ctrl = require('../controllers/platformSearchController');
-
 const router = express.Router();
-router.use(protect);
-router.get('/', zodValidate({ query: schemas.searchQuery }), ctrl.unifiedSearch);
+const sc = require('../controllers/searchController');
+const { optionalAuth } = require('../middleware/roleGuard');
+const auth = require('../middleware/auth');
+
+router.get('/filters', sc.filterOptions);
+router.get('/unified', optionalAuth, sc.unifiedSearch);
+router.delete('/history', auth, sc.clearSearchHistory);
+router.get('/', optionalAuth, sc.globalSearch);
 
 module.exports = router;

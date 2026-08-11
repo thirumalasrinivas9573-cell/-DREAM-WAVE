@@ -76,7 +76,7 @@ export default function Community() {
             <span>Student community</span>
             <h1>Knowledge feed & collaboration network</h1>
             <p>Share learning updates, showcase projects, ask questions, and discover collaborators across Dream Wave.</p>
-      </div>
+          </div>
           <nav className="community-tabs" aria-label="Feed sections">
             {TABS.map((item) => (
               <button
@@ -176,8 +176,8 @@ export default function Community() {
                 {selectedProject.githubUrl && <a href={selectedProject.githubUrl} target="_blank" rel="noreferrer">Open repository</a>}
               </footer>
             </section>
-        </div>
-      )}
+          </div>
+        )}
       </div>
     </StudentLayout>
   )

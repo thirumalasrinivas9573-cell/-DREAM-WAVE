@@ -1,46 +1,108 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const compression = require('compression');
-const morgan = require('morgan');
-const cookieParser = require('cookie-parser');
-const rateLimit = require('express-rate-limit');
-const mongoose = require('mongoose');
-const { validateEnv } = require('./config/env');
-const connectDB = require('./config/db');
-const { notFound, errorHandler } = require('./middleware/errorHandler');
-const { requestId, sanitizeInput } = require('./middleware/security');
-const { requestTimeout } = require('./middleware/requestTimeout');
-const { startBackgroundJobs, stopBackgroundJobs, getJobStatus } = require('./services/jobRunner');
-const { metricsMiddleware, getMetricsSnapshot } = require('./utils/metrics');
-const logger = require('./utils/logger');
-const { APP_VERSION, resolveReleaseChannel } = require('./config/release');
+require('dotenv').config()
+const express   = require('express')
+const http      = require('http')
+const { Server} = require('socket.io')
+const mongoose  = require('mongoose')
+const cors      = require('cors')
+const helmet    = require('helmet')
+const rateLimit = require('express-rate-limit')
+const cookieParser = require('cookie-parser')
+const jwt = require('jsonwebtoken')
+const User = require('./models/User')
+const { isSessionFamilyActive } = require('./utils/tokenService')
+const { validateEmailEnv } = require('./services/emailService')
+const { validateTwilioEnv } = require('./services/twilioVerify')
+const { validateCoreEnv } = require('./utils/validateEnv')
+const { requestId, rejectMongoOperators } = require('./middleware/requestSecurity')
+const { fail: apiFail } = require('./utils/apiResponse')
 
-validateEnv();
+let compression
+try { compression = require('compression') } catch { compression = null }
 
-const app = express();
-app.set('trust proxy', 1);
+// ── Logger ────────────────────────────────────────────────────────────────────
+const log = {
+  info:  (...a) => console.log (`[${new Date().toISOString()}] INFO `, ...a),
+  warn:  (...a) => console.warn (`[${new Date().toISOString()}] WARN `, ...a),
+  error: (...a) => console.error(`[${new Date().toISOString()}] ERROR`, ...a),
+}
 
-const isProd = process.env.NODE_ENV === 'production';
-const isTest = process.env.NODE_ENV === 'test';
-const RELEASE_CHANNEL = resolveReleaseChannel();
+try {
+  const warnings = validateCoreEnv({ fatalInProduction: true })
+  warnings.forEach((warning) => log.warn(warning))
+} catch (err) {
+  log.error(err.message)
+  process.exit(1)
+}
 
-<<<<<<< Updated upstream
+// Validate Resend / email configuration (fatal in production)
+try {
+  validateEmailEnv({ fatalInProduction: true })
+} catch (err) {
+  log.error(err.message)
+  process.exit(1)
+}
+
+// Validate Twilio Verify (fatal in production)
+try {
+  validateTwilioEnv({ fatalInProduction: true })
+} catch (err) {
+  log.error(err.message)
+  process.exit(1)
+}
+
+// ── Routes ────────────────────────────────────────────────────────────────────
+const authRoutes      = require('./routes/auth')
+const aiRoutes        = require('./routes/aiRoutes')
+const aiExtRoutes     = require('./routes/ai')
+const goalRoutes      = require('./routes/goals')
+const taskRoutes      = require('./routes/tasks')
+const communityRoutes = require('./routes/community')
+const paymentRoutes   = require('./routes/payment')
+const adminRoutes     = require('./routes/admin')
+const institutionRoutes = require('./routes/institution')
+const companyRoutes   = require('./routes/company')
+const discoveryRoutes = require('./routes/discovery')
+const searchRoutes    = require('./routes/search')
+const libraryRoutes   = require('./routes/library')
+const interactionRoutes = require('./routes/interaction')
+const careerRoutes     = require('./routes/career')
+const dashboardRoutes  = require('./routes/dashboard')
+const reportRoutes    = require('./routes/report')
+const roadmapRoutes   = require('./routes/roadmap')
+const booksRoutes     = require('./routes/books')
+const dailyRoutes     = require('./routes/daily')
+const mentorRoutes    = require('./routes/mentor')
+const profileRoutes   = require('./routes/profile')
+const lessonRoutes    = require('./routes/lesson')
+const mjRoutes        = require('./routes/mj')
+const partnershipRoutes = require('./routes/partnerships')
+const platformNotificationRoutes = require('./routes/platformNotifications')
+const recruitmentRoutes = require('./routes/recruitment')
+
 const app    = express()
 const server = http.createServer(app)
+if (process.env.TRUST_PROXY) {
+  app.set('trust proxy', process.env.TRUST_PROXY === 'true' ? 1 : process.env.TRUST_PROXY)
+}
 
 // ── CORS origin resolver ──────────────────────────────────────────────────────
-// Accepts: localhost (any port), any *.netlify.app, and CLIENT_URL env var
+// Localhost + explicit CLIENT_URL / EXTRA_CORS_ORIGINS (comma-separated)
 const corsOrigin = (origin, callback) => {
   if (!origin) return callback(null, true) // curl / mobile / server-to-server
+  const extras = String(process.env.EXTRA_CORS_ORIGINS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const localAllowed = process.env.NODE_ENV !== 'production' && (
+    /^https?:\/\/localhost(:\d+)?$/.test(origin) ||
+    /^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)
+  )
   const ok =
-    !origin ||
-    /^https?:\/\/localhost(:\d+)?$/.test(origin) ||    // localhost dev
-    /^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin) || // 127.0.0.1 dev
-    /\.netlify\.app$/.test(origin) ||                   // any *.netlify.app
-    /\.netlify\.live$/.test(origin) ||                  // netlify deploy previews
-    (process.env.CLIENT_URL && origin === process.env.CLIENT_URL)
+    localAllowed ||
+    /\.netlify\.app$/.test(origin) ||
+    /\.netlify\.live$/.test(origin) ||
+    (process.env.CLIENT_URL && origin === process.env.CLIENT_URL) ||
+    extras.includes(origin)
 
   if (ok) return callback(null, true)
   log.warn(`CORS blocked: ${origin}`)
@@ -54,23 +116,70 @@ const io = new Server(server, {
 })
 app.set('io', io)
 
+io.use(async (socket, next) => {
+  try {
+    const bearer = socket.handshake.auth?.token
+      || socket.handshake.headers?.authorization?.replace(/^Bearer\s+/i, '')
+    if (!bearer) return next(new Error('Authentication required'))
+    const decoded = jwt.verify(bearer, process.env.JWT_SECRET, {
+      issuer: 'dream-wave-api',
+      audience: 'dream-wave-client',
+    })
+    if (decoded.type !== 'access' || !decoded.sid) return next(new Error('Invalid session'))
+    if (!await isSessionFamilyActive(decoded.id, decoded.sid)) return next(new Error('Session revoked'))
+    const user = await User.findById(decoded.id).select('_id role suspended')
+    if (!user || user.suspended) return next(new Error('Account unavailable'))
+    socket.user = user
+    return next()
+  } catch {
+    return next(new Error('Invalid session'))
+  }
+})
+
 io.on('connection', socket => {
   log.info(`Socket connected: ${socket.id}`)
-  socket.on('join', userId => { socket.join(`user:${userId}`) })
+  socket.join(`user:${socket.user._id}`)
   socket.on('disconnect', () => { log.info(`Socket disconnected: ${socket.id}`) })
 })
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 if (compression) app.use(compression())
+app.use(requestId)
 app.use(helmet({ crossOriginResourcePolicy: false }))
 app.use(cors({ origin: corsOrigin, credentials: true }))
+app.use(cookieParser())
 
 // Rate limiters
-const authLimiter = rateLimit({ windowMs: 15*60*1000, max: 30,  standardHeaders: true, message: { success: false, message: 'Too many auth attempts.' } })
+// Session maintenance (/refresh, /me, logout) is not a brute-force vector — exclude it
+// from the strict auth limiter so tab reloads do not lock users out of login/OTP.
+const isProd = process.env.NODE_ENV === 'production'
+const skipAuthSessionPaths = (req) =>
+  /^\/(refresh|logout|logout-all|me|sessions|profile|login-history)(\/|$)/.test(req.path || '')
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isProd ? 40 : 300,
+  standardHeaders: true,
+  skip: skipAuthSessionPaths,
+  message: { success: false, message: 'Too many auth attempts. Please wait and try again.' },
+})
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isProd ? 20 : 100,
+  standardHeaders: true,
+  message: { success: false, message: 'Too many login attempts. Please wait and try again.' },
+})
 const aiLimiter   = rateLimit({ windowMs: 60*1000,    max: 40,  standardHeaders: true, message: { success: false, message: 'AI rate limit. Please wait.' } })
-const apiLimiter  = rateLimit({ windowMs: 15*60*1000, max: 500, standardHeaders: true, message: { success: false, message: 'Too many requests.' } })
+const apiLimiter  = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 500,
+  standardHeaders: true,
+  skip: (req) => req.originalUrl?.startsWith('/api/payment/webhook'),
+  message: { success: false, message: 'Too many requests.' },
+})
+app.use('/api/auth/login', loginLimiter)
 app.use('/api/auth', authLimiter)
 app.use('/api/ai',   aiLimiter)
+app.use('/api/mentor', aiLimiter)
 app.use('/api',      apiLimiter)
 
 // Stripe webhook needs raw body BEFORE json parser
@@ -79,14 +188,15 @@ app.use('/api/payment/webhook', express.raw({ type: 'application/json' }))
 // Body parsers
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true }))
+app.use(rejectMongoOperators)
 
 // Request logger
-app.use((req, _res, next) => { log.info(`${req.method} ${req.path}`); next() })
+app.use((req, _res, next) => { log.info(`${req.id} ${req.method} ${req.path}`); next() })
 
 // ── MongoDB ───────────────────────────────────────────────────────────────────
 const connectDB = async (attempt = 1) => {
-  const url = process.env.MONGODB_URL
-  if (!url) { log.error('MONGODB_URL not set'); return }
+  const url = process.env.MONGODB_URL || process.env.MONGODB_URI
+  if (!url) { log.error('MONGODB_URL (or MONGODB_URI) not set'); return }
   try {
     const conn = await mongoose.connect(url, {
       serverSelectionTimeoutMS: 10000,
@@ -94,6 +204,16 @@ const connectDB = async (attempt = 1) => {
       maxPoolSize:              10,
     })
     log.info(`MongoDB connected: ${conn.connection.host}`)
+    try {
+      const User = require('./models/User')
+      const { ensureMultiPortalUserIndexes } = require('./utils/ensureMultiPortalIndexes')
+      const { ensureCoreIndexes } = require('./utils/ensureCoreIndexes')
+      await ensureMultiPortalUserIndexes(mongoose, User)
+      await ensureCoreIndexes(mongoose)
+    } catch (idxErr) {
+      log.error(`Database index ensure failed: ${idxErr.message}`)
+      if (process.env.NODE_ENV === 'production') throw idxErr
+    }
   } catch (err) {
     log.error(`MongoDB attempt ${attempt}/3: ${err.message}`)
     if (attempt < 3) setTimeout(() => connectDB(attempt + 1), 5000)
@@ -102,7 +222,14 @@ const connectDB = async (attempt = 1) => {
 connectDB()
 
 // ── Health ────────────────────────────────────────────────────────────────────
-app.get('/health',    (_req, res) => res.json({ status: 'OK', ts: Date.now(), env: process.env.NODE_ENV }))
+app.get('/health', (_req, res) => res.json({ status: 'OK', ts: Date.now(), env: process.env.NODE_ENV }))
+app.get('/ready', async (_req, res) => {
+  const ready = mongoose.connection.readyState === 1
+  if (!ready) {
+    return res.status(503).json({ status: 'NOT_READY', mongo: mongoose.connection.readyState })
+  }
+  return res.json({ status: 'READY', mongo: 'connected', ts: Date.now() })
+})
 app.get('/api/test',  (_req, res) => res.json({ success: true, message: 'Dream Wave API is running' }))
 
 // ── API Routes ────────────────────────────────────────────────────────────────
@@ -114,20 +241,41 @@ app.use('/api/tasks',     taskRoutes)
 app.use('/api/community', communityRoutes)
 app.use('/api/payment',   paymentRoutes)
 app.use('/api/admin',     adminRoutes)
+// Lasya institution sub-modules (specific paths before general /api/institution)
+app.use('/api/institution/students', require('./routes/institutionStudents'))
+app.use('/api/institution/placements', require('./routes/institutionPlacements'))
+app.use('/api/institution/research', require('./routes/institutionResearch'))
+app.use('/api/institution/incubation', require('./routes/institutionIncubation'))
+app.use('/api/institution/alumni', require('./routes/institutionAlumni'))
+app.use('/api/institution/command-center', require('./routes/institutionCommandCenter'))
+app.use('/api/institution', institutionRoutes)
+app.use('/api/company',   companyRoutes)
+app.use('/api/discovery', discoveryRoutes)
+app.use('/api/search',    searchRoutes)
+app.use('/api/library',   libraryRoutes)
+app.use('/api/interaction', interactionRoutes)
+app.use('/api/career',    careerRoutes)
+app.use('/api/academics', require('./routes/academics'))
+app.use('/api/research', require('./routes/research'))
+app.use('/api/dashboard', dashboardRoutes)
+app.use('/api/activity', require('./routes/activity'))
+app.use('/api/intelligence', require('./routes/intelligence'))
+app.use('/api/agent', aiLimiter, require('./routes/agentOrchestration'))
+app.use('/api/memory', require('./routes/memory'))
+app.use('/api/notifications', require('./routes/notifications'))
+app.use('/api/content-reports', require('./routes/contentReports'))
 app.use('/api/report',    reportRoutes)
 app.use('/api/roadmap',   roadmapRoutes)
 app.use('/api/books',     booksRoutes)
 app.use('/api/daily',     dailyRoutes)
 app.use('/api/mentor',    mentorRoutes)
-<<<<<<< Updated upstream
-=======
-app.use('/api/agent',     aiLimiter, require('./routes/agentOrchestration'))
-app.use('/api/memory',    require('./routes/memory'))
 app.use('/api/planner',   require('./routes/planner'))
->>>>>>> Stashed changes
 app.use('/api/profile',   profileRoutes)
 app.use('/api/lesson',    lessonRoutes)
 app.use('/api/mj',        mjRoutes)
+app.use('/api/partnerships', partnershipRoutes)
+app.use('/api/platform-notifications', platformNotificationRoutes)
+app.use('/api/recruitment', recruitmentRoutes)
 
 // ── Global error handler ──────────────────────────────────────────────────────
 app.use((err, req, res, _next) => {
@@ -136,394 +284,63 @@ app.use((err, req, res, _next) => {
     const msg = Object.values(err.errors).map(v => v.message).join(', ')
     return res.status(400).json({ success: false, message: msg })
   }
-  if (err.code === 11000) return res.status(400).json({ success: false, message: 'Email already registered.' })
+  if (err.code === 11000) {
+    const key = err.keyPattern || {}
+    if (key.email && key.role) {
+      const role = err.keyValue?.role || 'portal'
+      const label = role.charAt(0).toUpperCase() + String(role).slice(1)
+      return res.status(400).json({
+        success: false,
+        message: `This ${label} account already exists.`,
+        code: 'PORTAL_EXISTS',
+      })
+    }
+    return res.status(400).json({ success: false, message: 'Account already registered for this portal.' })
+  }
   if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError')
     return res.status(401).json({ success: false, message: 'Session expired. Please log in again.' })
   if (err.message?.startsWith('CORS'))
     return res.status(403).json({ success: false, message: err.message })
-  res.status(err.statusCode || 500).json({
+  const status = err.statusCode || 500
+  res.status(status).json({
     success: false,
-    message: err.message || 'Something went wrong',
+    message: status >= 500 ? 'Internal server error.' : (err.message || 'Request failed.'),
+    code: err.code || (status >= 500 ? 'INTERNAL_ERROR' : 'REQUEST_ERROR'),
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
-=======
-app.use(requestId);
-app.use(metricsMiddleware);
-app.use(requestTimeout());
-app.use(
-  helmet({
-    crossOriginResourcePolicy: { policy: 'cross-origin' },
-    contentSecurityPolicy: false,
-    referrerPolicy: { policy: 'no-referrer' },
-    hsts: isProd ? { maxAge: 15552000, includeSubDomains: true } : false,
->>>>>>> Stashed changes
   })
-);
+})
 
-const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173')
-  .split(',')
-  .map((s) => s.trim())
-  .filter(Boolean);
+// ── 404 ───────────────────────────────────────────────────────────────────────
+app.use('*', (req, res) => apiFail(res, 404, `Route ${req.originalUrl} not found`, 'NOT_FOUND'))
 
-app.use(
-  cors({
-    origin(origin, cb) {
-      if (isProd && allowedOrigins.includes('*')) {
-        return cb(null, false);
-      }
-      if (!origin || allowedOrigins.includes(origin) || (!isProd && allowedOrigins.includes('*'))) {
-        return cb(null, true);
-      }
-      return cb(null, false);
-    },
-    credentials: true,
-  })
-);
+// ── Start ─────────────────────────────────────────────────────────────────────
+const PORT = parseInt(process.env.PORT || '5001', 10)
+server.listen(PORT, '0.0.0.0', () =>
+  log.info(`Server running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`)
+)
 
-app.use(compression());
-app.use(cookieParser());
-app.use(
-  morgan(isProd ? 'combined' : 'dev', {
-    stream: { write: (msg) => logger.info(msg.trim()) },
-    skip: () => isTest,
-  })
-);
-
-const webhookLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: Number(process.env.WEBHOOK_RATE_LIMIT) || 120,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { success: false, message: 'Too many webhook requests.', failureClass: 'rate_limit' },
-  skip: () => isTest,
-});
-
-// Stripe webhook needs the raw body for signature verification (before JSON parser)
-app.post(
-  '/api/billing/webhook',
-  webhookLimiter,
-  express.raw({ type: 'application/json' }),
-  require('./controllers/billingController').webhook
-);
-
-app.use(express.json({ limit: '2mb' }));
-app.use(express.urlencoded({ extended: true, limit: '2mb' }));
-app.use(sanitizeInput);
-
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: Number(process.env.API_RATE_LIMIT) || 500,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { success: false, message: 'Too many requests. Try again later.', failureClass: 'rate_limit' },
-  skip: (req) => {
-    if (isTest) return true;
-    const path = (req.originalUrl || req.url || '').split('?')[0];
-    return path === '/api/health' || path === '/api/ready';
-  },
-  handler: (req, res, _next, options) => {
-    try {
-      const { recordRateLimited } = require('./utils/metrics');
-      recordRateLimited();
-      const ops = require('./services/opsIntelligenceService');
-      ops.recordSecurityEvent({
-        type: 'rate_limited',
-        severity: 'medium',
-        user: req.user?._id || null,
-        ip: req.ip || '',
-        path: req.originalUrl,
-        requestId: req.requestId,
-        meta: { limiter: 'api' },
-      });
-    } catch {
-      /* ignore */
-    }
-    res.status(options.statusCode).json(options.message);
-  },
-});
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { success: false, message: 'Too many auth attempts. Try again later.', failureClass: 'rate_limit' },
-  skip: () => isTest,
-  handler: (req, res, _next, options) => {
-    try {
-      const { recordRateLimited } = require('./utils/metrics');
-      recordRateLimited();
-      const ops = require('./services/opsIntelligenceService');
-      ops.recordSecurityEvent({
-        type: 'rate_limited',
-        severity: 'high',
-        ip: req.ip || '',
-        path: req.originalUrl,
-        requestId: req.requestId,
-        meta: { limiter: 'auth' },
-      });
-    } catch {
-      /* ignore */
-    }
-    res.status(options.statusCode).json(options.message);
-  },
-});
-const contactLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 10,
-  message: { success: false, message: 'Too many contact messages. Try again later.', failureClass: 'rate_limit' },
-  skip: () => isTest,
-});
-const uploadLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: Number(process.env.UPLOAD_RATE_LIMIT) || 60,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { success: false, message: 'Too many uploads. Try again later.', failureClass: 'rate_limit' },
-  skip: () => isTest,
-});
-
-app.use('/api', apiLimiter);
-app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/signup', authLimiter);
-app.use('/api/auth/forgot-password', authLimiter);
-app.use('/api/auth/reset-password', authLimiter);
-app.use('/api/auth/verify-email', authLimiter);
-app.use('/api/auth/change-password', authLimiter);
-app.use('/api/auth/refresh', authLimiter);
-app.use('/api/auth/resend-verification', authLimiter);
-app.use('/api/auth/otp', authLimiter);
-app.use('/api/settings/contact', contactLimiter);
-app.use('/api/media', uploadLimiter);
-app.use('/api/documents', uploadLimiter);
-app.use('/api/research', uploadLimiter);
-app.use('/api/books/upload', uploadLimiter);
-app.use('/api/collab', uploadLimiter);
-
-const PORT = process.env.PORT || 5000;
-let httpServer = null;
-let shuttingDown = false;
-
-app.get('/api/health', async (_req, res) => {
-  if (shuttingDown) {
-    return res.status(503).json({
-      success: false,
-      status: 'draining',
-      mongo: 'draining',
-      version: APP_VERSION,
-      time: new Date().toISOString(),
-    });
-  }
-  const readyState = mongoose.connection.readyState;
-  const mongo = readyState === 1 ? 'up' : readyState === 2 ? 'connecting' : 'down';
-  const status = mongo === 'up' ? 'ok' : 'degraded';
-
-  // Production: minimal public health (no jobs/memory/storage leakage).
-  if (isProd) {
-    return res.status(mongo === 'up' ? 200 : 503).json({
-      success: mongo === 'up',
-      status,
-      mongo,
-      version: APP_VERSION,
-      time: new Date().toISOString(),
-    });
-  }
-
-  let storage = { status: 'unknown' };
-  let queue = { status: 'unknown' };
-  try {
-    const ops = require('./services/opsIntelligenceService');
-    storage = ops.storageHealth();
-    queue = ops.queueHealth();
-  } catch {
-    /* optional enrichment */
-  }
-  const body = {
-    success: mongo === 'up',
-    status,
-    mongo,
-    database: { status: mongo, readyState },
-    storage,
-    queue,
-    api: { status: 'up' },
-    version: APP_VERSION,
-    releaseChannel: RELEASE_CHANNEL,
-    uptimeSec: Math.round(process.uptime()),
-    jobs: getJobStatus(),
-    memory: {
-      rss: process.memoryUsage().rss,
-      heapUsed: process.memoryUsage().heapUsed,
-    },
-    time: new Date().toISOString(),
-  };
-  res.status(mongo === 'up' ? 200 : 503).json(body);
-});
-
-app.get('/api/ready', async (_req, res) => {
-  if (shuttingDown) {
-    return res.status(503).json({ success: false, status: 'draining', mongo: 'draining' });
-  }
-  if (mongoose.connection.readyState !== 1) {
-    return res.status(503).json({ success: false, status: 'not_ready', mongo: 'down' });
-  }
-  try {
-    const { pingDatabase } = require('./config/db');
-    const ping = await pingDatabase({
-      timeoutMs: Number(process.env.READY_PING_TIMEOUT_MS) || 2000,
-    });
-    if (!ping.ok) {
-      return res.status(503).json({
-        success: false,
-        status: 'not_ready',
-        mongo: 'degraded',
-        reason: ping.reason,
-        pingMs: ping.latencyMs,
-      });
-    }
-    return res.json({
-      success: true,
-      status: 'ready',
-      mongo: 'up',
-      pingMs: ping.latencyMs,
-      version: APP_VERSION,
-    });
-  } catch (err) {
-    return res.status(503).json({
-      success: false,
-      status: 'not_ready',
-      mongo: 'error',
-      reason: err.message,
-    });
-  }
-});
-
-app.get(
-  '/api/metrics',
-  require('./middleware/auth').protect,
-  require('./middleware/auth').authorize('admin'),
-  (_req, res) => {
-    const snap = getMetricsSnapshot();
-    let storage = null;
-    try {
-      storage = require('./services/opsIntelligenceService').storageHealth();
-    } catch {
-      storage = null;
-    }
-    res.json({
-      success: true,
-      data: {
-        ...snap,
-        mongo: mongoose.connection.readyState === 1 ? 'up' : 'down',
-        jobs: getJobStatus(),
-        storage,
-      },
-    });
-  }
-);
-
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/assets', require('./routes/assets'));
-app.use('/api/goals', require('./routes/goals'));
-app.use('/api/tasks', require('./routes/tasks'));
-app.use('/api/roadmap', require('./routes/roadmap'));
-app.use('/api/mentor', require('./routes/mentor'));
-app.use('/api/ai', require('./routes/ai'));
-app.use('/api/documents', require('./routes/documents'));
-app.use('/api/research', require('./routes/research'));
-app.use('/api/habits', require('./routes/habits'));
-app.use('/api/learning', require('./routes/learning'));
-app.use('/api/lms', require('./routes/lms'));
-app.use('/api/planner', require('./routes/planner'));
-app.use('/api/resume', require('./routes/resume'));
-app.use('/api/career', require('./routes/career'));
-app.use('/api/books', require('./routes/books'));
-app.use('/api/media', require('./routes/media'));
-app.use('/api/reports', require('./routes/report'));
-app.use('/api/community', require('./routes/community'));
-app.use('/api/collab', require('./routes/collab'));
-app.use('/api/graph', require('./routes/graph'));
-app.use('/api/adaptive', require('./routes/adaptive'));
-app.use('/api/productivity', require('./routes/productivity'));
-app.use('/api/personalization', require('./routes/personalization'));
-app.use('/api/ops', require('./routes/ops'));
-app.use('/api/search', require('./routes/search'));
-app.use('/api/dashboard', require('./routes/dashboard'));
-app.use('/api/settings', require('./routes/settings'));
-app.use('/api/billing', require('./routes/billing'));
-app.use('/api/orgs', require('./routes/orgs'));
-app.use('/api/jobs', require('./routes/jobs'));
-app.use('/api/admin', require('./routes/admin'));
-
-app.use(notFound);
-app.use(errorHandler);
-
+let shuttingDown = false
 async function shutdown(signal) {
-  if (shuttingDown) return;
-  shuttingDown = true;
-  logger.info(`Shutting down (${signal})`);
-  stopBackgroundJobs();
-  const forceTimer = setTimeout(() => {
-    logger.error('Forced shutdown after timeout');
-    process.exit(1);
-  }, 15000);
-  if (typeof forceTimer.unref === 'function') forceTimer.unref();
-
-  try {
-    if (httpServer) {
-      await new Promise((resolve) => httpServer.close(resolve));
+  if (shuttingDown) return
+  shuttingDown = true
+  log.info(`${signal} received — shutting down gracefully`)
+  server.close(async () => {
+    try {
+      await mongoose.connection.close(false)
+      log.info('MongoDB connection closed')
+    } catch (err) {
+      log.warn('MongoDB close error:', err?.message)
     }
-    if (mongoose.connection.readyState !== 0) {
-      await mongoose.connection.close();
-    }
-    clearTimeout(forceTimer);
-    process.exit(0);
-  } catch (err) {
-    logger.error('Shutdown error', { error: err.message });
-    process.exit(1);
-  }
+    process.exit(0)
+  })
+  setTimeout(() => {
+    log.error('Forced shutdown after timeout')
+    process.exit(1)
+  }, 15000).unref()
 }
 
-async function start() {
-  await connectDB();
-  startBackgroundJobs();
-  httpServer = app.listen(PORT, () =>
-    logger.info(`Dream Wave AI server listening on port ${PORT}`, {
-      version: APP_VERSION,
-      releaseChannel: RELEASE_CHANNEL,
-    })
-  );
-  httpServer.keepAliveTimeout = Number(process.env.HTTP_KEEPALIVE_MS) || 65000;
-  httpServer.headersTimeout = Number(process.env.HTTP_HEADERS_TIMEOUT_MS) || 70000;
-  httpServer.requestTimeout = Number(process.env.HTTP_REQUEST_TIMEOUT_MS) || 120000;
-  httpServer.on('error', (err) => {
-    logger.error('HTTP server failed to bind', { error: err.message, code: err.code });
-    process.exit(1);
-  });
-  return httpServer;
-}
+process.on('SIGTERM', () => shutdown('SIGTERM'))
+process.on('SIGINT', () => shutdown('SIGINT'))
 
-if (require.main === module) {
-  start().catch((err) => {
-    logger.error('Failed to start server', { error: err.message });
-    process.exit(1);
-  });
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
-  process.on('SIGINT', () => shutdown('SIGINT'));
-  process.on('unhandledRejection', (reason) => {
-    logger.error('Unhandled promise rejection', {
-      error: reason instanceof Error ? reason.message : String(reason),
-    });
-  });
-  process.on('uncaughtException', (err) => {
-    logger.error('Uncaught exception', { error: err.message, stack: err.stack });
-    shutdown('uncaughtException');
-  });
-}
-
-module.exports = app;
-module.exports.start = start;
-module.exports.shutdown = shutdown;
-module.exports.setShuttingDown = (value) => {
-  shuttingDown = Boolean(value);
-};
-module.exports.isShuttingDown = () => shuttingDown;
-module.exports.APP_VERSION = APP_VERSION;
-module.exports.RELEASE_CHANNEL = RELEASE_CHANNEL;
+process.on('unhandledRejection', err => log.warn('Unhandled rejection:', err?.message))
+process.on('uncaughtException',  err => { log.error('Uncaught exception:', err?.message); process.exit(1) })

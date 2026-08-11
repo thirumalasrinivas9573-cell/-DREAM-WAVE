@@ -1,17 +1,13 @@
-const express = require('express');
-const ctrl = require('../controllers/dashboardController');
-const { protect } = require('../middleware/auth');
-const { requireVerifiedEmail } = require('../middleware/requireVerifiedEmail');
+const express = require('express')
+const auth = require('../middleware/auth')
+const { studentDashboard } = require('../controllers/studentDashboardController')
 
-const router = express.Router();
-router.use(protect);
-router.get('/stats', ctrl.getStats);
-router.get('/progress', ctrl.getProgress);
-router.get('/suggestions', requireVerifiedEmail, ctrl.getSuggestions);
-router.get('/notifications', ctrl.getNotifications);
-router.patch('/notifications/read-all', ctrl.markAllRead);
-router.delete('/notifications/read', ctrl.clearReadNotifications);
-router.patch('/notifications/:id/read', ctrl.markRead);
-router.delete('/notifications/:id', ctrl.removeNotification);
+const router = express.Router()
+const requireStudent = (req, res, next) => {
+  if (req.user?.role !== 'student') return res.status(403).json({ success: false, code: 'STUDENT_ONLY', message: 'Student dashboard access only.' })
+  return next()
+}
 
-module.exports = router;
+router.get('/student', auth, requireStudent, studentDashboard)
+
+module.exports = router

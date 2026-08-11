@@ -1,39 +1,63 @@
-const express = require('express');
-const ctrl = require('../controllers/aiController');
-const { protect } = require('../middleware/auth');
-const { requireVerifiedEmail } = require('../middleware/requireVerifiedEmail');
-const { zodValidate } = require('../middleware/validate');
-const schemas = require('../config/schemas');
-const rateLimit = require('express-rate-limit');
+/**
+ * Supplemental AI routes that are not provided by aiRoutes.js.
+ * Keep this router intentionally small to avoid shadowed duplicate endpoints.
+ */
+const router = require('express').Router()
+const UserProfile = require('../models/UserProfile')
+const auth = require('../middleware/auth')
+const { sanitizeInput } = require('../middleware/sanitize')
+const { openai } = require('../utils/openaiClient')
 
-const aiLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 30,
-  message: { success: false, message: 'AI rate limit exceeded. Slow down.', failureClass: 'rate_limit' },
-  skip: () => process.env.NODE_ENV === 'test',
-});
+router.use(sanitizeInput)
 
-const router = express.Router();
-router.use(protect, aiLimiter);
+router.get('/progress', auth, async (req, res) => {
+  try {
+    const profile = await UserProfile.findOneAndUpdate(
+      { userId: req.user._id },
+      { $setOnInsert: { userId: req.user._id } },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    )
+    res.json({
+      success: true,
+      progress: {
+        consistencyScore: profile.consistencyScore,
+        focusScore: profile.focusScore,
+        dailyStreak: profile.dailyStreak,
+        lastActivity: profile.lastActivity,
+      },
+    })
+  } catch (err) {
+    console.error('[ai/progress]', err.message)
+    res.status(500).json({ success: false, message: 'Failed to load progress.' })
+  }
+})
 
-router.get('/modes', ctrl.listModes);
-router.get('/models', ctrl.listModels);
-router.get('/credits', ctrl.getCredits);
-router.get('/usage', ctrl.getUsage);
+router.get('/daily-suggestion', auth, async (req, res) => {
+  try {
+    const Goal = require('../models/Goal')
+    const Task = require('../models/Task')
+    const [goals, tasks] = await Promise.all([
+      Goal.find({ userId: req.user._id, completed: false }).select('title progress').limit(3).lean(),
+      Task.find({ userId: req.user._id, completed: false }).select('title').limit(5).lean(),
+    ])
+    const goalList = goals.map((goal) => `- ${goal.title} (${goal.progress || 0}% done)`).join('\n') || 'No active goals'
+    const taskList = tasks.map((task) => `- ${task.title}`).join('\n') || 'No pending tasks'
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      temperature: 0.7,
+      max_tokens: 300,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: 'You are a concise career mentor. Return valid JSON only.' },
+        { role: 'user', content: `Create today's suggestion from goals:\n${goalList}\nTasks:\n${taskList}. Keys: greeting, focus, action, avoid, affirmation.` },
+      ],
+    })
+    const suggestion = JSON.parse(completion.choices[0].message.content)
+    res.json({ success: true, suggestion })
+  } catch (err) {
+    console.error('[ai/daily-suggestion]', err.message)
+    res.status(500).json({ success: false, message: 'Failed to generate suggestion.' })
+  }
+})
 
-router.get('/prompts', ctrl.listPrompts);
-router.post('/prompts', zodValidate(schemas.aiPromptCreate), ctrl.createPrompt);
-router.put('/prompts/:id', zodValidate(schemas.aiPromptUpdate), ctrl.updatePrompt);
-router.delete('/prompts/:id', ctrl.deletePrompt);
-
-router.post('/run', requireVerifiedEmail, zodValidate(schemas.aiRun), ctrl.run);
-router.post('/quick', requireVerifiedEmail, zodValidate(schemas.aiQuick), ctrl.quick);
-router.post('/stream', requireVerifiedEmail, zodValidate(schemas.aiStream), ctrl.stream);
-router.post(
-  '/assistants/:name',
-  requireVerifiedEmail,
-  zodValidate(schemas.aiRun),
-  ctrl.assistant
-);
-
-module.exports = router;
+module.exports = router

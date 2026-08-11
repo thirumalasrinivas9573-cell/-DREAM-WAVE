@@ -1,29 +1,66 @@
 const express = require('express');
-const auth = require('../controllers/authController');
-const { protect } = require('../middleware/auth');
-const { zodValidate } = require('../middleware/validate');
-const { uploadImage } = require('../middleware/upload');
-const { requireTrustedOrigin } = require('../middleware/security');
-const schemas = require('../config/schemas');
-
 const router = express.Router();
+const auth = require('../middleware/auth');
+const { requireTrustedOrigin } = require('../middleware/requestSecurity');
+const {
+  signup,
+  login,
+  aaidLogin,
+  getMe,
+  getProfile,
+  forgotPassword,
+  resendOtp,
+  verifyOtp,
+  resetPassword,
+  completeOnboarding,
+  sendPhoneOtp,
+  verifyPhoneOtp,
+  registerVerified,
+  portalInit,
+  portalSendPhone,
+  portalVerifyPhone,
+  portalComplete,
+  portalResendPhone,
+  verifyLoginEmailOtp,
+  refresh,
+  logout,
+  logoutAll,
+  listSessions,
+  revokeSession,
+  revokeAllSessions,
+  listLoginHistory,
+} = require('../controllers/authController');
 
-router.post('/signup', zodValidate(schemas.signup), auth.signup);
-router.post('/login', zodValidate(schemas.login), auth.login);
-router.post('/refresh', requireTrustedOrigin, auth.refresh);
-router.post('/forgot-password', zodValidate(schemas.forgotPassword), auth.forgotPassword);
-router.put('/reset-password/:token', zodValidate(schemas.resetPassword), auth.resetPassword);
-router.get('/verify-email/:token', auth.verifyEmail);
+router.post('/signup', signup);
+router.post('/register', signup);
+router.post('/register-verified', registerVerified);
+router.post('/login', login);
+router.post('/aaid-login', aaidLogin);
+router.get('/me', auth, getMe);
+router.get('/profile', auth, getProfile);
+router.post('/forgot-password', forgotPassword);
+router.post('/resend-otp', resendOtp);
+router.post('/verify-otp', verifyOtp);
+router.post('/verify-email-otp', verifyOtp);
+router.post('/reset-password', resetPassword);
+router.post('/onboarding', auth, completeOnboarding);
 
-router.post('/logout', requireTrustedOrigin, auth.logout);
-router.get('/me', protect, auth.getMe);
-router.get('/sessions', protect, auth.sessions);
-router.delete('/sessions/:id', protect, auth.revokeSession);
-router.post('/resend-verification', protect, auth.resendVerification);
-router.post('/otp/send', protect, auth.sendEmailOtp);
-router.post('/otp/verify', protect, zodValidate(schemas.otpVerify), auth.verifyEmailOtp);
-router.put('/profile', protect, uploadImage.single('avatar'), zodValidate(schemas.updateProfile), auth.updateProfile);
-router.put('/change-password', protect, zodValidate(schemas.changePassword), auth.changePassword);
-router.put('/preferences', protect, zodValidate(schemas.preferences), auth.updatePreferences);
+router.post('/send-phone-otp', sendPhoneOtp);
+router.post('/verify-phone-otp', verifyPhoneOtp);
+router.post('/verify-mobile-otp', verifyPhoneOtp);
+
+router.post('/portal/init', portalInit);
+router.post('/portal/send-phone', portalSendPhone);
+router.post('/portal/verify-phone', portalVerifyPhone);
+router.post('/portal/complete', portalComplete);
+router.post('/portal/resend-phone', portalResendPhone);
+router.post('/verify-login-email-otp', verifyLoginEmailOtp);
+router.post('/refresh', requireTrustedOrigin, refresh);
+router.post('/logout', requireTrustedOrigin, logout);
+router.post('/logout-all', requireTrustedOrigin, auth, logoutAll);
+router.get('/sessions', auth, listSessions);
+router.delete('/sessions/:id', auth, revokeSession);
+router.delete('/sessions', auth, revokeAllSessions);
+router.get('/login-history', auth, listLoginHistory);
 
 module.exports = router;

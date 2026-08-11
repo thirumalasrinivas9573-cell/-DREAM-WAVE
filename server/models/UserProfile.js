@@ -81,8 +81,6 @@ const userProfileSchema = new mongoose.Schema({
     },
   },
 
-<<<<<<< Updated upstream
-=======
   // ── V2 Intelligence Core ────────────────────────────────────────────────────
   preferredTopics: [{ type: String, trim: true }],
   careerPreferences: {
@@ -144,7 +142,6 @@ const userProfileSchema = new mongoose.Schema({
     }],
   },
 
->>>>>>> Stashed changes
 }, { timestamps: true })
 
 module.exports = mongoose.model('UserProfile', userProfileSchema)

@@ -1,46 +1,41 @@
-const mongoose = require('mongoose');
+const mongoose = require('mongoose')
 
-const chatSchema = new mongoose.Schema(
-  {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    organizationId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Organization',
-      default: null,
-      index: true,
-    },
-    title: { type: String, default: 'New conversation' },
-    mode: {
-      type: String,
-      default: 'mentor',
-      index: true,
-    },
-    model: { type: String, default: '', maxlength: 80 },
-    contextSummary: { type: String, default: '', maxlength: 4000 },
-    pinned: { type: Boolean, default: false },
-    messages: [
-      {
-        role: { type: String, enum: ['user', 'assistant', 'system'], required: true },
-        content: { type: String, required: true },
-        model: { type: String, default: '' },
-        attachments: [
-          {
-            url: String,
-            type: String,
-            name: String,
-          },
-        ],
-        createdAt: { type: Date, default: Date.now },
-      },
-    ],
+const messageSchema = new mongoose.Schema({
+  role:    { type: String, enum: ['user', 'assistant'], required: true },
+  content: { type: String, required: true },
+  ts:      { type: Date, default: Date.now },
+  metadata: {
+    action: { type: String, default: '' },
+    mentorMode: { type: String, default: '' },
   },
-  { timestamps: true }
-);
+})
 
-chatSchema.index({ user: 1, updatedAt: -1 });
-chatSchema.index({ user: 1, title: 'text' });
-chatSchema.index({ organizationId: 1, user: 1 });
-chatSchema.index({ organizationId: 1, updatedAt: -1 });
-chatSchema.index({ user: 1, mode: 1, updatedAt: -1 });
+const chatSchema = new mongoose.Schema({
+  userId:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  session:  { type: String, default: 'default', trim: true, maxlength: 120 },
+  title:    { type: String, default: '', trim: true, maxlength: 160 },
+  pinned:   { type: Boolean, default: false },
+  archived: { type: Boolean, default: false },
+  mentorMode: { type: String, default: 'general', trim: true },
+  faithMode:  { type: String, default: 'general', trim: true },
+  explanationDepth: {
+    type: String,
+    enum: ['quick', 'simple', 'standard', 'detailed', 'deep'],
+    default: 'standard',
+  },
+  summary: { type: String, default: '' },
+  messages: [messageSchema],
+}, { timestamps: true })
 
-module.exports = mongoose.model('Chat', chatSchema);
+chatSchema.index({ userId: 1, session: 1 })
+chatSchema.index({ userId: 1, updatedAt: -1 })
+chatSchema.index({ userId: 1, pinned: -1, updatedAt: -1 })
+
+chatSchema.pre('save', function capStoredHistory(next) {
+  if (this.isModified('messages') && this.messages.length > 200) {
+    this.messages = this.messages.slice(-200)
+  }
+  next()
+})
+
+module.exports = mongoose.model('Chat', chatSchema)

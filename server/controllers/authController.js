@@ -1,612 +1,1165 @@
-const crypto = require('crypto');
-const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const Organization = require('../models/Organization');
-const OrgMembership = require('../models/OrgMembership');
-const asyncHandler = require('../utils/asyncHandler');
-const { AppError } = require('../middleware/errorHandler');
-const { sendEmail } = require('../utils/sendEmail');
-const logger = require('../utils/logger');
-const schemas = require('../config/schemas');
-const { toAssetUrl } = require('../utils/assetUrl');
-const { PORTALS, ORG_TYPES } = require('../config/constants');
-const { auditFromRequest, writeAudit, clientIp } = require('../utils/audit');
+const LoginHistory = require('../models/LoginHistory');
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const {
+  OTP_TTL_MS,
+  generateOtp,
+  hashOtp,
+  isOtpValid,
+  canResend,
+  assertAttempts,
+} = require('../utils/otp');
+const { sendOtpEmail, sendWelcomeEmail, sendPasswordResetEmail } = require('../services/emailService');
+const { sendOTP: twilioSendOTP, verifyOTP: twilioVerifyOTP } = require('../services/twilioVerify');
+const { issueSession, rotateRefreshToken, revokeRefreshToken, revokeAllForUser, setRefreshCookie, clearRefreshCookie, readRefreshFromReq, listSessions, revokeSessionById, ACCESS_TTL } = require('../utils/tokenService');
+const { bootstrapPortalProfile } = require('../utils/portalBootstrap');
+const {
+  PORTAL_ROLES,
+  AUTH_ROLES,
+  portalAlreadyExistsMessage,
+  wrongPortalPayload,
+  findByEmailAndPortal,
+  findUserByIdentifier: findPortalUser,
+  findSiblingRoles,
+} = require('../utils/portalAccounts');
+const {
+  assertE164,
+  maskPhone,
+  isPhoneVerified,
+  consumeVerified,
+  markVerified,
+} = require('../utils/phoneOtpGuard');
+const { validatePasswordStrength } = require('../utils/passwordPolicy');
+const { clientIp } = require('../utils/userAgent');
+const {
+  assertNotLocked,
+  recordFailedLogin,
+  clearLoginFailures,
+  recordLoginEvent,
+  issueSecureEmailOtp,
+  verifySecureEmailOtp,
+  createPasswordReset,
+  consumePasswordReset,
+  assertPasswordNotReused,
+  pushPasswordHistory,
+} = require('../utils/authSecurity');
 
-exports.signupSchema = schemas.signup;
-exports.loginSchema = schemas.login;
+const CHALLENGE_TTL = '5m';
+const CHALLENGE_SECRET = process.env.AUTH_CHALLENGE_SECRET || process.env.JWT_SECRET;
+const CHALLENGE_VERIFY = { issuer: 'dream-wave-api', audience: 'dream-wave-auth' };
+
+async function completeLoginSession(req, res, user, options = {}) {
+  // Portal from OTP challenge / login body must match this account's role.
+  // Multi-portal: each (email, role) is a separate User — never rewrite role across portals.
+  const portal = options.portal || req.body?.portal || null
+  const portalRole = AUTH_ROLES.includes(portal) ? portal : null
+
+  if (portalRole) {
+    if (!user.role) {
+      user.role = portalRole
+      await user.save()
+    } else if (user.role !== portalRole) {
+      return res.status(403).json(wrongPortalPayload(portalRole, [user.role]))
+    }
+  } else if (!user.role) {
+    return res.status(403).json({
+      success: false,
+      message: 'Account has no portal role. Sign in from Student, Institution, or Company login.',
+      code: 'ROLE_REQUIRED',
+    })
+  }
+
+  await bootstrapPortalProfile(user);
+  await clearLoginFailures(user);
+  const ua = req.headers['user-agent'] || '';
+  const remember = options.remember !== undefined
+    ? Boolean(options.remember)
+    : req.body?.remember !== false;
+  const { token, refreshToken, ttl } = await issueSession(
+    user._id,
+    { userAgent: ua, ip: clientIp(req) },
+    { remember },
+  );
+  setRefreshCookie(res, refreshToken, ttl);
+  await recordLoginEvent(req, {
+    user,
+    success: true,
+    portal: portalRole || user.role || '',
+    identifier: options.identifier || '',
+  });
+  return res.json({
+    success: true,
+    message: 'Login successful',
+    token,
+    accessToken: token,
+    accessTokenTtl: ACCESS_TTL,
+    user: publicUser(user),
+    role: user.role,
+  });
+}
 
 const publicUser = (user) => ({
   id: user._id,
   name: user.name,
   email: user.email,
   aaid: user.aaid,
-  role: user.role,
-  profileImage: user.profileImage,
-  bio: user.bio,
   level: user.level,
   credits: user.credits,
   streak: user.streak,
-  learningStreak: user.learningStreak,
-  plan: user.plan,
-  organizationId: user.organizationId || null,
-  targetCareer: user.targetCareer,
-  isEmailVerified: user.isEmailVerified,
-  isActive: user.isActive !== false,
+  emailVerified: Boolean(user.emailVerified),
+  phone: user.phone || '',
+  phoneVerified: Boolean(user.phoneVerified),
+  profileImage: user.profileImage,
   certificates: user.certificates,
-  preferences: user.preferences,
-  createdAt: user.createdAt,
+  role: user.role || null,
+  onboardingCompleted: Boolean(user.onboardingCompleted),
+  organizationName: user.organizationName || '',
+  learningGoal: user.learningGoal || '',
+  registrationComplete: user.registrationComplete !== false,
 });
 
-exports.publicUser = publicUser;
+const fail = (res, error) => {
+  const status = error.statusCode || 500;
+  if (status >= 500) console.error('[auth]', error.message);
+  const body = {
+    success: false,
+    message: error.message || 'Server error',
+  };
+  if (error.code) body.code = error.code;
+  if (error.verified === false) body.verified = false;
+  return res.status(status).json(body);
+};
 
-async function resolveLoginContext(user, portal) {
-  let organization = null;
-  let membership = null;
-  let resolvedPortal = PORTALS.STUDENT;
+function issueEmailLoginChallenge(user, portal = null) {
+  return jwt.sign(
+    {
+      purpose: 'login_email_otp',
+      userId: String(user._id),
+      email: user.email,
+      portal: portal || null,
+    },
+    CHALLENGE_SECRET,
+    { expiresIn: CHALLENGE_TTL, ...CHALLENGE_VERIFY },
+  );
+}
 
-  if (user.organizationId) {
-    const org = await Organization.findById(user.organizationId).lean();
-    const mem = await OrgMembership.findOne({ org: user.organizationId, user: user._id }).lean();
-    if (org) {
-      organization = {
-        id: org._id,
-        name: org.name,
-        slug: org.slug,
-        type: org.type || ORG_TYPES.INSTITUTION,
-        plan: org.plan,
-      };
-      membership = mem ? { role: mem.role } : null;
-      if (org.type === ORG_TYPES.COMPANY) resolvedPortal = PORTALS.COMPANY;
-      else if (org.type === ORG_TYPES.INSTITUTION || org.type === ORG_TYPES.TEAM) {
-        resolvedPortal = PORTALS.INSTITUTION;
+function readEmailLoginChallenge(token) {
+  try {
+    const payload = jwt.verify(token, CHALLENGE_SECRET, CHALLENGE_VERIFY);
+    if (payload.purpose !== 'login_email_otp' || !payload.userId || !payload.email) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+function issueLoginChallenge(user, portal = null) {
+  return jwt.sign(
+    {
+      purpose: 'login_otp',
+      userId: String(user._id),
+      phone: user.phone,
+      portal: portal || null,
+    },
+    CHALLENGE_SECRET,
+    { expiresIn: CHALLENGE_TTL, ...CHALLENGE_VERIFY },
+  );
+}
+
+function readLoginChallenge(token) {
+  try {
+    const payload = jwt.verify(token, CHALLENGE_SECRET, CHALLENGE_VERIFY);
+    if (payload.purpose !== 'login_otp' || !payload.userId || !payload.phone) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+function issueRegistrationChallenge(user, portal) {
+  return jwt.sign(
+    {
+      purpose: 'portal_registration',
+      userId: String(user._id),
+      email: user.email,
+      portal,
+      nonce: crypto.randomBytes(16).toString('hex'),
+    },
+    CHALLENGE_SECRET,
+    { expiresIn: '30m', ...CHALLENGE_VERIFY },
+  );
+}
+
+async function readRegistrationAccount(token, expectedPortal) {
+  if (!token) return null;
+  try {
+    const payload = jwt.verify(token, CHALLENGE_SECRET, CHALLENGE_VERIFY);
+    if (
+      payload.purpose !== 'portal_registration'
+      || payload.portal !== expectedPortal
+      || !payload.userId
+    ) return null;
+    const user = await User.findOne({
+      _id: payload.userId,
+      email: payload.email,
+      role: expectedPortal,
+      registrationComplete: false,
+    });
+    return user ? { user, payload } : null;
+  } catch {
+    return null;
+  }
+}
+
+async function issueEmailOtp(user, purpose = 'verification') {
+  await issueSecureEmailOtp({
+    user,
+    purpose: purpose === 'login' ? 'login' : 'verification',
+    emailFn: sendOtpEmail,
+  });
+}
+
+// @desc    Register student account (independent of Institution/Company for same email)
+// @route   POST /api/auth/signup | /api/auth/register
+exports.signup = async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Name, email, and password are required' });
+    }
+    const strength = validatePasswordStrength(password);
+    if (!strength.ok) {
+      return res.status(400).json({ message: strength.message });
+    }
+
+    const normalized = String(email).toLowerCase().trim();
+    const studentExists = await findByEmailAndPortal(normalized, 'student');
+    if (studentExists) {
+      return res.status(400).json({
+        success: false,
+        message: portalAlreadyExistsMessage('student'),
+        code: 'PORTAL_EXISTS',
+        portal: 'student',
+      });
+    }
+
+    const user = await User.create({
+      name: String(name).trim().slice(0, 120),
+      email: normalized,
+      password,
+      emailVerified: false,
+      registrationComplete: true,
+      role: 'student',
+    });
+
+    try {
+      await issueEmailOtp(user, 'verification');
+    } catch (mailErr) {
+      console.error('[auth] signup email delivery failed:', mailErr.message);
+      return res.status(503).json({
+        success: false,
+        message: 'Account created but we could not send the verification email. Try resend OTP.',
+        requiresVerification: true,
+        email: user.email,
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      requiresVerification: true,
+      message: 'Account created. Enter the verification code sent to your email before signing in.',
+      email: user.email,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        emailVerified: false,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    return fail(res, error);
+  }
+};
+
+/**
+ * Login — email or mobile + password for ONE portal account.
+ * On success: send OTP challenge scoped to that portal user.
+ */
+exports.login = async (req, res) => {
+  try {
+    const { email, phone, password, portal, identifier } = req.body;
+    const id = identifier || email || phone;
+    if (!id || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email or mobile, and password are required',
+      });
+    }
+
+    const portalRole = AUTH_ROLES.includes(portal) ? portal : null;
+    if (!portalRole) {
+      return res.status(400).json({
+        success: false,
+        message: 'portal is required (student, institution, company, or admin)',
+        code: 'PORTAL_REQUIRED',
+      });
+    }
+
+    const user = await findPortalUser(id, portalRole);
+    if (!user) {
+      const siblings = await findSiblingRoles(id, portalRole);
+      if (siblings.length) {
+        await recordLoginEvent(req, { success: false, reason: 'wrong_portal', portal, identifier: id });
+        return res.status(403).json(wrongPortalPayload(portalRole, siblings));
+      }
+      await recordLoginEvent(req, { success: false, reason: 'invalid_credentials', portal, identifier: id });
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+
+    try {
+      assertNotLocked(user);
+    } catch (lockErr) {
+      await recordLoginEvent(req, { user, success: false, reason: 'locked', portal, identifier: id });
+      return fail(res, lockErr);
+    }
+
+    if (user.registrationComplete === false) {
+      return res.status(403).json({
+        success: false,
+        message: 'Please finish registration (mobile verification) before signing in.',
+        requiresRegistration: true,
+      });
+    }
+
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      await recordFailedLogin(user);
+      await recordLoginEvent(req, { user, success: false, reason: 'bad_password', portal, identifier: id });
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+
+    if (user.suspended) {
+      await recordLoginEvent(req, { user, success: false, reason: 'suspended', portal, identifier: id });
+      return res.status(403).json({ success: false, message: 'Account suspended. Contact support.' });
+    }
+
+    const otpChannel = req.body.otpChannel || 'email';
+
+    if (otpChannel === 'email') {
+      await issueEmailOtp(user, 'login');
+      const challengeToken = issueEmailLoginChallenge(user, portalRole);
+      return res.json({
+        success: true,
+        requiresOtp: true,
+        requiresEmailOtp: true,
+        otpChannel: 'email',
+        message: 'Verification code sent to your email.',
+        challengeToken,
+        email: user.email,
+        portal: portalRole,
+        expiresInSeconds: 300,
+      });
+    }
+
+    if (!user.phone || !user.phoneVerified) {
+      return res.status(403).json({
+        success: false,
+        message: 'This account has no verified mobile number. Use email OTP or complete registration.',
+        code: 'PHONE_REQUIRED',
+      });
+    }
+
+    await twilioSendOTP(user.phone);
+    const challengeToken = issueLoginChallenge(user, portalRole);
+
+    res.json({
+      success: true,
+      requiresOtp: true,
+      otpChannel: 'phone',
+      message: 'OTP sent successfully.',
+      challengeToken,
+      phoneMasked: maskPhone(user.phone),
+      portal: portalRole,
+      expiresInSeconds: 300,
+    });
+  } catch (error) {
+    return fail(res, error);
+  }
+};
+
+exports.aaidLogin = async (req, res) => {
+  return res.status(410).json({
+    success: false,
+    code: 'AAID_LOGIN_DISABLED',
+    message: 'AAID-only login is disabled. Sign in with email or mobile, password, and OTP.',
+  });
+};
+
+exports.getMe = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id || req.user.id).select('-password');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    // Do NOT invent a role here — portal login assigns role; fabricating "student"
+    // caused Institution/Company sessions to open the Student portal.
+    res.json({ success: true, user: publicUser(user) });
+  } catch (error) {
+    return fail(res, error);
+  }
+};
+
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email, portal } = req.body;
+    if (!email) return res.status(400).json({ message: 'Email is required' });
+
+    const base = {
+      success: true,
+      message: 'If an account exists for that email, a verification code has been sent.',
+    };
+
+    const normalized = String(email).toLowerCase().trim();
+    if (!PORTAL_ROLES.includes(portal)) {
+      return res.status(400).json({ success: false, code: 'PORTAL_REQUIRED', message: 'portal is required for password reset.' });
+    }
+    const user = await findByEmailAndPortal(normalized, portal);
+    if (!user) return res.json(base);
+
+    await createPasswordReset({
+      user,
+      req,
+      emailFn: sendPasswordResetEmail,
+    });
+
+    res.json(base);
+  } catch (error) {
+    return fail(res, error);
+  }
+};
+
+exports.resendOtp = async (req, res) => {
+  try {
+    const { email, purpose, portal } = req.body;
+    if (!email || !['verify', 'reset'].includes(purpose)) {
+      return res.status(400).json({ message: 'Email and purpose (verify|reset) are required' });
+    }
+
+    const base = {
+      success: true,
+      message: 'If an account exists for that email, a new code has been sent.',
+    };
+
+    const normalized = String(email).toLowerCase().trim();
+    if (!PORTAL_ROLES.includes(portal)) {
+      return res.status(400).json({ success: false, code: 'PORTAL_REQUIRED', message: 'portal is required for OTP resend.' });
+    }
+    const user = await findByEmailAndPortal(normalized, portal);
+    if (!user) return res.json(base);
+
+    if (purpose === 'verify') {
+      await issueEmailOtp(user, 'verification');
+    } else {
+      await createPasswordReset({
+        user,
+        req,
+        emailFn: sendPasswordResetEmail,
+      });
+    }
+
+    res.json(base);
+  } catch (error) {
+    return fail(res, error);
+  }
+};
+
+exports.verifyOtp = async (req, res) => {
+  try {
+    const { email, otp, purpose, portal, registrationToken } = req.body;
+    if (!email || !otp || !['verify', 'reset'].includes(purpose)) {
+      return res.status(400).json({
+        message: 'Email, otp, and purpose (verify|reset) are required',
+      });
+    }
+
+    const normalized = String(email).toLowerCase().trim();
+    if (purpose === 'reset' && !PORTAL_ROLES.includes(portal)) {
+      return res.status(400).json({
+        success: false,
+        code: 'PORTAL_REQUIRED',
+        message: 'portal is required for password reset verification.',
+      });
+    }
+
+    let user = null;
+    if (registrationToken && PORTAL_ROLES.includes(portal)) {
+      const registration = await readRegistrationAccount(registrationToken, portal);
+      user = registration?.user || null;
+    } else if (PORTAL_ROLES.includes(portal)) {
+      user = await findByEmailAndPortal(normalized, portal);
+    }
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired verification code' });
+    }
+    if (user.registrationComplete === false && !registrationToken) {
+      return res.status(401).json({
+        success: false,
+        code: 'REGISTRATION_SESSION_REQUIRED',
+        message: 'Registration session expired. Start again.',
+      });
+    }
+
+    if (purpose === 'verify') {
+      const checked = await verifySecureEmailOtp({
+        email: normalized,
+        purpose: 'verification',
+        otp,
+        userId: user._id,
+      });
+      if (!checked.ok) {
+        // Fallback to legacy User fields (portal-scoped user doc)
+        assertAttempts(user.emailOtpAttempts);
+        if (!isOtpValid(user.verificationOTP, user.verificationOTPExpires, otp)) {
+          user.emailOtpAttempts = (user.emailOtpAttempts || 0) + 1;
+          await user.save();
+          return res.status(400).json({ message: 'Invalid or expired verification code' });
+        }
+      }
+      user.emailVerified = true;
+      user.verificationOTP = null;
+      user.verificationOTPExpires = null;
+      user.emailOtpAttempts = 0;
+      await user.save();
+
+      // Mid-signup for Institution/Company — verify only, do not issue a session yet
+      if (user.registrationComplete === false) {
+        return res.json({
+          success: true,
+          message: 'Email verified successfully',
+          email: user.email,
+          portal: user.role,
+          registrationToken,
+          step: 'verify-phone',
+        });
+      }
+
+      return completeLoginSession(req, res, user, {
+        remember: req.body?.remember !== false,
+        portal: portal || user.role,
+      });
+    }
+
+    const resetCheck = await consumePasswordReset({ userId: user._id, otp });
+    if (!resetCheck.ok) {
+      assertAttempts(user.emailOtpAttempts);
+      if (!isOtpValid(user.resetPasswordOTP, user.resetPasswordOTPExpires, otp)) {
+        user.emailOtpAttempts = (user.emailOtpAttempts || 0) + 1;
+        await user.save();
+        return res.status(400).json({ message: 'Invalid or expired verification code' });
       }
     }
-  }
 
-  if (portal && portal !== PORTALS.STUDENT) {
-    if (!organization) {
-      throw new AppError(`No organization found for ${portal} login`, 403);
-    }
-    if (portal === PORTALS.INSTITUTION && organization.type === ORG_TYPES.COMPANY) {
-      throw new AppError('This account belongs to a company organization. Use company login.', 403);
-    }
-    if (portal === PORTALS.COMPANY && organization.type !== ORG_TYPES.COMPANY) {
-      throw new AppError('This account belongs to an institution. Use institution login.', 403);
-    }
-    resolvedPortal = portal;
-  }
-
-  return { organization, membership, portal: resolvedPortal };
-}
-
-function bumpStreak(user) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const last = user.lastActiveDate ? new Date(user.lastActiveDate) : null;
-  if (last) last.setHours(0, 0, 0, 0);
-  if (!last) user.streak = 1;
-  else {
-    const diffDays = Math.round((today - last) / 86400000);
-    if (diffDays === 1) user.streak = (user.streak || 0) + 1;
-    else if (diffDays > 1) user.streak = 1;
-  }
-  user.lastActiveDate = new Date();
-}
-
-function hashToken(token) {
-  return crypto.createHash('sha256').update(token).digest('hex');
-}
-
-function refreshCookieMaxAgeMs() {
-  const raw = process.env.JWT_REFRESH_EXPIRE || '7d';
-  const m = String(raw).match(/^(\d+)([smhd])$/i);
-  if (!m) return 7 * 24 * 60 * 60 * 1000;
-  const n = Number(m[1]);
-  const unit = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 }[m[2].toLowerCase()];
-  return n * (unit || 86_400_000);
-}
-
-function setRefreshCookie(res, token) {
-  const isProd = process.env.NODE_ENV === 'production';
-  res.cookie('dw_refresh', token, {
-    httpOnly: true,
-    secure: isProd,
-    sameSite: isProd ? 'none' : 'lax',
-    maxAge: refreshCookieMaxAgeMs(),
-    path: '/api/auth',
-  });
-}
-
-function clearRefreshCookie(res) {
-  const isProd = process.env.NODE_ENV === 'production';
-  res.clearCookie('dw_refresh', {
-    path: '/api/auth',
-    httpOnly: true,
-    secure: isProd,
-    sameSite: isProd ? 'none' : 'lax',
-  });
-}
-
-async function issueTokens(user, req, res) {
-  const accessToken = user.getSignedJwtToken();
-  const refreshToken = user.getRefreshToken();
-  user.refreshTokens = (user.refreshTokens || [])
-    .filter((t) => t.expiresAt > new Date())
-    .slice(-4);
-  user.refreshTokens.push({
-    tokenHash: hashToken(refreshToken),
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    userAgent: req.get('user-agent') || '',
-  });
-  await user.save({ validateBeforeSave: false });
-  setRefreshCookie(res, refreshToken);
-  return { accessToken, refreshToken };
-}
-
-exports.signup = asyncHandler(async (req, res) => {
-  const { name, email, password, inviteToken } = req.body;
-  if (await User.findOne({ email })) throw new AppError('Email already registered', 400);
-
-  const OrgInvite = require('../models/OrgInvite');
-  const { acceptPendingInvite } = require('../services/orgInviteService');
-
-  if (inviteToken) {
-    const invite = await OrgInvite.findOne({
-      tokenHash: OrgInvite.hashToken(inviteToken),
-      status: 'pending',
-      expiresAt: { $gt: new Date() },
-    });
-    if (!invite) throw new AppError('Invite is invalid or expired', 400);
-    if (invite.email !== String(email).toLowerCase().trim()) {
-      throw new AppError('Invite email does not match signup email', 400);
-    }
-  }
-
-  // Admin role is never granted via signup (use admin user update only).
-  const user = await User.create({ name, email, password, role: 'user' });
-  bumpStreak(user);
-  await acceptPendingInvite(user, inviteToken);
-
-  const verifyToken = user.getEmailVerificationToken();
-  await user.save({ validateBeforeSave: false });
-
-  const verifyUrl = `${(process.env.CLIENT_URL || 'http://localhost:5173').split(',')[0]}/verify-email/${verifyToken}`;
-  await sendEmail({
-    to: user.email,
-    subject: 'Verify your Dream Wave AI email',
-    text: `Verify your email: ${verifyUrl}`,
-    html: `<p>Welcome to Dream Wave AI.</p><p><a href="${verifyUrl}">Verify email</a></p>`,
-  });
-
-  const { accessToken } = await issueTokens(user, req, res);
-  logger.info('User signed up', { userId: String(user._id) });
-  await writeAudit({
-    actor: user._id,
-    action: 'auth.signup',
-    resource: 'user',
-    resourceId: user._id,
-    ip: clientIp(req),
-    requestId: req.requestId,
-  });
-  res.status(201).json({
-    success: true,
-    token: accessToken,
-    data: { user: publicUser(user) },
-  });
-});
-
-exports.login = asyncHandler(async (req, res) => {
-  const { email, password, portal } = req.body;
-  const ip = clientIp(req);
-  try {
-    const ops = require('../services/opsIntelligenceService');
-    const lock = await ops.isLoginLocked({ email, ip });
-    if (lock.locked) {
-      await ops.recordSecurityEvent({
-        type: 'login_locked',
-        severity: 'high',
-        email: String(email || '').toLowerCase(),
-        ip,
-        path: req.originalUrl,
-        requestId: req.requestId,
-        meta: { failedLogins: lock.failedLogins, until: lock.until },
-      });
-      throw new AppError('Too many failed login attempts. Try again later.', 429, {
-        failureClass: 'auth',
-      });
-    }
-  } catch (err) {
-    if (err instanceof AppError) throw err;
-  }
-  const user = await User.findOne({ email }).select('+password');
-  if (!user || !(await user.comparePassword(password))) {
-    await writeAudit({
-      actor: user?._id || null,
-      action: 'auth.login_failed',
-      resource: 'user',
-      resourceId: user?._id,
-      meta: { email: String(email || '').toLowerCase() },
-      ip,
-      requestId: req.requestId,
-    });
-    try {
-      const ops = require('../services/opsIntelligenceService');
-      await ops.recordSecurityEvent({
-        type: 'login_failed',
-        severity: 'low',
-        user: user?._id || null,
-        email: String(email || '').toLowerCase(),
-        ip,
-        path: req.originalUrl,
-        requestId: req.requestId,
-      });
-      await ops.detectSuspiciousActivity({ email, ip });
-    } catch {
-      /* non-blocking */
-    }
-    throw new AppError('Invalid credentials', 401, { failureClass: 'auth' });
-  }
-  if (user.isActive === false) {
-    try {
-      const ops = require('../services/opsIntelligenceService');
-      await ops.recordSecurityEvent({
-        type: 'account_disabled_attempt',
-        severity: 'medium',
-        user: user._id,
-        email: user.email,
-        ip: clientIp(req),
-        path: req.originalUrl,
-        requestId: req.requestId,
-      });
-    } catch {
-      /* non-blocking */
-    }
-    throw new AppError('Account is disabled.', 403, { failureClass: 'auth' });
-  }
-  bumpStreak(user);
-  const context = await resolveLoginContext(user, portal);
-  const { accessToken } = await issueTokens(user, req, res);
-  await writeAudit({
-    organizationId: user.organizationId,
-    actor: user._id,
-    action: 'auth.login',
-    resource: 'user',
-    resourceId: user._id,
-    meta: { portal: context.portal },
-    ip: clientIp(req),
-    requestId: req.requestId,
-  });
-  try {
-    const ops = require('../services/opsIntelligenceService');
-    await ops.recordSecurityEvent({
-      type: 'login_success',
-      severity: 'info',
-      user: user._id,
-      organizationId: user.organizationId,
-      email: user.email,
-      ip: clientIp(req),
-      path: req.originalUrl,
-      requestId: req.requestId,
-      meta: { portal: context.portal },
-    });
-  } catch {
-    /* non-blocking */
-  }
-  res.json({
-    success: true,
-    token: accessToken,
-    data: {
-      user: publicUser(user),
-      portal: context.portal,
-      organization: context.organization,
-      membership: context.membership,
-    },
-  });
-});
-
-exports.sendEmailOtp = asyncHandler(async (req, res) => {
-  if (req.user.isEmailVerified) {
-    return res.json({ success: true, message: 'Email already verified' });
-  }
-  const code = req.user.issueEmailOtp();
-  await req.user.save({ validateBeforeSave: false });
-  await sendEmail({
-    to: req.user.email,
-    subject: 'Dream Wave AI — Email verification code',
-    text: `Your verification code is ${code}. It expires in 10 minutes.`,
-    html: `<p>Your Dream Wave verification code:</p><p style="font-size:24px;font-weight:bold;letter-spacing:4px">${code}</p><p>Expires in 10 minutes.</p>`,
-  });
-  res.json({ success: true, message: 'OTP sent to your email' });
-});
-
-exports.verifyEmailOtp = asyncHandler(async (req, res) => {
-  const { code } = req.body;
-  if (!code) throw new AppError('OTP code is required', 400);
-  if (req.user.isEmailVerified) {
     return res.json({
       success: true,
-      message: 'Email already verified',
-      data: { user: publicUser(req.user) },
+      message: 'Code verified. You can reset your password.',
+      resetAllowed: true,
+      email: user.email,
+      portal: user.role,
     });
+  } catch (error) {
+    return fail(res, error);
   }
-  if (req.user.emailOtpLockedUntil && req.user.emailOtpLockedUntil > new Date()) {
-    throw new AppError('Too many OTP attempts. Try again later.', 429, { failureClass: 'auth' });
-  }
-  if (!req.user.verifyEmailOtp(code)) {
-    req.user.emailOtpAttempts = (req.user.emailOtpAttempts || 0) + 1;
-    if (req.user.emailOtpAttempts >= 5) {
-      req.user.emailOtpLockedUntil = new Date(Date.now() + 15 * 60 * 1000);
-      req.user.emailOtpAttempts = 0;
-      req.user.emailOtpHash = undefined;
-      req.user.emailOtpExpire = undefined;
-    }
-    await req.user.save({ validateBeforeSave: false });
-    throw new AppError('Invalid or expired OTP', 400, { failureClass: 'auth' });
-  }
-  req.user.isEmailVerified = true;
-  req.user.emailOtpHash = undefined;
-  req.user.emailOtpExpire = undefined;
-  req.user.emailOtpAttempts = 0;
-  req.user.emailOtpLockedUntil = undefined;
-  req.user.emailVerificationToken = undefined;
-  req.user.emailVerificationExpire = undefined;
-  await req.user.save({ validateBeforeSave: false });
-  await auditFromRequest(req, {
-    action: 'auth.email_verified_otp',
-    resource: 'user',
-    resourceId: req.user._id,
-  });
-  res.json({
-    success: true,
-    message: 'Email verified',
-    data: { user: publicUser(req.user) },
-  });
-});
+};
 
-exports.refresh = asyncHandler(async (req, res) => {
-  // Browser clients: httpOnly cookie only. Body refreshToken is rejected for XSS hardening.
-  const token = req.cookies?.dw_refresh;
-  if (!token) throw new AppError('Refresh token required', 401);
-  let decoded;
+exports.resetPassword = async (req, res) => {
   try {
-    decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET, {
-      algorithms: ['HS256'],
-    });
-  } catch {
-    throw new AppError('Invalid refresh token', 401);
-  }
-  if (decoded.type !== 'refresh') throw new AppError('Invalid refresh token', 401);
-  const user = await User.findById(decoded.id);
-  if (!user) throw new AppError('User not found', 401);
-  if (user.isActive === false) throw new AppError('Account is disabled.', 403, { failureClass: 'auth' });
-  const hashed = hashToken(token);
-  const stored = (user.refreshTokens || []).find(
-    (t) => t.tokenHash === hashed && t.expiresAt > new Date()
-  );
-  if (!stored) {
-    // Possible refresh-token reuse after rotation — revoke all sessions.
-    user.refreshTokens = [];
-    await user.save({ validateBeforeSave: false });
-    clearRefreshCookie(res);
-    try {
-      const ops = require('../services/opsIntelligenceService');
-      await ops.recordSecurityEvent({
-        type: 'token_reuse',
-        severity: 'high',
-        user: user._id,
-        email: user.email,
-        ip: clientIp(req),
-        path: req.originalUrl,
-        requestId: req.requestId,
-      });
-    } catch {
-      /* non-blocking */
+    const { email, otp, password, portal } = req.body;
+    if (!email || !otp || !password) {
+      return res.status(400).json({ message: 'Email, otp, and password are required' });
     }
-    await writeAudit({
-      actor: user._id,
-      action: 'auth.refresh_reuse',
-      resource: 'user',
-      resourceId: user._id,
-      ip: clientIp(req),
-      requestId: req.requestId,
-    });
-    throw new AppError('Session expired. Please log in again.', 401);
-  }
+    const strength = validatePasswordStrength(password);
+    if (!strength.ok) {
+      return res.status(400).json({ message: strength.message });
+    }
 
-  user.refreshTokens = user.refreshTokens.filter((t) => t.tokenHash !== hashed);
-  const { accessToken } = await issueTokens(user, req, res);
-  res.json({ success: true, token: accessToken, data: { user: publicUser(user) } });
+    const normalized = String(email).toLowerCase().trim();
+    if (!PORTAL_ROLES.includes(portal)) {
+      return res.status(400).json({ success: false, code: 'PORTAL_REQUIRED', message: 'portal is required for password reset.' });
+    }
+    const user = await findByEmailAndPortal(normalized, portal);
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired verification code' });
+    }
+
+    const resetCheck = await consumePasswordReset({ userId: user._id, otp });
+    const legacyOk = isOtpValid(user.resetPasswordOTP, user.resetPasswordOTPExpires, otp);
+    if (!resetCheck.ok && !legacyOk) {
+      return res.status(400).json({ message: 'Invalid or expired verification code' });
+    }
+
+    await assertPasswordNotReused(user, password);
+    await pushPasswordHistory(user);
+    user.password = password;
+    user.resetPasswordOTP = null;
+    user.resetPasswordOTPExpires = null;
+    user.failedLoginAttempts = 0;
+    user.lockUntil = null;
+    await user.save();
+    await revokeAllForUser(user._id);
+
+    res.json({ success: true, message: 'Password updated successfully. You can sign in now.' });
+  } catch (error) {
+    return fail(res, error);
+  }
+};
+
+const VALID_ROLES = ['student', 'institution', 'company', 'admin'];
+const SELF_ASSIGNABLE_ROLES = ['student', 'institution', 'company'];
+
+exports.completeOnboarding = async (req, res) => {
+  try {
+    const { role, organizationName, learningGoal } = req.body;
+    if (!role || !SELF_ASSIGNABLE_ROLES.includes(role)) {
+      return res.status(400).json({
+        message: 'A valid role is required (student, institution, company)',
+      });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (user.role && user.role !== role) {
+      return res.status(409).json({
+        success: false,
+        code: 'ROLE_IMMUTABLE',
+        message: 'Portal role cannot be changed during onboarding. Create a separate portal account.',
+      });
+    }
+    if (!user.role) user.role = role;
+    user.onboardingCompleted = true;
+    if (typeof organizationName === 'string') user.organizationName = organizationName.trim();
+    if (typeof learningGoal === 'string') user.learningGoal = learningGoal.trim();
+    await user.save();
+
+    res.json({ success: true, message: 'Onboarding completed', user: publicUser(user) });
+  } catch (error) {
+    return fail(res, error);
+  }
+};
+
+// ── Twilio Verify phone OTP endpoints ─────────────────────────────────────────
+
+/**
+ * POST /api/auth/send-phone-otp
+ * Body: { phone: "+91XXXXXXXXXX" }
+ */
+exports.sendPhoneOtp = async (req, res) => {
+  try {
+    const phone = assertE164(req.body.phone);
+    await twilioSendOTP(phone);
+    res.json({
+      success: true,
+      message: 'OTP sent successfully.',
+      expiresInSeconds: 600,
+      phoneMasked: maskPhone(phone),
+    });
+  } catch (error) {
+    return fail(res, error);
+  }
+};
+
+/**
+ * POST /api/auth/verify-phone-otp
+ * Body: { phone, code, challengeToken? }
+ * With challengeToken → completes login and returns JWT.
+ */
+exports.verifyPhoneOtp = async (req, res) => {
+  try {
+    const code = req.body.code || req.body.otp;
+    if (!code) {
+      return res.status(400).json({
+        success: false,
+        verified: false,
+        message: 'Invalid or expired OTP.',
+      });
+    }
+
+    const challengeToken = req.body.challengeToken;
+    let phone;
+    if (challengeToken) {
+      const challenge = readLoginChallenge(challengeToken);
+      if (!challenge?.phone) {
+        return res.status(401).json({
+          success: false,
+          verified: false,
+          message: 'Login session expired. Sign in again.',
+        });
+      }
+      phone = assertE164(challenge.phone);
+    } else {
+      phone = assertE164(req.body.phone);
+    }
+
+    try {
+      await twilioVerifyOTP(phone, code);
+    } catch (verifyErr) {
+      console.log('[TwilioVerify] OTP Failed', { phone: maskPhone(phone), code: verifyErr.code });
+      return res.status(verifyErr.statusCode || 400).json({
+        success: false,
+        verified: false,
+        message: verifyErr.message === 'OTP Expired'
+          ? 'OTP Expired'
+          : verifyErr.message === 'Too Many Requests'
+            ? 'Too Many Requests'
+            : 'Invalid or expired OTP.',
+        code: verifyErr.code || 'OTP_INCORRECT',
+      });
+    }
+
+    if (challengeToken) {
+      const challenge = readLoginChallenge(challengeToken);
+      if (!challenge || challenge.phone !== phone) {
+        return res.status(401).json({
+          success: false,
+          verified: false,
+          message: 'Login session expired. Sign in again.',
+        });
+      }
+
+      const user = await User.findById(challenge.userId);
+      if (!user || user.phone !== phone) {
+        return res.status(401).json({
+          success: false,
+          verified: false,
+          message: 'Login session expired. Sign in again.',
+        });
+      }
+
+      user.phoneVerified = true;
+      user.phoneOTP = null;
+      user.phoneOTPExpires = null;
+      await user.save();
+
+      return completeLoginSession(req, res, user, {
+        remember: req.body?.remember !== false,
+        portal: challenge.portal || req.body?.portal || null,
+      });
+    }
+
+    await markVerified(phone);
+    return res.json({
+      success: true,
+      verified: true,
+    });
+  } catch (error) {
+    error.verified = false;
+    return fail(res, error);
+  }
+};
+
+/**
+ * Create account only after Twilio phone verification.
+ * POST /api/auth/register-verified
+ */
+exports.registerVerified = async (_req, res) => res.status(410).json({
+  success: false,
+  code: 'REGISTRATION_FLOW_RETIRED',
+  message: 'Use the portal registration flow with email and mobile verification.',
 });
 
-exports.logout = asyncHandler(async (req, res) => {
-  const token = req.cookies?.dw_refresh;
-  let userId = null;
-  if (token) {
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET, {
-        algorithms: ['HS256'],
+// ── Portal registration (Twilio Verify for mobile) ────────────────────────────
+
+exports.portalInit = async (req, res) => {
+  try {
+    const { name, email, portal } = req.body;
+    if (!name || !email || !PORTAL_ROLES.includes(portal)) {
+      return res.status(400).json({
+        message: 'Name, email, and portal (student|institution|company) are required',
       });
-      userId = decoded.id;
-    } catch {
-      /* ignore invalid cookie */
     }
-    if (userId) {
-      const user = await User.findById(userId);
-      if (user) {
-        const hashed = hashToken(token);
-        user.refreshTokens = (user.refreshTokens || []).filter((t) => t.tokenHash !== hashed);
-        await user.save({ validateBeforeSave: false });
+
+    const normalized = String(email).toLowerCase().trim();
+    const existing = await findByEmailAndPortal(normalized, portal);
+    if (existing && existing.registrationComplete !== false) {
+      return res.status(400).json({
+        success: false,
+        message: portalAlreadyExistsMessage(portal),
+        code: 'PORTAL_EXISTS',
+        portal,
+      });
+    }
+
+    const tempPassword = crypto.randomBytes(24).toString('hex');
+    let user = existing;
+    if (!user) {
+      // Create a NEW portal profile even if the same email already has Student/other portals
+      user = new User({
+        name: String(name).trim(),
+        email: normalized,
+        password: tempPassword,
+        role: portal,
+        emailVerified: false,
+        phoneVerified: false,
+        registrationComplete: false,
+        onboardingCompleted: false,
+      });
+      await user.save();
+    } else {
+      user.name = String(name).trim();
+      user.emailVerified = false;
+      await user.save();
+    }
+
+    await issueEmailOtp(user, 'verification');
+    const registrationToken = issueRegistrationChallenge(user, portal);
+
+    res.status(201).json({
+      success: true,
+      message: 'Verification code sent to your email',
+      email: normalized,
+      portal,
+      registrationToken,
+      step: 'verify-email',
+      resendAfterSeconds: 60,
+      expiresInSeconds: 300,
+    });
+  } catch (error) {
+    return fail(res, error);
+  }
+};
+
+exports.portalSendPhone = async (req, res) => {
+  try {
+    const { phone, countryCode, portal, registrationToken } = req.body;
+    if (!phone || !registrationToken) {
+      return res.status(400).json({ message: 'Registration session and phone are required' });
+    }
+    if (!PORTAL_ROLES.includes(portal)) {
+      return res.status(400).json({ message: 'portal is required for registration' });
+    }
+
+    const registration = await readRegistrationAccount(registrationToken, portal);
+    const user = registration?.user;
+    if (!user) {
+      return res.status(404).json({ message: 'Registration session not found. Start again.' });
+    }
+    if (!user.emailVerified) {
+      return res.status(400).json({ message: 'Verify email before mobile verification' });
+    }
+
+    let e164 = String(phone).trim();
+    if (!e164.startsWith('+')) {
+      const cc = String(countryCode || '+91').startsWith('+') ? countryCode : `+${countryCode || '91'}`;
+      e164 = `${cc}${e164.replace(/\D/g, '').replace(/^0+/, '')}`;
+    }
+    e164 = assertE164(e164);
+
+    user.phone = e164;
+    user.phoneVerified = false;
+    user.phoneOTP = null;
+    user.phoneOTPExpires = null;
+    user.phoneOtpAttempts = 0;
+    user.phoneOtpSentAt = new Date();
+    await user.save();
+
+    await twilioSendOTP(e164);
+
+    res.json({
+      success: true,
+      message: 'OTP sent successfully.',
+      phoneMasked: maskPhone(e164),
+      step: 'verify-phone',
+      portal,
+      resendAfterSeconds: 45,
+      expiresInSeconds: 600,
+    });
+  } catch (error) {
+    return fail(res, error);
+  }
+};
+
+exports.portalVerifyPhone = async (req, res) => {
+  try {
+    const { otp, code, portal, registrationToken } = req.body;
+    const phoneCode = code || otp;
+    if (!registrationToken || !phoneCode) {
+      return res.status(400).json({
+        success: false,
+        verified: false,
+        message: 'Invalid or expired OTP.',
+      });
+    }
+    if (!PORTAL_ROLES.includes(portal)) {
+      return res.status(400).json({
+        success: false,
+        verified: false,
+        message: 'portal is required for registration',
+      });
+    }
+
+    const registration = await readRegistrationAccount(registrationToken, portal);
+    const user = registration?.user;
+    if (!user || !user.phone) {
+      return res.status(400).json({
+        success: false,
+        verified: false,
+        message: 'Invalid or expired OTP.',
+      });
+    }
+
+    try {
+      await twilioVerifyOTP(user.phone, phoneCode);
+    } catch (verifyErr) {
+      return res.status(verifyErr.statusCode || 400).json({
+        success: false,
+        verified: false,
+        message: 'Invalid or expired OTP.',
+      });
+    }
+
+    user.phoneVerified = true;
+    user.phoneOTP = null;
+    user.phoneOTPExpires = null;
+    user.phoneOtpAttempts = 0;
+    await user.save();
+    await markVerified(user.phone);
+
+    res.json({
+      success: true,
+      verified: true,
+      message: 'Mobile verified successfully',
+      step: 'create-password',
+      portal,
+      user: publicUser(user),
+    });
+  } catch (error) {
+    return fail(res, error);
+  }
+};
+
+exports.portalComplete = async (req, res) => {
+  try {
+    const { password, confirmPassword, organizationName, learningGoal, portal, registrationToken } = req.body;
+    if (!password) {
+      return res.status(400).json({ message: 'Password is required' });
+    }
+    if (!PORTAL_ROLES.includes(portal)) {
+      return res.status(400).json({ message: 'portal is required for registration' });
+    }
+    if (confirmPassword != null && password !== confirmPassword) {
+      return res.status(400).json({ message: 'Passwords do not match' });
+    }
+    const strength = validatePasswordStrength(password);
+    if (!strength.ok) {
+      return res.status(400).json({ message: strength.message });
+    }
+
+    const registration = await readRegistrationAccount(registrationToken, portal);
+    const user = registration?.user;
+    if (!user) return res.status(404).json({ message: 'Registration session not found' });
+    if (!user.emailVerified || !user.phoneVerified) {
+      return res.status(400).json({ message: 'Email and mobile must be verified first' });
+    }
+
+    user.password = password;
+    user.registrationComplete = true;
+    user.onboardingCompleted = true;
+    if (typeof organizationName === 'string') user.organizationName = organizationName.trim();
+    if (typeof learningGoal === 'string') user.learningGoal = learningGoal.trim();
+    user.phoneOTP = null;
+    user.phoneOTPExpires = null;
+    await user.save();
+
+    try {
+      await sendWelcomeEmail({
+        to: user.email,
+        name: user.name,
+        portal: user.role || portal,
+      });
+    } catch (mailErr) {
+      console.error('[auth] welcome email failed:', mailErr.message);
+    }
+
+    return completeLoginSession(req, res, user, { portal });
+  } catch (error) {
+    return fail(res, error);
+  }
+};
+
+exports.portalResendPhone = async (req, res) => {
+  try {
+    const { portal, registrationToken } = req.body;
+    const base = { success: true, message: 'If registration is in progress, a new code was sent.' };
+    if (!PORTAL_ROLES.includes(portal)) return res.json(base);
+
+    const registration = await readRegistrationAccount(registrationToken, portal);
+    const user = registration?.user;
+    if (!user || !user.phone) return res.json(base);
+
+    await twilioSendOTP(user.phone);
+    user.phoneOtpSentAt = new Date();
+    await user.save();
+
+    res.json({
+      ...base,
+      message: 'OTP sent successfully.',
+      portal,
+      resendAfterSeconds: 45,
+      expiresInSeconds: 600,
+    });
+  } catch (error) {
+    return fail(res, error);
+  }
+};
+
+exports.verifyLoginEmailOtp = async (req, res) => {
+  try {
+    const { challengeToken, otp, code } = req.body;
+    const tokenOtp = otp || code;
+    if (!challengeToken || !tokenOtp) {
+      return res.status(400).json({ success: false, message: 'challengeToken and otp are required' });
+    }
+    const challenge = readEmailLoginChallenge(challengeToken);
+    if (!challenge) {
+      return res.status(401).json({ success: false, message: 'Login session expired. Sign in again.' });
+    }
+    const user = await User.findById(challenge.userId);
+    if (!user || user.email !== challenge.email) {
+      return res.status(401).json({ success: false, message: 'Login session expired. Sign in again.' });
+    }
+    // Challenge portal must match this account — never mix Student/Institution/Company OTP
+    const portal = challenge.portal || req.body?.portal || null;
+    if (portal && user.role && user.role !== portal && user.role !== 'admin') {
+      return res.status(403).json(wrongPortalPayload(portal, [user.role]));
+    }
+
+    const checked = await verifySecureEmailOtp({
+      email: user.email,
+      purpose: 'login',
+      otp: tokenOtp,
+      userId: user._id,
+    });
+    if (!checked.ok) {
+      assertAttempts(user.emailOtpAttempts);
+      if (!isOtpValid(user.verificationOTP, user.verificationOTPExpires, tokenOtp)) {
+        user.emailOtpAttempts = (user.emailOtpAttempts || 0) + 1;
+        await user.save();
+        return res.status(400).json({ success: false, message: 'Invalid or expired verification code' });
       }
     }
+    user.verificationOTP = null;
+    user.verificationOTPExpires = null;
+    user.emailOtpAttempts = 0;
+    user.emailVerified = true;
+    await user.save();
+    return completeLoginSession(req, res, user, {
+      remember: req.body?.remember !== false,
+      portal: portal || user.role,
+    });
+  } catch (error) {
+    return fail(res, error);
   }
-  clearRefreshCookie(res);
-  await writeAudit({
-    actor: userId || null,
-    action: 'auth.logout',
-    resource: 'user',
-    resourceId: userId,
-    ip: clientIp(req),
-    requestId: req.requestId,
-  });
-  res.json({ success: true, message: 'Logged out' });
-});
+};
 
-exports.sessions = asyncHandler(async (req, res) => {
-  const sessions = (req.user.refreshTokens || []).map((t) => ({
-    id: t._id,
-    userAgent: t.userAgent,
-    createdAt: t.createdAt,
-    expiresAt: t.expiresAt,
-  }));
-  res.json({ success: true, data: { sessions } });
-});
-
-exports.revokeSession = asyncHandler(async (req, res) => {
-  req.user.refreshTokens = (req.user.refreshTokens || []).filter(
-    (t) => String(t._id) !== String(req.params.id)
-  );
-  await req.user.save({ validateBeforeSave: false });
-  await auditFromRequest(req, {
-    action: 'auth.session_revoked',
-    resource: 'user',
-    resourceId: req.user._id,
-    meta: { sessionId: req.params.id },
-  });
-  res.json({ success: true, message: 'Session revoked' });
-});
-
-exports.verifyEmail = asyncHandler(async (req, res) => {
-  const hashed = crypto.createHash('sha256').update(req.params.token).digest('hex');
-  const user = await User.findOne({
-    emailVerificationToken: hashed,
-    emailVerificationExpire: { $gt: Date.now() },
-  });
-  if (!user) throw new AppError('Invalid or expired verification token', 400);
-  user.isEmailVerified = true;
-  user.emailVerificationToken = undefined;
-  user.emailVerificationExpire = undefined;
-  await user.save({ validateBeforeSave: false });
-  await writeAudit({
-    actor: user._id,
-    action: 'auth.email_verified',
-    resource: 'user',
-    resourceId: user._id,
-    ip: clientIp(req),
-    requestId: req.requestId,
-  });
-  res.json({ success: true, message: 'Email verified', data: { user: publicUser(user) } });
-});
-
-exports.resendVerification = asyncHandler(async (req, res) => {
-  if (req.user.isEmailVerified) {
-    return res.json({ success: true, message: 'Email already verified' });
+exports.refresh = async (req, res) => {
+  try {
+    const refreshToken = readRefreshFromReq(req);
+    if (!refreshToken) {
+      return res.status(400).json({ success: false, message: 'refreshToken is required' });
+    }
+    const rotated = await rotateRefreshToken(refreshToken, {
+      userAgent: req.headers['user-agent'] || '',
+      ip: clientIp(req),
+    });
+    if (!rotated) {
+      clearRefreshCookie(res);
+      return res.status(401).json({ success: false, message: 'Invalid or expired refresh token' });
+    }
+    const user = await User.findById(rotated.userId).select('-password');
+    if (!user || user.suspended) {
+      clearRefreshCookie(res);
+      return res.status(401).json({ success: false, message: 'Session invalid' });
+    }
+    setRefreshCookie(res, rotated.refreshToken, rotated.ttl);
+    res.json({
+      success: true,
+      token: rotated.accessToken,
+      user: publicUser(user),
+    });
+  } catch (error) {
+    return fail(res, error);
   }
-  const token = req.user.getEmailVerificationToken();
-  await req.user.save({ validateBeforeSave: false });
-  const verifyUrl = `${(process.env.CLIENT_URL || 'http://localhost:5173').split(',')[0]}/verify-email/${token}`;
-  await sendEmail({
-    to: req.user.email,
-    subject: 'Verify your Dream Wave AI email',
-    text: `Verify your email: ${verifyUrl}`,
-    html: `<p><a href="${verifyUrl}">Verify email</a></p>`,
-  });
-  res.json({ success: true, message: 'Verification email sent' });
-});
+};
 
-exports.getMe = asyncHandler(async (req, res) => {
-  res.json({ success: true, data: { user: publicUser(req.user) } });
-});
-
-exports.forgotPassword = asyncHandler(async (req, res) => {
-  const { email } = req.body;
-  const user = await User.findOne({ email });
-  if (!user) {
-    return res.json({ success: true, message: 'If that email exists, a reset link was sent.' });
+exports.logout = async (req, res) => {
+  try {
+    const refreshToken = readRefreshFromReq(req);
+    await revokeRefreshToken(refreshToken);
+    if (req.body?.allSessions && (req.user?.id || req.user?._id)) {
+      await revokeAllForUser(req.user.id || req.user._id);
+    }
+    clearRefreshCookie(res);
+    res.json({ success: true, message: 'Logged out' });
+  } catch (error) {
+    return fail(res, error);
   }
-  const resetToken = user.getResetPasswordToken();
-  await user.save({ validateBeforeSave: false });
-  const resetUrl = `${(process.env.CLIENT_URL || 'http://localhost:5173').split(',')[0]}/reset-password/${resetToken}`;
-  await sendEmail({
-    to: user.email,
-    subject: 'Dream Wave AI — Password Reset',
-    text: `Reset your password: ${resetUrl}\nThis link expires in 30 minutes.`,
-    html: `<p><a href="${resetUrl}">${resetUrl}</a></p>`,
-  });
-  await writeAudit({
-    actor: user._id,
-    action: 'auth.password_reset_requested',
-    resource: 'user',
-    resourceId: user._id,
-    ip: clientIp(req),
-    requestId: req.requestId,
-  });
-  res.json({ success: true, message: 'If that email exists, a reset link was sent.' });
-});
+};
 
-exports.resetPassword = asyncHandler(async (req, res) => {
-  const hashed = crypto.createHash('sha256').update(req.params.token).digest('hex');
-  const user = await User.findOne({
-    resetPasswordToken: hashed,
-    resetPasswordExpire: { $gt: Date.now() },
-  }).select('+password');
-  if (!user) throw new AppError('Invalid or expired reset token', 400);
-  user.password = req.body.password;
-  user.resetPasswordToken = undefined;
-  user.resetPasswordExpire = undefined;
-  user.refreshTokens = [];
-  await user.save();
-  await writeAudit({
-    actor: user._id,
-    action: 'auth.password_reset',
-    resource: 'user',
-    resourceId: user._id,
-    ip: clientIp(req),
-    requestId: req.requestId,
-  });
-  const { accessToken } = await issueTokens(user, req, res);
-  res.json({
-    success: true,
-    token: accessToken,
-    data: { user: publicUser(user) },
-    message: 'Password updated',
-  });
-});
-
-exports.updateProfile = asyncHandler(async (req, res) => {
-  const { name, bio, targetCareer } = req.body;
-  if (name) req.user.name = name.slice(0, 80);
-  if (bio !== undefined) req.user.bio = String(bio).slice(0, 500);
-  if (targetCareer !== undefined) req.user.targetCareer = String(targetCareer).slice(0, 120);
-  if (req.file) req.user.profileImage = toAssetUrl(req.file.filename);
-  await req.user.save();
-  res.json({ success: true, data: { user: publicUser(req.user) } });
-});
-
-exports.changePassword = asyncHandler(async (req, res) => {
-  const { currentPassword, newPassword } = req.body;
-  const user = await User.findById(req.user._id).select('+password');
-  if (!(await user.comparePassword(currentPassword))) {
-    throw new AppError('Current password is incorrect', 400);
+exports.logoutAll = async (req, res) => {
+  try {
+    await revokeAllForUser(req.user.id || req.user._id);
+    clearRefreshCookie(res);
+    res.json({ success: true, message: 'Logged out from all devices' });
+  } catch (error) {
+    return fail(res, error);
   }
-  user.password = newPassword;
-  user.refreshTokens = [];
-  await user.save();
-  clearRefreshCookie(res);
-  await auditFromRequest(req, {
-    action: 'auth.password_changed',
-    resource: 'user',
-    resourceId: user._id,
-  });
-  res.json({ success: true, message: 'Password changed' });
-});
+};
 
-exports.updatePreferences = asyncHandler(async (req, res) => {
-  const { theme, language, notifications, emailUpdates, focusMinutes } = req.body;
-  if (theme) req.user.preferences.theme = theme;
-  if (language) req.user.preferences.language = language;
-  if (notifications !== undefined) req.user.preferences.notifications = notifications;
-  if (emailUpdates !== undefined) req.user.preferences.emailUpdates = emailUpdates;
-  if (focusMinutes !== undefined) req.user.preferences.focusMinutes = focusMinutes;
-  await req.user.save();
-  res.json({ success: true, data: { preferences: req.user.preferences } });
-});
+exports.listSessions = async (req, res) => {
+  try {
+    const current = readRefreshFromReq(req);
+    const sessions = await listSessions(req.user.id || req.user._id, current);
+    res.json({ success: true, sessions });
+  } catch (error) {
+    return fail(res, error);
+  }
+};
+
+exports.revokeSession = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await revokeSessionById(req.user.id || req.user._id, id);
+    if (!result.deletedCount) {
+      return res.status(404).json({ success: false, message: 'Session not found' });
+    }
+    res.json({ success: true, message: 'Session revoked' });
+  } catch (error) {
+    return fail(res, error);
+  }
+};
+
+exports.revokeAllSessions = async (req, res) => {
+  try {
+    await revokeAllForUser(req.user.id || req.user._id);
+    clearRefreshCookie(res);
+    res.json({ success: true, message: 'All sessions revoked' });
+  } catch (error) {
+    return fail(res, error);
+  }
+};
+
+exports.listLoginHistory = async (req, res) => {
+  try {
+    const rows = await LoginHistory.find({ userId: req.user.id || req.user._id })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean();
+    res.json({ success: true, history: rows });
+  } catch (error) {
+    return fail(res, error);
+  }
+};
+
+/** Profile alias for /me */
+exports.getProfile = exports.getMe;

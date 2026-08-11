@@ -1,6 +1,5 @@
-const mongoose = require('mongoose');
+const mongoose = require('mongoose')
 
-<<<<<<< Updated upstream
 const goalSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -20,8 +19,40 @@ const goalSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    enum: ['Education', 'Career', 'Personal', 'Health', 'Finance'],
+    enum: [
+      'Academic', 'Career', 'Certification', 'Education', 'Finance', 'Health', 'Personal', 'Skill',
+      'Technical Skill', 'Soft Skill', 'Project', 'Research', 'Placement', 'Internship',
+      'Entrepreneurship', 'Personal Development', 'Custom',
+    ],
     default: 'Personal',
+  },
+  priority: {
+    type: String,
+    enum: ['Low', 'Medium', 'High', 'Critical'],
+    default: 'Medium',
+  },
+  estimatedDuration: {
+    type: String,
+    trim: true,
+    maxlength: 80,
+    default: '',
+  },
+  weeklyStudyHours: {
+    type: Number,
+    min: 0,
+    max: 168,
+    default: 0,
+  },
+  difficulty: {
+    type: String,
+    enum: ['Beginner', 'Intermediate', 'Advanced'],
+    default: 'Intermediate',
+  },
+  status: {
+    type: String,
+    enum: ['planning', 'active', 'paused', 'completed', 'archived'],
+    default: 'active',
+    index: true,
   },
   progress: {
     type: Number,
@@ -39,8 +70,6 @@ const goalSchema = new mongoose.Schema({
   aiPlan: [{
     type: String,
   }],
-<<<<<<< Updated upstream
-=======
   milestones: [{
     title: { type: String, required: true, trim: true, maxlength: 160 },
     description: { type: String, trim: true, maxlength: 1000, default: '' },
@@ -53,12 +82,6 @@ const goalSchema = new mongoose.Schema({
     targetDate: Date,
     dependencies: [{ type: mongoose.Schema.Types.ObjectId }],
     completedAt: Date,
-  }],
-  // Required skills for Goal → Skill mapping (Learning Intelligence). Strings only — no invented catalog.
-  requiredSkills: [{
-    type: String,
-    trim: true,
-    maxlength: 100,
   }],
   resources: {
     books: [{
@@ -95,53 +118,10 @@ const goalSchema = new mongoose.Schema({
   completedAt: Date,
   pausedAt: Date,
   archivedAt: Date,
->>>>>>> Stashed changes
 }, { timestamps: true })
-=======
-const milestoneSchema = new mongoose.Schema({
-  title: { type: String, required: true },
-  completed: { type: Boolean, default: false },
-  dueDate: Date,
-  completedAt: Date,
-});
->>>>>>> Stashed changes
 
-const goalSchema = new mongoose.Schema(
-  {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    organizationId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Organization',
-      default: null,
-      index: true,
-    },
-    title: { type: String, required: true, trim: true },
-    description: { type: String, default: '' },
-    category: { type: String, default: 'general', maxlength: 80, index: true },
-    status: { type: String, enum: ['active', 'completed', 'paused'], default: 'active' },
-    progress: { type: Number, min: 0, max: 100, default: 0 },
-    targetDate: Date,
-    priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
-    milestones: [milestoneSchema],
-    tags: [{ type: String, maxlength: 40 }],
-    aiRecommended: { type: Boolean, default: false },
-    aiSuggestion: { type: String, default: '', maxlength: 2000 },
-  },
-  { timestamps: true }
-);
+goalSchema.index({ userId: 1, status: 1, updatedAt: -1 })
+goalSchema.index({ userId: 1, category: 1 })
+goalSchema.index({ userId: 1, deadline: 1 })
 
-goalSchema.index({ user: 1, status: 1 });
-goalSchema.index({ user: 1, category: 1, status: 1 });
-goalSchema.index({ user: 1, createdAt: -1 });
-goalSchema.index({ organizationId: 1, user: 1 });
-goalSchema.index({ organizationId: 1, createdAt: -1 });
-
-goalSchema.methods.recalcProgress = function () {
-  if (!this.milestones?.length) return this.progress;
-  const done = this.milestones.filter((m) => m.completed).length;
-  this.progress = Math.round((done / this.milestones.length) * 100);
-  if (this.progress === 100) this.status = 'completed';
-  return this.progress;
-};
-
-module.exports = mongoose.model('Goal', goalSchema);
+module.exports = mongoose.model('Goal', goalSchema)

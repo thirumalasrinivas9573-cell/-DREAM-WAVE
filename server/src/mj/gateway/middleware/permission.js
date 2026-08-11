@@ -6,25 +6,31 @@
 const { MJLogger } = require('../../logger')
 
 /**
- * Attaches permission context for future RBAC enforcement.
- * Does NOT modify Dream Wave auth middleware.
+ * Builds permission context from canonical Dream Wave authentication.
  */
 function permissionMiddleware(req, res, next) {
   req.mjPermissions = {
-    authenticated: false,
-    userId: req.body?.userId || req.headers['x-user-id'] || null,
-    roles: [],
+    authenticated: Boolean(req.user),
+    userId: req.user ? String(req.user._id || req.user.id) : null,
+    roles: req.user?.role ? [req.user.role] : [],
     capabilities: [],
-    jwtReady: false,
-    rbacReady: false,
+    jwtReady: Boolean(req.user),
+    rbacReady: true,
   }
 
-  // Future: validate JWT from Authorization header without touching Dream Wave auth
-  const authHeader = req.headers.authorization
-  if (authHeader?.startsWith('Bearer ')) {
-    req.mjPermissions.jwtReady = true
-    // Architecture stub — decode JWT in future sprint
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      code: 'AUTH_REQUIRED',
+      message: 'Authentication required.',
+    })
   }
+
+  // Never trust a caller-supplied identity. Normalize all supported locations
+  // to the authenticated account before gateway handlers resolve user scope.
+  if (req.body && typeof req.body === 'object') req.body.userId = req.mjPermissions.userId
+  if (req.query && typeof req.query === 'object') req.query.userId = req.mjPermissions.userId
+  req.headers['x-user-id'] = req.mjPermissions.userId
 
   MJLogger.child('Gateway:Permission').debug('Permission context attached', {
     requestId: req.mjRequestId,

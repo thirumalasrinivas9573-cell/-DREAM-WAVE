@@ -1,53 +1,145 @@
-const mongoose = require('mongoose');
+const mongoose = require('mongoose')
 
-const taskSchema = new mongoose.Schema(
-  {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    organizationId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Organization',
-      default: null,
-      index: true,
-    },
-    title: { type: String, required: true, trim: true },
-    description: { type: String, default: '' },
-    priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
-    status: { type: String, enum: ['todo', 'in_progress', 'done', 'blocked'], default: 'todo' },
-    dueDate: Date,
-    scheduledAt: Date,
-    estimatedMinutes: { type: Number, min: 0, max: 24 * 60, default: 0 },
-    loggedMinutes: { type: Number, min: 0, default: 0 },
-    goal: { type: mongoose.Schema.Types.ObjectId, ref: 'Goal' },
-    dependsOn: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Task' }],
-    tags: [{ type: String, maxlength: 40 }],
-    aiPriorityScore: { type: Number, min: 0, max: 100, default: 0 },
-    aiPriorityReason: { type: String, default: '', maxlength: 400 },
-    recurrence: {
-      enabled: { type: Boolean, default: false },
-      frequency: {
-        type: String,
-        enum: ['none', 'daily', 'weekly', 'monthly'],
-        default: 'none',
-      },
-      interval: { type: Number, min: 1, max: 30, default: 1 },
-      nextOccurrence: Date,
-      endDate: Date,
-    },
-    progress: { type: Number, min: 0, max: 100, default: 0 },
-    completedAt: Date,
+const taskSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    index: true,
   },
-  { timestamps: true }
-);
+  goalId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Goal',
+    index: true,
+  },
+  roadmapId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Roadmap',
+    index: true,
+  },
+  source: {
+    type: String,
+    enum: ['manual', 'ai', 'duplicate', 'roadmap'],
+    default: 'manual',
+    index: true,
+  },
+  duplicatedFrom: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Task',
+  },
+  day: {
+    type: Number,
+  },
+  type: {
+    type: String,
+    enum: ['learn', 'quiz', 'practice', 'revise'],
+  },
+  title: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+  description: {
+    type: String,
+    trim: true,
+  },
+  estimatedTime: {
+    type: String,
+    trim: true,
+  },
+  estimatedMinutes: {
+    type: Number,
+    min: 0,
+    max: 24 * 60,
+    default: 0,
+  },
+  priority: {
+    type: String,
+    enum: ['High', 'Medium', 'Low'],
+    default: 'Medium',
+  },
+  category: {
+    type: String,
+    default: 'General',
+    trim: true,
+  },
+  status: {
+    type: String,
+    enum: ['todo', 'in-progress', 'paused', 'completed', 'archived'],
+    default: 'todo',
+    index: true,
+  },
+  startDate: Date,
+  dueDate: {
+    type: Date,
+    index: true,
+  },
+  reminderAt: Date,
+  reminder: {
+    enabled: { type: Boolean, default: false },
+    daily: { type: Boolean, default: false },
+    dueSoon: { type: Boolean, default: true },
+    overdue: { type: Boolean, default: true },
+    weeklySummary: { type: Boolean, default: true },
+    sentAt: Date,
+  },
+  tags: [{
+    type: String,
+    trim: true,
+    lowercase: true,
+    maxlength: 40,
+  }],
+  subtasks: [{
+    title: { type: String, required: true, trim: true, maxlength: 200 },
+    completed: { type: Boolean, default: false },
+    completedAt: Date,
+  }],
+  checklist: [{
+    text: { type: String, required: true, trim: true, maxlength: 300 },
+    done: { type: Boolean, default: false },
+    doneAt: Date,
+  }],
+  notes: [{
+    text: { type: String, required: true, trim: true, maxlength: 4000 },
+    createdAt: { type: Date, default: Date.now },
+  }],
+  attachments: [{
+    name: { type: String, required: true, trim: true, maxlength: 200 },
+    url: { type: String, required: true, trim: true, maxlength: 1000 },
+    mime: { type: String, trim: true, maxlength: 100, default: '' },
+    size: { type: Number, min: 0, default: 0 },
+    uploadedAt: { type: Date, default: Date.now },
+  }],
+  progress: {
+    type: Number,
+    min: 0,
+    max: 100,
+    default: 0,
+  },
+  actualMinutes: {
+    type: Number,
+    min: 0,
+    default: 0,
+  },
+  countsTowardGoalProgress: {
+    type: Boolean,
+    default: true,
+  },
+  pausedAt: Date,
+  archivedAt: Date,
+  completed: {
+    type: Boolean,
+    default: false,
+  },
+  completedAt: {
+    type: Date,
+  },
+}, { timestamps: true })
 
-taskSchema.index({ user: 1, status: 1, dueDate: 1 });
-taskSchema.index({ user: 1, status: 1, completedAt: -1 });
-taskSchema.index({ user: 1, createdAt: -1 });
-taskSchema.index({ user: 1, scheduledAt: 1 });
-taskSchema.index({ user: 1, aiPriorityScore: -1 });
-taskSchema.index({ organizationId: 1, user: 1 });
-taskSchema.index({ organizationId: 1, createdAt: -1 });
-taskSchema.index({ user: 1, 'recurrence.enabled': 1, 'recurrence.nextOccurrence': 1 });
-taskSchema.index({ goal: 1 });
-taskSchema.index({ dependsOn: 1 });
+taskSchema.index({ userId: 1, status: 1, dueDate: 1 })
+taskSchema.index({ userId: 1, goalId: 1, status: 1 })
+taskSchema.index({ userId: 1, roadmapId: 1, day: 1 })
+taskSchema.index({ userId: 1, completed: 1, completedAt: -1 })
+taskSchema.index({ userId: 1, tags: 1 })
 
-module.exports = mongoose.model('Task', taskSchema);
+module.exports = mongoose.model('Task', taskSchema)

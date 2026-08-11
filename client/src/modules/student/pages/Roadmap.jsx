@@ -252,7 +252,7 @@ export default function Roadmap() {
             {dirty && <Button onClick={saveArchitecture} disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</Button>}
             {roadmap && <Button variant="secondary" onClick={() => setConfirmGenerate(true)} disabled={generating}>AI generation</Button>}
             {roadmap && <Button variant="secondary" onClick={loadAdaptPreview} disabled={adaptLoading}>Suggest adjustments</Button>}
-        </div>
+          </div>
         </header>
 
         <section className="roadmap-selector" aria-label="Select roadmap goal">
@@ -370,10 +370,10 @@ export default function Roadmap() {
                   </RoadmapSection>
                 )}
               </main>
-                      </div>
+            </div>
           </>
         )}
-                            </div>
+      </div>
 
       <Dialog
         open={Boolean(adaptPreview)}
@@ -395,8 +395,8 @@ export default function Roadmap() {
             {(adaptPreview.suggested?.nextSteps || []).slice(0, 6).map((step, index) => (
               <p key={`${step.title}-${index}`}>{index + 1}. {step.title}</p>
             ))}
-                </div>
-              )}
+          </div>
+        )}
       </Dialog>
 
       <Dialog

@@ -1,33 +1,38 @@
 {
   "name": "dream-wave-ai",
   "version": "1.0.0",
-  "description": "Dream Wave AI — production AI career mentor, goals, learning & community platform",
-  "private": true,
+  "description": "Complete AI-powered career guidance platform",
+  "engines": {
+    "node": ">=20.9.0 <21"
+  },
   "scripts": {
-    "install:all": "npm install && npm install --prefix client && npm install --prefix server",
-    "dev": "concurrently -n server,client -c teal,cyan \"npm run server\" \"npm run client\"",
-    "server": "npm run dev --prefix server",
-    "client": "npm run dev --prefix client",
-    "build": "npm run build --prefix client",
-    "start": "npm start --prefix server",
-    "lint": "npm run lint --prefix client",
-    "arch:verify": "bash scripts/verify-boundaries.sh",
-    "test": "npm test --prefix server",
-    "ci": "npm run arch:verify && npm test && npm run build"
+    "start": "bash start.sh",
+    "dev": "bash start.sh",
+    "dev:memory": "USE_MEMORY_MONGO=1 bash start.sh",
+    "dev:legacy": "concurrently \"npm run server\" \"npm run client\"",
+    "dev:web": "concurrently \"npm run server\" \"npm run web\"",
+    "server": "cd server && node server.js",
+    "server:memory": "cd server && npm run dev:memory",
+    "client": "cd client && npm run dev",
+    "web": "cd web && npm run dev",
+    "install:all": "npm install && cd client && npm install && cd ../server && npm install && cd ../web && npm install",
+    "build": "cd client && npm run build",
+    "build:web": "cd web && npm run build",
+    "test": "cd server && npm test",
+    "test:server": "cd server && npm test"
   },
   "devDependencies": {
-    "concurrently": "^9.0.1"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "concurrently": "^8.2.0"
   },
   "keywords": [
     "ai",
     "career",
+    "education",
     "mentor",
     "react",
-    "express",
-    "mongodb"
+    "nodejs",
+    "openai"
   ],
+  "author": "DREAM WAVE AI Team",
   "license": "MIT"
 }

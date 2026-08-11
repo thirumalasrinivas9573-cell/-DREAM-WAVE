@@ -1,25 +1,47 @@
 const express = require('express');
-const ctrl = require('../controllers/adminController');
-const { protect, authorize } = require('../middleware/auth');
-const { zodValidate } = require('../middleware/validate');
-const schemas = require('../config/schemas');
-
 const router = express.Router();
-router.use(protect, authorize('admin'));
-router.get('/dashboard', ctrl.dashboard);
-router.get('/users', ctrl.listUsers);
-router.patch('/users/:id', zodValidate(schemas.adminUserUpdate), ctrl.updateUser);
-router.delete('/users/:id', ctrl.deleteUser);
-router.get('/reports', ctrl.reports);
-router.patch(
-  '/orgs/:id/verification',
-  zodValidate(
-    require('zod').z.object({
-      status: require('zod').z.enum(['unverified', 'pending', 'verified', 'rejected']),
-      notes: require('zod').z.string().max(500).optional(),
-    })
-  ),
-  require('../controllers/companyController').adminSetVerification
-);
+const auth = require('../middleware/auth');
+const { requireRole } = require('../middleware/roleGuard');
+const { getStats } = require('../controllers/analyticsController');
+const ap = require('../controllers/adminPortalController');
+
+router.use(auth, requireRole('admin'));
+router.get('/stats', getStats);
+router.get('/overview', ap.getOverview);
+router.get('/analytics', ap.getAnalytics);
+router.get('/logs', ap.listLogs);
+router.get('/users', ap.listUsers);
+router.patch('/users/:id/suspend', ap.suspendUser);
+
+router.get('/institutions', ap.listInstitutions);
+router.patch('/institutions/:id/approve', ap.approveInstitution);
+router.patch('/institutions/:id/suspend', ap.suspendInstitution);
+
+router.get('/companies', ap.listCompanies);
+router.patch('/companies/:id/approve', ap.approveCompany);
+router.patch('/companies/:id/suspend', ap.suspendCompany);
+
+router.get('/promotions', ap.listPromotions);
+router.patch('/promotions/:id/approve', ap.approvePromotion);
+router.patch('/promotions/:id/reject', ap.rejectPromotion);
+
+router.get('/reviews', ap.listReviews);
+router.patch('/reviews/:id', ap.moderateReview);
+
+router.get('/books', ap.listBooks);
+router.patch('/books/:id/archive', ap.archiveBook);
+
+router.get('/jobs', ap.listJobs);
+router.patch('/jobs/:id/close', ap.closeJob);
+router.get('/internships', ap.listInternships);
+router.get('/courses', ap.listCourses);
+router.get('/events', ap.listEvents);
+router.get('/scholarships', ap.listScholarships);
+
+router.get('/reports', ap.listContentReports);
+router.patch('/reports/:id', ap.resolveContentReport);
+router.get('/career-reports', ap.listCareerReports);
+
+router.post('/notifications/broadcast', ap.broadcastNotification);
 
 module.exports = router;

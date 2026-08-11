@@ -1,90 +1,32 @@
-const express = require('express');
-const ctrl = require('../controllers/careerController');
-const { protect } = require('../middleware/auth');
-const { requireVerifiedEmail } = require('../middleware/requireVerifiedEmail');
-const { zodValidate } = require('../middleware/validate');
-const schemas = require('../config/schemas');
+const express = require('express')
+const auth = require('../middleware/auth')
+const career = require('../controllers/careerController')
 
-const router = express.Router();
-router.use(protect);
+const router = express.Router()
+const requireStudent = (req, res, next) => {
+  if (req.user?.role !== 'student') return res.status(403).json({ success: false, code: 'STUDENT_ONLY', message: 'Career Hub is available to students only.' })
+  return next()
+}
 
-router.get('/catalog', ctrl.catalog);
-router.get('/profile', ctrl.getProfile);
-router.patch('/profile', zodValidate(schemas.careerProfileUpdate), ctrl.updateProfile);
+router.get('/public/resumes/:token.pdf', career.publicResume)
 
-router.get('/skill-gap', ctrl.skillGap);
-router.post('/skill-gap', zodValidate(schemas.careerRoleQuery), ctrl.skillGap);
+router.use(auth, requireStudent)
+router.get('/dashboard', career.getDashboard)
+router.get('/profile', career.getProfile)
+router.put('/profile', career.updateProfile)
+router.get('/readiness', career.getReadiness)
+router.get('/notifications', career.getNotifications)
+router.get('/opportunities', career.getOpportunities)
+router.get('/opportunity-filters', career.getOpportunityFilters)
+router.post('/opportunities/:type(job|internship)/:id/apply', career.apply)
+router.get('/applications', career.getApplications)
+router.post('/applications/:id/withdraw', career.withdrawApplication)
+router.get('/resumes', career.listResumes)
+router.post('/resumes', career.createResume)
+router.get('/resumes/:id', career.getResume)
+router.put('/resumes/:id', career.updateResume)
+router.delete('/resumes/:id', career.deleteResume)
+router.post('/resumes/:id/analyze', career.analyzeResume)
+router.get('/resumes/:id/pdf', career.downloadResume)
 
-router.get('/recommendations', ctrl.recommendations);
-router.get('/salary', ctrl.salaryInsights);
-
-router.get('/roadmaps', ctrl.listIntelligentRoadmaps);
-router.post(
-  '/roadmaps/generate',
-  requireVerifiedEmail,
-  zodValidate(schemas.careerRoadmapGenerate),
-  ctrl.generateRoadmap
-);
-
-router.get('/jobs/match', ctrl.matchJobs);
-router.get('/internships/match', ctrl.matchInternships);
-router.get('/companies/match', ctrl.matchCompanies);
-router.get('/eligibility', ctrl.eligibility);
-router.get('/jobs/:jobId/resume-match', ctrl.resumeJobMatch);
-
-router.post(
-  '/interview/questions',
-  requireVerifiedEmail,
-  zodValidate(schemas.careerInterviewQuestions),
-  ctrl.generateQuestions
-);
-router.get('/interview/sessions', ctrl.listInterviewSessions);
-router.post(
-  '/interview/sessions',
-  requireVerifiedEmail,
-  zodValidate(schemas.careerInterviewSession),
-  ctrl.createInterviewSession
-);
-router.get('/interview/sessions/:id', ctrl.getInterviewSession);
-router.post(
-  '/interview/sessions/:id/questions/:questionId/answer',
-  requireVerifiedEmail,
-  zodValidate(schemas.careerInterviewAnswer),
-  ctrl.answerInterviewQuestion
-);
-router.post(
-  '/interview/sessions/:id/complete',
-  requireVerifiedEmail,
-  ctrl.completeInterviewSession
-);
-
-router.post(
-  '/resume/analyze',
-  requireVerifiedEmail,
-  zodValidate(schemas.careerResumeAnalyze),
-  ctrl.analyzeResume
-);
-router.post(
-  '/resume/optimize',
-  requireVerifiedEmail,
-  zodValidate(schemas.careerResumeOptimize),
-  ctrl.optimizeResume
-);
-
-router.get('/certifications/recommend', ctrl.recommendCertifications);
-router.post('/certifications', zodValidate(schemas.careerCertification), ctrl.addCertification);
-router.patch(
-  '/certifications/:certId',
-  zodValidate(schemas.careerCertificationUpdate),
-  ctrl.updateCertification
-);
-router.post(
-  '/certifications/:certId/complete',
-  zodValidate(schemas.careerCertificationComplete),
-  ctrl.completeCertification
-);
-
-router.get('/learning/recommendations', ctrl.learningRecommendations);
-router.get('/analytics', ctrl.analytics);
-
-module.exports = router;
+module.exports = router

@@ -1,26 +1,26 @@
-const { parsePagination, paginationMeta } = require('./pagination');
-
 /**
- * Standard success envelope. Prefer this over ad-hoc res.json shapes for new code.
- * Existing auth token top-level fields remain intentional for frontend compatibility.
+ * Standard API response helpers for Dream Wave controllers.
+ * Shape: { success, message?, code?, ...payload }
  */
-function sendSuccess(res, data, { status = 200, message, meta } = {}) {
-  const body = { success: true };
-  if (data !== undefined) body.data = data;
-  if (message) body.message = message;
-  if (meta && typeof meta === 'object') body.meta = meta;
-  return res.status(status).json(body);
+
+function ok(res, status = 200, payload = {}) {
+  return res.status(status).json({ success: true, ...payload })
 }
 
-function sendMessage(res, message, { status = 200, data } = {}) {
-  const body = { success: true, message };
-  if (data !== undefined) body.data = data;
-  return res.status(status).json(body);
+function fail(res, status = 500, message = 'Request failed.', code = 'REQUEST_ERROR', extra = {}) {
+  return res.status(status).json({ success: false, code, message, ...extra })
 }
 
-module.exports = {
-  parsePagination,
-  paginationMeta,
-  sendSuccess,
-  sendMessage,
-};
+function fromError(res, err, fallbackMessage = 'Internal server error.') {
+  const status = err?.statusCode || err?.status || 500
+  if (status >= 500) console.error('[api]', err?.message || err)
+  const body = {
+    success: false,
+    message: err?.message || (status >= 500 ? fallbackMessage : 'Request failed.'),
+    code: err?.code || (status >= 500 ? 'INTERNAL_ERROR' : 'REQUEST_ERROR'),
+  }
+  if (err?.verified === false) body.verified = false
+  return res.status(status).json(body)
+}
+
+module.exports = { ok, fail, fromError }

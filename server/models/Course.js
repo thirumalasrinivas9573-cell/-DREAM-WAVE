@@ -1,28 +1,35 @@
 const mongoose = require('mongoose');
 
-const courseSchema = new mongoose.Schema(
-  {
-    organizationId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Organization',
-      required: true,
-      index: true,
-    },
-    department: { type: mongoose.Schema.Types.ObjectId, ref: 'Department', default: null, index: true },
-    name: { type: String, required: true, trim: true, maxlength: 160 },
-    code: { type: String, trim: true, uppercase: true, maxlength: 30, default: '' },
-    description: { type: String, default: '', maxlength: 2000 },
-    credits: { type: Number, default: 0, min: 0, max: 60 },
-    durationMonths: { type: Number, default: 12, min: 1, max: 72 },
-    active: { type: Boolean, default: true },
+const courseSchema = new mongoose.Schema({
+  institutionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Institution', required: true, index: true },
+  departmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Department' },
+  title: { type: String, required: true, trim: true },
+  code: { type: String, default: '' },
+  duration: { type: String, default: '' },
+  level: { type: String, enum: ['UG', 'PG', 'Diploma', 'Certificate', 'Other'], default: 'UG' },
+  seats: { type: Number, default: 0 },
+  enrolled: { type: Number, default: 0 },
+  fees: { type: Number, default: 0 },
+  eligibility: { type: String, default: '' },
+  curriculum: { type: String, default: '' },
+  brochureUrl: { type: String, default: '' },
+  description: { type: String, default: '' },
+  skills: [{ type: String }],
+  careerPaths: [{ type: String }],
+  industryDemand: { type: String, default: '' },
+  futureScope: { type: String, default: '' },
+  competitionLevel: { type: String, default: '' },
+  avgSalary: { type: Number, default: 0 },
+  aiInsights: {
+    popularity: { type: Number, default: 0 },
+    salaryRank: { type: Number, default: 0 },
+    demandScore: { type: Number, default: 0 },
+    summary: { type: String, default: '' },
   },
-  { timestamps: true }
-);
+  status: { type: String, enum: ['active', 'draft', 'archived'], default: 'active' },
+}, { timestamps: true });
 
-courseSchema.index(
-  { organizationId: 1, code: 1 },
-  { unique: true, partialFilterExpression: { code: { $type: 'string', $gt: '' } } }
-);
-courseSchema.index({ organizationId: 1, name: 1 }, { unique: true });
+courseSchema.index({ title: 'text', description: 'text' });
+courseSchema.index({ institutionId: 1, status: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Course', courseSchema);
