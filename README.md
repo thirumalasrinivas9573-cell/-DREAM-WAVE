@@ -1,262 +1,137 @@
-# DREAM WAVE AI
+# Dream Wave AI
 
-Complete AI-powered career guidance platform with mentorship, gamification, and community features.
+Production-ready AI career mentor platform with goals, tasks, learning roadmaps, books, community, reports (PDF), and an admin panel.
 
-## 🚀 Features
+## Canonical architecture
 
-- **AI Career Guidance** - Personalized goal planning with OpenAI
-- **R&D Reports** - Comprehensive career research with PDF export
-- **Learning Roadmaps** - Step-by-step career paths
-- **Book Discovery** - Google Books API integration
-- **Gamified Tasks** - Complete challenges, earn points and levels
-- **Daily Life AI** - Lifestyle advice (cooking, fitness, yoga, etc.)
-- **Mentor Mode** - Krishna AI with ancient wisdom and slokas
-- **Community** - Social features with posts, comments, and friends
-- **Profile System** - Certificates and progress tracking
-- **Authentication** - JWT-based auth with AAID system
+**Ship only from:**
 
-## 🛠 Tech Stack
+| Path | Role |
+|------|------|
+| `client/` | Web SPA (React 19 + TypeScript + Vite) |
+| `server/` | API (Express + MongoDB) — **excluding** `server/src/mj/` |
 
-### Backend
-- **Node.js** + **Express**
-- **MongoDB Atlas** (Database)
-- **JWT** (Authentication)
-- **OpenAI API** (AI features)
-- **PDFKit** (PDF generation)
-- **Firebase** (Storage)
-- **Socket.io** (Real-time features)
+**Quarantined (do not run or import):** `dream-wave-ai/**`, `server/src/mj/**`  
+**Separate lane:** `mobile/**`
 
-### Frontend
-- **React** + **Vite**
-- **Tailwind CSS** (Styling)
-- **Framer Motion** (Animations)
-- **React Query** (State management)
-- **React Router** (Navigation)
-- **Lucide React** (Icons)
+See [ARCHITECTURE_BOUNDARIES.md](./ARCHITECTURE_BOUNDARIES.md). Verify with:
 
-## 📁 Project Structure
-
-```
-├── client/
-│   ├── src/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   ├── services/
-│   │   ├── context/
-│   │   └── App.jsx
-│   ├── package.json
-│   └── vite.config.js
-├── server/
-│   ├── controllers/
-│   ├── routes/
-│   ├── models/
-│   ├── middleware/
-│   ├── services/
-│   └── server.js
-├── .env.example
-└── README.md
+```bash
+npm run arch:verify
 ```
 
-## 🚀 Quick Start
+### Tests & merge gate
+
+```bash
+npm test          # API smoke
+npm run ci        # arch:verify → test → client build (required before merge)
+```
+
+CI runs the same gate on push/PR via [`.github/workflows/ci.yml`](./.github/workflows/ci.yml).  
+Release steps: [docs/RELEASE_CHECKLIST.md](./docs/RELEASE_CHECKLIST.md).
+
+API smoke suite: health, auth, assets, billing/Stripe, organizations. Uses MongoMemoryServer when available; otherwise `server/.env` `MONGODB_URI` with isolated DB `dreamwave_smoke_test`. Override with `TEST_MONGODB_URI`. Set `PREFER_MEMORY_MONGO=1` in CI.
+
+Tenancy: [docs/ORG_TENANCY.md](./docs/ORG_TENANCY.md).
+
+## Stack
+
+- **Frontend:** React 19, Vite, TypeScript, Tailwind CSS, Zustand, React Router, Framer Motion, Recharts, Axios, React Hook Form, Zod
+- **Backend:** Node.js, Express, MongoDB (Mongoose), JWT, private authenticated uploads, PDFKit, OpenAI (optional fallback)
+
+## Quick start
 
 ### Prerequisites
-- Node.js (v16 or higher)
-- MongoDB Atlas account
-- OpenAI API key
 
-### 1. Clone and Install Dependencies
+- Node.js 18+
+- MongoDB running locally (or a cloud URI)
 
-```bash
-# Install backend dependencies
-cd server
-npm install
-
-# Install frontend dependencies
-cd ../client
-npm install
-```
-
-### 2. Environment Setup
-
-Create a `.env` file in the `server` directory:
-
-```env
-# MongoDB Atlas Connection
-MONGODB_URL=mongodb+srv://username:password@cluster.mongodb.net/dreamwave
-
-# JWT Secret Key
-JWT_SECRET=your_jwt_secret_key_here
-
-# OpenAI API Key
-OPENAI_API_KEY=your_openai_api_key_here
-
-# Firebase Configuration
-FIREBASE_PROJECT_ID=your_firebase_project_id
-FIREBASE_PRIVATE_KEY=your_firebase_private_key
-FIREBASE_CLIENT_EMAIL=your_firebase_client_email
-
-# Server Port
-PORT=5000
-```
-
-### 3. Start the Application
+### Install
 
 ```bash
-# Start backend server (from server directory)
-npm run dev
+npm run install:all
+```
 
-# Start frontend (from client directory)
+### Configure
+
+```bash
+cp .env.example server/.env
+# edit server/.env — set MONGODB_URI, JWT_SECRET, optional OPENAI_API_KEY
+# set ADMIN_EMAIL to the email you will sign up with to receive admin role
+```
+
+### Run
+
+```bash
 npm run dev
 ```
 
-The application will be available at:
-- Frontend: `http://localhost:5173`
-- Backend API: `http://localhost:5000`
+- Client: http://localhost:5173  
+- API: http://localhost:5000/api/health  
 
-### 4. Connectivity Check
+### Production build
 
-- Backend test route: `GET /api/test` returns `{ message: "Backend working" }`
-- In the UI, a floating badge shows backend status: "Backend Connected ✅" or "Backend Not Connected ❌".
-
-## 🔧 Development Commands
-
-### Backend (server/)
 ```bash
-npm run dev    # Start with nodemon
-npm start      # Production start
+npm run build
+npm start
 ```
 
-### Frontend (client/)
-```bash
-npm run dev    # Start development server
-npm run build  # Build for production
-npm preview    # Preview production build
-```
+Serve the client `client/dist` with any static host (Netlify/Vercel) and point `VITE_API_URL` at your API. Or reverse-proxy `/api` to the Express server (user files are served only via authenticated `GET /api/assets/:filename`).
 
-## 🌐 Deployment
+## Features
 
-### Render Deployment
+| Area | Capabilities |
+|------|----------------|
+| Landing | Animated hero, glassmorphism, dark/light mode, pricing, FAQ, contact |
+| Auth | Signup, login, JWT, forgot/reset password, profile |
+| Dashboard | Stats, Recharts activity, AI suggestions, calendar snapshot, notifications |
+| AI Mentor | Chat history, markdown replies, file/image upload |
+| Goals | CRUD, milestones, progress |
+| Tasks | Priorities, due dates, list + calendar views |
+| Roadmap | AI-generated paths, skills, timeline phases |
+| Books | Categories, search, bookmarks, reading progress |
+| Reports | Analytics charts, generate report, PDF download |
+| Community | Posts, likes, comments |
+| Settings | Theme, language, security, delete account |
+| Admin | Users, roles/plans, analytics, reports |
 
-1. **Backend Deployment**
-   - Connect your GitHub repository
-   - Set build command: `cd server && npm install`
-   - Set start command: `cd server && npm start`
-   - Add environment variables from `.env`
+## API overview
 
-2. **Frontend Deployment**
-   - Set build command: `cd client && npm install && npm run build`
-   - Set publish directory: `client/dist`
-   - Add environment variable: `VITE_API_URL=your_backend_url`
+- `POST /api/auth/signup|login` · `POST /api/auth/forgot-password` · `PUT /api/auth/reset-password/:token`
+- `GET/POST /api/goals` · `GET/POST /api/tasks` · `POST /api/roadmap/generate`
+- `GET/POST /api/mentor` · `POST /api/mentor/:id/messages`
+- `GET /api/books` · `POST /api/reports/generate` · `GET /api/reports/:id/pdf`
+- `GET/POST /api/community` · `GET /api/dashboard/stats`
+- `GET /api/admin/dashboard` (admin role)
 
-## ✅ Local Checklist
+## Admin access
 
-- Backend starts without errors on port 5000
-- MongoDB connects (check console log). If it fails, a readable error is logged and server continues.
-- Frontend runs on port 5173
-- Visiting the app shows "Backend Connected ✅"
+Sign up with the email matching `ADMIN_EMAIL` in `server/.env` (default `admin@dreamwave.ai`), or promote a user via MongoDB / admin panel once an admin exists.
 
-## 🧰 Troubleshooting
+## What's new in 2.1
 
-- MODULE_NOT_FOUND: Run `npm install` inside both `server/` and `client/`.
-- MongoDB ECONNREFUSED: Verify `MONGODB_URL`, password correctness, and IP access (0.0.0.0/0) in Atlas.
-- Env not loading: Ensure `.env` file exists under `server/` (not `.env.example`).
-- CORS issues: Update `CLIENT_URL` in `server/.env` to match your frontend URL.
+- **AI Studio** — 18 specialized AI modes (mentor, career, study, roadmap, research, PDF, notes, quiz, resume, interview, coding, daily, goals, habits, motivation, books, project, time)
+- **AI Chat** — single conversation history for all modes (search, rename, export, uploads); AI Modes launches into Chat
+- **Learning Hub** — skills, gaps, study plans, quizzes, certificates, learning streaks
+- **Productivity** — calendar events, habits, Pomodoro, focus mode, AI daily planner
+- **Document AI** — PDF/DOCX/PPT/image upload, summarize, notes, quizzes, Q&A
+- **Chat upgrades** — search, rename, export markdown, modes, syntax highlighting
+- **Security** — access + refresh tokens, httpOnly cookies, email verification, session management
+- **Billing foundation** — plan catalog (`free` / `pro` / `team`), entitlements service, AI credit gate, Stripe Checkout/Portal/webhooks when env configured
+- **Resume Builder** — AI-assisted resume improvement
+- **DB** — indexes, aggregation-ready analytics, `server/utils/backup.sh`
 
-## 📊 API Endpoints
+## Security
 
-### Authentication
-- `POST /api/auth/signup` - User registration
-- `POST /api/auth/login` - User login
-- `POST /api/auth/aaid-login` - AAID login
-- `GET /api/auth/me` - Get current user
+- JWT access (15m) + refresh (7d) with hashed session store; refresh in httpOnly cookie only
+- Private user assets via `/api/assets/:filename` (auth + ownership)
+- bcrypt password hashing (cost 12) with stronger password policy
+- Zod validation on auth and core write endpoints
+- Helmet, CORS allowlist, compression, rate limits (global + auth + contact + AI)
+- Mass-assignment protection via field whitelists
+- Centralized error handler with structured JSON logging
+- Environment validation at boot (`config/env.js`)
 
-### Goals
-- `POST /api/goals` - Create goal
-- `GET /api/goals` - Get user goals
-- `GET /api/goals/:id` - Get specific goal
+## License
 
-### Reports
-- `POST /api/report` - Generate R&D report
-- `GET /api/report` - Get user reports
-- `GET /api/report/:id/download` - Download PDF
-
-### Roadmaps
-- `POST /api/roadmap` - Generate learning roadmap
-
-### Books
-- `GET /api/books` - Search books
-
-### Tasks
-- `GET /api/tasks` - Get user tasks
-- `POST /api/tasks` - Create task
-- `POST /api/tasks/:id/complete` - Complete task
-- `POST /api/tasks/generate` - Generate AI quiz
-
-### Daily Life
-- `POST /api/daily` - Get lifestyle advice
-
-### Mentor
-- `POST /api/mentor` - Get Krishna's advice
-
-### Community
-- `GET /api/community/posts` - Get posts
-- `POST /api/community/posts` - Create post
-- `POST /api/community/posts/:id/like` - Like post
-- `POST /api/community/posts/:id/comment` - Comment on post
-- `GET /api/community/friends` - Get friends
-- `POST /api/community/friends/:id` - Add friend
-
-### Profile
-- `GET /api/profile` - Get profile
-- `PUT /api/profile` - Update profile
-- `POST /api/profile/upload` - Upload profile image
-- `POST /api/profile/certificate` - Generate certificate
-
-## 🎨 UI Features
-
-- **Gradient Theme**: Violet to pink gradient design
-- **Responsive Design**: Mobile-first approach
-- **Smooth Animations**: Framer Motion transitions
-- **Modern Components**: Cards, modals, and interactive elements
-- **Loading States**: Skeleton loaders and spinners
-- **Error Handling**: User-friendly error messages
-
-## 🏆 Gamification System
-
-- **Points System**: Earn points for completing tasks
-- **Streak Tracking**: Daily activity tracking
-- **Level Progress**: Advance through levels with credits
-- **Certificates**: Auto-generated achievement certificates
-- **Leaderboards**: Community rankings
-
-## 🔐 Security Features
-
-- JWT authentication
-- Password hashing with bcrypt
-- Rate limiting
-- CORS protection
-- Input validation
-- Secure file uploads
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## 📝 License
-
-This project is licensed under the MIT License.
-
-## 🆘 Support
-
-For support and questions:
-- Create an issue on GitHub
-- Check the documentation
-- Review the API endpoints above
-
----
-
-**DREAM WAVE AI** - Your AI-powered career companion 🚀
+MIT

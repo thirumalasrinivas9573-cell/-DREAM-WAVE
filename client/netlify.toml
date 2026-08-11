@@ -1,30 +1,21 @@
 [build]
-  base    = "."
-  command = "npm run build"
+  base = "client"
+  command = "npm install && npm run build"
   publish = "dist"
 
-[build.environment]
-  NODE_VERSION = "18"
-  NPM_VERSION  = "10"
-
-# ── SPA routing — all client-side routes go to index.html ────────────────────
 [[redirects]]
-  from   = "/*"
-  to     = "/index.html"
+  from = "/api/*"
+  to = "https://YOUR_API_HOST/api/:splat"
   status = 200
+  force = true
 
-# ── Security headers ──────────────────────────────────────────────────────────
-[[headers]]
-  for = "/*"
-  [headers.values]
-    X-Frame-Options        = "DENY"
-    X-XSS-Protection       = "1; mode=block"
-    X-Content-Type-Options = "nosniff"
-    Referrer-Policy        = "strict-origin-when-cross-origin"
-    Permissions-Policy     = "camera=(), microphone=(), geolocation=()"
+[[redirects]]
+  from = "/uploads/*"
+  to = "https://YOUR_API_HOST/uploads/:splat"
+  status = 200
+  force = true
 
-# ── Cache static assets ───────────────────────────────────────────────────────
-[[headers]]
-  for = "/assets/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

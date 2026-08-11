@@ -1,179 +1,142 @@
-const Task = require('../models/Task')
-const Goal = require('../models/Goal')
-const Roadmap = require('../models/Roadmap')
-const aiTaskService = require('../services/aiTaskService')
-const calculateProgress = require('../utils/calculateProgress')
+const Task = require('../models/Task');
+const User = require('../models/User');
+const Notification = require('../models/Notification');
+const asyncHandler = require('../utils/asyncHandler');
+const { AppError } = require('../middleware/errorHandler');
+const { pick } = require('../utils/helpers');
+const { orgCreateStamp, orgListFilter, findAccessible, findMutable } = require('../utils/orgScope');
 
-// ── Helper: Recalculate goal progress ──────────────────────────────────────────
-const updateGoalProgress = async (goalId, userId) => {
-  if (!goalId) return
-  try {
-    const progress = await calculateProgress(goalId, userId);
-    
-    await Goal.findOneAndUpdate(
-      { _id: goalId, userId },
-      { progress, completed: progress >= 100 }
-    )
-  } catch (err) {
-    console.error('[updateGoalProgress]', err.message)
+const FIELDS = [
+  'title',
+  'description',
+  'priority',
+  'status',
+  'dueDate',
+  'scheduledAt',
+  'estimatedMinutes',
+  'loggedMinutes',
+  'goal',
+  'dependsOn',
+  'tags',
+  'progress',
+  'recurrence',
+];
+
+exports.list = asyncHandler(async (req, res) => {
+  const filter = await orgListFilter(req.user);
+  if (req.query.status) filter.status = req.query.status;
+  if (req.query.goal) filter.goal = req.query.goal;
+  if (req.query.tag) filter.tags = req.query.tag;
+  if (req.query.from || req.query.to) {
+    filter.dueDate = {};
+    if (req.query.from) filter.dueDate.$gte = new Date(req.query.from);
+    if (req.query.to) filter.dueDate.$lte = new Date(req.query.to);
   }
-}
+  const sort =
+    req.query.sort === 'priority'
+      ? { aiPriorityScore: -1, dueDate: 1 }
+      : { dueDate: 1, createdAt: -1 };
+  const { parsePagination, paginationMeta } = require('../utils/pagination');
+  const { page, limit, skip } = parsePagination(req.query, { defaultLimit: 50 });
+  const [tasks, total] = await Promise.all([
+    Task.find(filter).sort(sort).skip(skip).limit(limit).lean(),
+    Task.countDocuments(filter),
+  ]);
+  res.json({ success: true, data: { tasks, pagination: paginationMeta(page, limit, total) } });
+});
 
-// ── POST /api/tasks/generate-from-roadmap ─────────────────────────────────────
-exports.generateFromRoadmap = async (req, res) => {
-  try {
-    const { goalId, roadmapId } = req.body;
-    if (!goalId || !roadmapId) {
-      return res.status(400).json({ success: false, message: "Goal and Roadmap IDs are required." });
-    }
-
-    // 1. Fetch data
-    const [goal, roadmap] = await Promise.all([
-      Goal.findOne({ _id: goalId, userId: req.user._id }),
-      Roadmap.findOne({ _id: roadmapId, userId: req.user._id })
-    ]);
-
-    if (!goal || !roadmap) {
-      return res.status(404).json({ success: false, message: "Goal or Roadmap not found." });
-    }
-
-    // 2. Generate daily tasks via AI
-    const { days } = await aiTaskService.generateDailyTasks(goal.title, goal.category, roadmap.data);
-
-    // 3. Clear existing roadmap tasks
-    await Task.deleteMany({ roadmapId: roadmap._id, userId: req.user._id });
-
-    // 4. Flatten and save tasks
-    const tasksToCreate = [];
-    days.forEach(dayInfo => {
-      dayInfo.tasks.forEach(task => {
-        tasksToCreate.push({
-          userId: req.user._id,
-          goalId: goal._id,
-          roadmapId: roadmap._id,
-          day: dayInfo.day,
-          type: task.type,
-          title: task.title,
-          description: task.description,
-          estimatedTime: task.estimatedTime,
-          category: goal.category,
-          completed: false
-        });
-      });
-    });
-
-    if (tasksToCreate.length > 0) {
-      await Task.insertMany(tasksToCreate);
-    }
-
-    // 5. Update goal progress
-    await updateGoalProgress(goal._id, req.user._id);
-
-    res.status(201).json({ success: true, message: "Plan generated successfully!" });
-  } catch (err) {
-    console.error('[taskController.generateFromRoadmap]', err.message);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to generate execution plan.',
-      details: err.message 
+exports.create = asyncHandler(async (req, res) => {
+  const task = await Task.create({ ...pick(req.body, FIELDS), ...orgCreateStamp(req.user) });
+  if (task.dueDate) {
+    await Notification.create({
+      user: req.user._id,
+      title: 'Task scheduled',
+      message: `"${task.title}" due ${new Date(task.dueDate).toLocaleDateString()}`,
+      type: 'task',
+      link: '/tasks',
     });
   }
-}
+  res.status(201).json({ success: true, data: { task } });
+});
 
-// ── GET /api/tasks ────────────────────────────────────────────────────────────
-exports.getTasks = async (req, res) => {
-  try {
-    const tasks = await Task.find({ userId: req.user._id }).sort({ createdAt: -1 })
-    res.json({ success: true, tasks })
-  } catch (err) {
-    console.error('[taskController.getTasks]', err.message)
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error.',
-      details: err.message
-    })
+exports.update = asyncHandler(async (req, res) => {
+  const existing = await findMutable(Task, req.user, req.params.id);
+  if (!existing) throw new AppError('Task not found', 404);
+  Object.assign(existing, pick(req.body, FIELDS));
+  if (existing.status === 'done' && !existing.completedAt) existing.completedAt = new Date();
+  if (existing.status !== 'done') existing.completedAt = undefined;
+  await existing.save();
+  res.json({ success: true, data: { task: existing } });
+});
+
+exports.remove = asyncHandler(async (req, res) => {
+  const existing = await findMutable(Task, req.user, req.params.id);
+  if (!existing) throw new AppError('Task not found', 404);
+  await existing.deleteOne();
+  res.json({ success: true, message: 'Task deleted' });
+});
+
+exports.toggleComplete = asyncHandler(async (req, res) => {
+  const task = await findMutable(Task, req.user, req.params.id);
+  if (!task) throw new AppError('Task not found', 404);
+
+  if (task.status === 'done') {
+    task.status = 'todo';
+    task.completedAt = undefined;
+    task.progress = Math.min(task.progress || 0, 99);
+    await task.save();
+    return res.json({ success: true, data: { task } });
   }
-}
 
-// ── POST /api/tasks ───────────────────────────────────────────────────────────
-exports.createTask = async (req, res) => {
-  try {
-    const { title, priority, category, goalId } = req.body
-    if (!title?.trim()) return res.status(400).json({ success: false, message: 'Title is required.' })
-
-    const task = await Task.create({
-      userId:   req.user._id,
-      title:    title.trim(),
-      priority: priority || 'Medium',
-      category: category || 'General',
-      goalId:   goalId || undefined,
-    })
-
-    // Update goal progress if linked
-    if (goalId) await updateGoalProgress(goalId, req.user._id)
-
-    res.status(201).json({ success: true, task })
-  } catch (err) {
-    console.error('[taskController.createTask]', err.message)
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error.',
-      details: err.message
-    })
+  const completed = await Task.findOneAndUpdate(
+    { _id: task._id, status: { $ne: 'done' }, user: req.user._id },
+    {
+      $set: {
+        status: 'done',
+        progress: 100,
+        completedAt: new Date(),
+      },
+    },
+    { new: true }
+  );
+  if (!completed) {
+    const current = await findMutable(Task, req.user, req.params.id);
+    return res.json({ success: true, data: { task: current } });
   }
-}
 
-// ── PUT /api/tasks/:id ────────────────────────────────────────────────────────
-// Toggle complete or update fields
-exports.updateTask = async (req, res) => {
-  try {
-    const task = await Task.findOne({ _id: req.params.id, userId: req.user._id })
-    if (!task) return res.status(404).json({ success: false, message: 'Task not found.' })
-
-    const oldGoalId = task.goalId
-
-    if (req.body.completed !== undefined) {
-      task.completed   = req.body.completed
-      task.completedAt = req.body.completed ? new Date() : undefined
-    }
-    if (req.body.title)    task.title    = req.body.title
-    if (req.body.priority) task.priority = req.body.priority
-    if (req.body.goalId !== undefined) task.goalId = req.body.goalId
-
-    await task.save()
-
-    // Recalculate progress for old and new goals if changed
-    if (task.goalId) await updateGoalProgress(task.goalId, req.user._id)
-    if (oldGoalId && oldGoalId.toString() !== task.goalId?.toString()) {
-      await updateGoalProgress(oldGoalId, req.user._id)
-    }
-
-    res.json({ success: true, task })
-  } catch (err) {
-    console.error('[taskController.updateTask]', err.message)
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error.',
-      details: err.message
-    })
+  const dayStart = new Date();
+  dayStart.setHours(0, 0, 0, 0);
+  const completedToday = await Task.countDocuments({
+    user: req.user._id,
+    status: 'done',
+    completedAt: { $gte: dayStart },
+  });
+  const DAILY_TASK_CREDIT_AWARDS = 5;
+  let awarded = 0;
+  if (completedToday <= DAILY_TASK_CREDIT_AWARDS) {
+    awarded = 5;
+    await User.findByIdAndUpdate(req.user._id, { $inc: { credits: awarded } });
+    req.user.credits = (req.user.credits || 0) + awarded;
   }
-}
 
-// ── DELETE /api/tasks/:id ─────────────────────────────────────────────────────
-exports.deleteTask = async (req, res) => {
-  try {
-    const task = await Task.findOneAndDelete({ _id: req.params.id, userId: req.user._id })
-    if (!task) return res.status(404).json({ success: false, message: 'Task not found.' })
+  await Notification.create({
+    user: req.user._id,
+    title: 'Task completed',
+    message:
+      awarded > 0
+        ? `You finished "${completed.title}" (+${awarded} credits)`
+        : `You finished "${completed.title}" (daily credit cap reached)`,
+    type: 'success',
+    link: '/tasks',
+  });
+  const { safeEmit } = require('../utils/platformEvents');
+  await safeEmit(req.user, {
+    type: 'task_completed',
+    module: 'productivity',
+    title: completed.title,
+    refType: 'Task',
+    refId: completed._id,
+  });
 
-    if (task.goalId) await updateGoalProgress(task.goalId, req.user._id)
-
-    res.json({ success: true })
-  } catch (err) {
-    console.error('[taskController.deleteTask]', err.message)
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error.',
-      details: err.message
-    })
-  }
-}
+  res.json({ success: true, data: { task: completed, creditsAwarded: awarded } });
+});

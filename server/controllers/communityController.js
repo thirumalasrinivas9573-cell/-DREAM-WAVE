@@ -1,86 +1,99 @@
-const Post = require('../models/Post')
+const Post = require('../models/Post');
+const asyncHandler = require('../utils/asyncHandler');
+const { AppError } = require('../middleware/errorHandler');
+const { toAssetUrl } = require('../utils/assetUrl');
+const { orgCreateStamp } = require('../utils/orgScope');
 
-// ── GET /api/community/posts ──────────────────────────────────────────────────
-exports.getPosts = async (req, res) => {
-  try {
-    const posts = await Post.find()
+async function communityListFilter(user) {
+  if (!user.organizationId) {
+    return { $or: [{ organizationId: null }, { organizationId: { $exists: false } }] };
+  }
+  return { organizationId: user.organizationId };
+}
+
+async function findCommunityPost(user, id) {
+  const post = await Post.findById(id);
+  if (!post) return null;
+  if (user.role === 'admin') return post;
+  if (String(post.user) === String(user._id)) return post;
+  if (!post.organizationId) {
+    return user.organizationId ? null : post;
+  }
+  if (user.organizationId && String(post.organizationId) === String(user.organizationId)) {
+    return post;
+  }
+  return null;
+}
+
+exports.list = asyncHandler(async (req, res) => {
+  const filter = await communityListFilter(req.user);
+  const { parsePagination, paginationMeta } = require('../utils/pagination');
+  const { page, limit, skip } = parsePagination(req.query, { defaultLimit: 30 });
+  const [posts, total] = await Promise.all([
+    Post.find(filter)
+      .populate('user', 'name profileImage aaid')
+      .populate('comments.user', 'name profileImage')
       .sort({ createdAt: -1 })
-      .limit(50)
-      .lean()
+      .skip(skip)
+      .limit(limit),
+    Post.countDocuments(filter),
+  ]);
+  res.json({
+    success: true,
+    data: { posts, pagination: paginationMeta(page, limit, total) },
+  });
+});
 
-    // Attach likedByMe flag
-    const userId = req.user._id.toString()
-    const mapped = posts.map(p => ({
-      ...p,
-      likeCount: p.likes.length,
-      likedByMe: p.likes.map(id => id.toString()).includes(userId),
-    }))
+exports.create = asyncHandler(async (req, res) => {
+  const content = req.body.content;
+  if (!content?.trim()) throw new AppError('Content is required', 400);
+  const image = req.file ? toAssetUrl(req.file.filename) : '';
+  const post = await Post.create({
+    ...orgCreateStamp(req.user),
+    content: content.trim().slice(0, 2000),
+    image,
+  });
+  await post.populate('user', 'name profileImage aaid');
+  const { safeEmit } = require('../utils/platformEvents');
+  await safeEmit(req.user, {
+    type: 'community_activity',
+    module: 'community',
+    title: 'New post',
+    refType: 'Post',
+    refId: post._id,
+    payload: { action: 'create' },
+  });
+  res.status(201).json({ success: true, data: { post } });
+});
 
-    res.json({ success: true, posts: mapped })
-  } catch (err) {
-    console.error('[communityController.getPosts]', err.message)
-    res.status(500).json({ message: 'Server error.' })
+exports.like = asyncHandler(async (req, res) => {
+  const post = await findCommunityPost(req.user, req.params.id);
+  if (!post) throw new AppError('Post not found', 404);
+  const idx = post.likes.findIndex((id) => String(id) === String(req.user._id));
+  if (idx >= 0) post.likes.splice(idx, 1);
+  else post.likes.push(req.user._id);
+  await post.save();
+  await post.populate('user', 'name profileImage aaid');
+  res.json({ success: true, data: { post } });
+});
+
+exports.comment = asyncHandler(async (req, res) => {
+  const post = await findCommunityPost(req.user, req.params.id);
+  if (!post) throw new AppError('Post not found', 404);
+  if (!req.body.text?.trim()) throw new AppError('Comment text required', 400);
+  post.comments.push({ user: req.user._id, text: req.body.text.trim() });
+  await post.save();
+  await post.populate('user', 'name profileImage aaid');
+  await post.populate('comments.user', 'name profileImage');
+  res.json({ success: true, data: { post } });
+});
+
+exports.remove = asyncHandler(async (req, res) => {
+  const post = await findCommunityPost(req.user, req.params.id);
+  if (!post) throw new AppError('Post not found', 404);
+  if (String(post.user) !== String(req.user._id) && req.user.role !== 'admin') {
+    throw new AppError('Not allowed', 403);
   }
-}
-
-// ── POST /api/community/posts ─────────────────────────────────────────────────
-exports.createPost = async (req, res) => {
-  try {
-    const { content, tag } = req.body
-    if (!content?.trim()) return res.status(400).json({ message: 'Content is required.' })
-
-    const initials = req.user.name
-      .split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-
-    const post = await Post.create({
-      userId:         req.user._id,
-      authorName:     req.user.name,
-      authorInitials: initials,
-      content:        content.trim(),
-      tag:            tag || 'General',
-    })
-
-    res.status(201).json({
-      success: true,
-      post: { ...post.toObject(), likeCount: 0, likedByMe: false },
-    })
-  } catch (err) {
-    console.error('[communityController.createPost]', err.message)
-    res.status(500).json({ message: 'Server error.' })
-  }
-}
-
-// ── PUT /api/community/posts/:id/like ─────────────────────────────────────────
-exports.toggleLike = async (req, res) => {
-  try {
-    const post   = await Post.findById(req.params.id)
-    if (!post) return res.status(404).json({ message: 'Post not found.' })
-
-    const uid    = req.user._id
-    const liked  = post.likes.some(id => id.equals(uid))
-
-    if (liked) {
-      post.likes = post.likes.filter(id => !id.equals(uid))
-    } else {
-      post.likes.push(uid)
-    }
-    await post.save()
-
-    res.json({ success: true, likeCount: post.likes.length, likedByMe: !liked })
-  } catch (err) {
-    console.error('[communityController.toggleLike]', err.message)
-    res.status(500).json({ message: 'Server error.' })
-  }
-}
-
-// ── DELETE /api/community/posts/:id ──────────────────────────────────────────
-exports.deletePost = async (req, res) => {
-  try {
-    const post = await Post.findOneAndDelete({ _id: req.params.id, userId: req.user._id })
-    if (!post) return res.status(404).json({ message: 'Post not found or not yours.' })
-    res.json({ success: true })
-  } catch (err) {
-    console.error('[communityController.deletePost]', err.message)
-    res.status(500).json({ message: 'Server error.' })
-  }
-}
+  await post.deleteOne();
+  res.json({ success: true, message: 'Post deleted' });
+});

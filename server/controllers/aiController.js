@@ -1,218 +1,378 @@
-const OpenAI = require('openai')
-const Chat   = require('../models/Chat')
+const aiService = require('../services/aiService');
+const Chat = require('../models/Chat');
+const AiUsage = require('../models/AiUsage');
+const AiPrompt = require('../models/AiPrompt');
+const asyncHandler = require('../utils/asyncHandler');
+const { AppError } = require('../middleware/errorHandler');
+const { consumeAiCredit, refundAiCredit, getEntitlements, isLiveAiResult } = require('../services/entitlements');
+const { orgCreateStamp, findAccessible, orgListFilter } = require('../utils/orgScope');
+const { auditFromRequest } = require('../utils/audit');
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-
-// ── V10 DEEP CONTENT SYSTEM PROMPT ────────────────────────────────────────────
-const SYSTEM = `You are Sage — a world-class AI mentor, career coach, teacher, research guide and productivity expert inside Dream Wave AI.
-
-IDENTITY:
-You are NOT a chatbot. You are a premium consultant equivalent to a ₹5,000/hour career consultant.
-Students rely on you for career-defining decisions. Every response must honor that responsibility.
-
-CONTENT DEPTH MANDATE:
-For career questions      → 700-1200 words with full roadmap, resources, timeline
-For learning questions    → 600-1000 words with step-by-step plan and specific resources
-For goal-setting          → 500-800 words with concrete milestones and actions
-For research questions    → 600-900 words with data, examples, industry insights
-For motivation/struggles  → 300-500 words emotionally intelligent and practical
-For simple questions      → 150-300 words is sufficient
-For greetings/casual      → 100-200 words
-
-RESPONSE STRUCTURE for career/learning questions:
-1. SITUATION ANALYSIS — honest assessment of where the student is
-2. THE REAL PICTURE — what this career/path actually looks like (not sugar-coated)
-3. LEARNING ROADMAP — specific phases with timeframes (Month 1-2, Month 3-4, etc.)
-4. SPECIFIC RESOURCES — actual course names, book titles, YouTube channels, websites
-5. PROJECTS TO BUILD — real portfolio projects that impress employers
-6. JOB MARKET REALITY — salary ranges, demand, timeline to first job
-7. COMMON MISTAKES — what students waste time on and how to avoid it
-8. YOUR FIRST STEP TODAY — one specific action to take within 24 hours
-
-PROHIBITED:
-- "Here are some tips:" (never write this)
-- Generic 5-line responses to career questions
-- Vague advice like "practice regularly" without specifics
-- Any response under 400 words for a serious career or learning question
-
-STYLE:
-- Use clear section headers (##) for long responses
-- Be warm but direct — like a senior who respects the student's time
-- Include real numbers: salary ranges, time estimates, specific statistics
-- Name real companies, real tools, real courses
-
-USER GOAL CONTEXT: Will be provided per request.`
-
-// ── POST /api/ai/chat ─────────────────────────────────────────────────────────
-exports.chat = async (req, res) => {
-  try {
-    const { message, session = 'mentor', userGoal, mode } = req.body
-    if (!message?.trim()) return res.status(400).json({ success: false, message: 'Message required.' })
-
-    let chatDoc = await Chat.findOne({ userId: req.user._id, session })
-    if (!chatDoc) chatDoc = new Chat({ userId: req.user._id, session, messages: [] })
-
-    const history = chatDoc.messages.slice(-16).map(m => ({ role: m.role, content: m.content }))
-
-    let msg = message.trim()
-    if (mode === 'simpler')  msg += '\n\n[Explain this more simply, as if to a complete beginner with no background in this topic.]'
-    if (mode === 'deeper')   msg += '\n\n[Go significantly deeper on this — include research, statistics, real examples, and advanced nuances.]'
-    if (mode === 'actions')  msg += '\n\n[Give me ONLY a concrete action plan — numbered steps, specific resources, realistic timeline. No theory.]'
-
-    const systemWithGoal = SYSTEM + (userGoal ? `\n\nSTUDENT'S CURRENT GOAL: "${userGoal}"\nEverything you say should ultimately serve this goal or honestly address how it relates.` : '')
-
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      temperature: 0.72,
-      max_tokens: 3000,
-      messages: [
-        { role: 'system', content: systemWithGoal },
-        ...history,
-        { role: 'user', content: msg },
-      ],
-    })
-
-    const reply = completion.choices[0].message.content
-    chatDoc.messages.push({ role: 'user', content: message.trim() })
-    chatDoc.messages.push({ role: 'assistant', content: reply })
-    await chatDoc.save()
-
-    res.json({ success: true, reply })
-  } catch (err) {
-    console.error('[aiController.chat]', err.message)
-    if (err.status === 429) return res.status(429).json({ success: false, message: 'AI rate limit. Please wait.' })
-    res.status(500).json({ success: false, message: 'AI error.', error: err.message })
-  }
+function resolveModeOrThrow(raw) {
+  const mode = aiService.normalizeMode(raw);
+  if (!mode) throw new AppError('Unknown AI mode', 400);
+  return mode;
 }
 
-// ── GET/DELETE /api/ai/history ────────────────────────────────────────────────
-exports.getHistory = async (req, res) => {
-  try {
-    const { session = 'mentor' } = req.query
-    const chatDoc = await Chat.findOne({ userId: req.user._id, session })
-    res.json({ success: true, messages: chatDoc?.messages || [] })
-  } catch (err) { res.status(500).json({ success: false, message: 'Failed to load history.' }) }
-}
+exports.listModes = asyncHandler(async (_req, res) => {
+  res.json({
+    success: true,
+    data: {
+      modes: aiService.listModes(),
+      aliases: aiService.MODE_ALIASES,
+      assistants: Object.keys(aiService.ASSISTANT_ROUTES),
+    },
+  });
+});
 
-exports.clearHistory = async (req, res) => {
-  try {
-    const { session = 'mentor' } = req.query
-    await Chat.findOneAndUpdate({ userId: req.user._id, session }, { $set: { messages: [] } })
-    res.json({ success: true })
-  } catch (err) { res.status(500).json({ success: false, message: 'Failed to clear history.' }) }
-}
+exports.listModels = asyncHandler(async (_req, res) => {
+  res.json({ success: true, data: { models: aiService.listModels() } });
+});
 
-// ── POST /api/ai/goal-plan — deep 800+ word plan ──────────────────────────────
-exports.goalPlan = async (req, res) => {
-  try {
-    const { title, category = 'Career' } = req.body
-    if (!title?.trim()) return res.status(400).json({ success: false, message: 'title required' })
+exports.getCredits = asyncHandler(async (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      credits: req.user.credits,
+      entitlements: getEntitlements(req.user),
+    },
+  });
+});
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      temperature: 0.7,
-      max_tokens: 1500,
-      messages: [
-        {
-          role: 'system',
-          content: `You are a world-class career coach. Generate a detailed, actionable goal plan.
-Return JSON ONLY: { "steps": ["step1 (50-80 words each, specific and actionable)","step2","step3","step4","step5","step6"] }
-Each step must be 50-80 words. Be specific. Include what to do, how long it takes, and expected outcome.`
+exports.getUsage = asyncHandler(async (req, res) => {
+  const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 30));
+  // AI usage is private to the account (platform admin may filter by userId).
+  const filter =
+    req.user.role === 'admin' && req.query.userId
+      ? { user: req.query.userId }
+      : { user: req.user._id };
+  if (req.query.mode) filter.mode = String(req.query.mode);
+  if (req.query.source) filter.source = String(req.query.source);
+
+  const [rows, totals] = await Promise.all([
+    AiUsage.find(filter).sort({ createdAt: -1 }).limit(limit).lean(),
+    AiUsage.aggregate([
+      { $match: { user: req.user._id } },
+      {
+        $group: {
+          _id: null,
+          calls: { $sum: 1 },
+          credits: { $sum: '$creditsUsed' },
+          failures: { $sum: { $cond: ['$success', 0, 1] } },
         },
-        {
-          role: 'user',
-          content: `Create a practical 6-step action plan for this goal: "${title}" (Category: ${category}).
-Make each step specific, actionable, and 50-80 words long. Include timeline and expected outcome per step.`
-        },
-      ],
-    })
+      },
+    ]),
+  ]);
 
-    let steps = []
-    try { steps = JSON.parse(completion.choices[0].message.content).steps || [] } catch { steps = [] }
-    res.json({ success: true, steps })
+  const summary = totals[0] || { calls: 0, credits: 0, failures: 0 };
+  res.json({
+    success: true,
+    data: {
+      usage: rows,
+      summary: {
+        calls: summary.calls,
+        creditsUsed: summary.credits,
+        failures: summary.failures,
+        creditsRemaining: req.user.credits,
+      },
+    },
+  });
+});
+
+exports.listPrompts = asyncHandler(async (req, res) => {
+  const filter = await orgListFilter(req.user);
+  if (req.query.mode) filter.mode = String(req.query.mode);
+  const prompts = await AiPrompt.find(filter).sort({ isFavorite: -1, updatedAt: -1 }).limit(100);
+  res.json({ success: true, data: { prompts } });
+});
+
+exports.createPrompt = asyncHandler(async (req, res) => {
+  const mode = resolveModeOrThrow(req.body.mode || 'mentor');
+  const prompt = await AiPrompt.create({
+    ...orgCreateStamp(req.user),
+    name: req.body.name,
+    mode,
+    body: req.body.body,
+    description: req.body.description || '',
+    isFavorite: Boolean(req.body.isFavorite),
+  });
+  res.status(201).json({ success: true, data: { prompt } });
+});
+
+exports.updatePrompt = asyncHandler(async (req, res) => {
+  const prompt = await findAccessible(AiPrompt, req.user, req.params.id);
+  if (!prompt) throw new AppError('Prompt not found', 404);
+  if (req.body.name !== undefined) prompt.name = req.body.name;
+  if (req.body.body !== undefined) prompt.body = req.body.body;
+  if (req.body.description !== undefined) prompt.description = req.body.description;
+  if (typeof req.body.isFavorite === 'boolean') prompt.isFavorite = req.body.isFavorite;
+  if (req.body.mode !== undefined) prompt.mode = resolveModeOrThrow(req.body.mode);
+  await prompt.save();
+  res.json({ success: true, data: { prompt } });
+});
+
+exports.deletePrompt = asyncHandler(async (req, res) => {
+  const prompt = await findAccessible(AiPrompt, req.user, req.params.id);
+  if (!prompt) throw new AppError('Prompt not found', 404);
+  await prompt.deleteOne();
+  res.json({ success: true, message: 'Prompt deleted' });
+});
+
+/** Persisted multi-turn run — writes to Chat (same store as /api/mentor). */
+exports.run = asyncHandler(async (req, res) => {
+  const started = Date.now();
+
+  const mode = resolveModeOrThrow(req.body.mode || 'mentor');
+  const { message, conversationId, context, model, promptId } = req.body;
+  if (!message?.trim()) throw new AppError('Message is required', 400);
+
+  await consumeAiCredit(req.user, 1);
+
+  let conversation;
+  try {
+    if (conversationId) {
+      conversation = await findAccessible(Chat, req.user, conversationId);
+      if (!conversation) throw new AppError('Conversation not found', 404);
+    } else {
+      conversation = await Chat.create({
+        title: message.slice(0, 60),
+        mode,
+        model: model || '',
+        messages: [],
+        ...orgCreateStamp(req.user),
+      });
+    }
+
+    if (promptId) {
+      const saved = await findAccessible(AiPrompt, req.user, promptId);
+      if (saved) {
+        saved.usageCount += 1;
+        await saved.save();
+      }
+    }
+
+    conversation.mode = mode;
+    if (model) conversation.model = aiService.resolveModel(model).id;
+    conversation.messages.push({ role: 'user', content: message });
+
+    const history = aiService.trimHistory(
+      conversation.messages.map((m) => ({
+        role: m.role === 'assistant' ? 'assistant' : 'user',
+        content: m.content,
+      }))
+    );
+
+    const result = await aiService.runMode(mode, history, context || '', {
+      model: model || conversation.model,
+      contextSummary: conversation.contextSummary,
+    });
+
+    conversation.messages.push({
+      role: 'assistant',
+      content: result.content,
+      model: result.model,
+    });
+    if (conversation.title === 'New conversation') conversation.title = message.slice(0, 60);
+    if (conversation.messages.length > 8 && !conversation.contextSummary) {
+      conversation.contextSummary = `Ongoing ${mode} chat titled "${conversation.title}". Last topic: ${message.slice(0, 200)}`;
+    }
+    await conversation.save();
+
+    const live = isLiveAiResult(result);
+    if (!live) await refundAiCredit(req.user, 1);
+
+    await require('../services/entitlements').recordAiUsage(req.user, {
+      mode,
+      model: result.model,
+      source: 'run',
+      creditsUsed: live ? 1 : 0,
+      latencyMs: Date.now() - started,
+      promptChars: message.length,
+      replyChars: result.content.length,
+      conversationId: conversation._id,
+      success: live,
+      errorCode: live ? '' : 'local_fallback',
+      failureClass: live ? '' : 'local_fallback',
+    });
+
+    await auditFromRequest(req, {
+      action: 'ai.run',
+      resource: 'Chat',
+      resourceId: conversation._id,
+      meta: { mode, live, creditsUsed: live ? 1 : 0 },
+    });
+
+    res.json({
+      success: true,
+      data: {
+        reply: result.content,
+        conversation,
+        mode,
+        modeLabel: result.modeLabel,
+        model: result.model,
+        provider: result.provider,
+        recovered: Boolean(result.recovered) || !live,
+        saved: true,
+        credits: req.user.credits,
+      },
+    });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'AI error.', error: err.message })
+    await refundAiCredit(req.user, 1);
+    throw err;
   }
-}
+});
 
-// ── POST /api/ai/daily ────────────────────────────────────────────────────────
-exports.daily = async (req, res) => {
-  try {
-    const { message } = req.body
-    if (!message?.trim()) return res.status(400).json({ success: false, message: 'message required' })
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini', temperature: 0.75, max_tokens: 600,
-      messages: [{ role: 'system', content: SYSTEM + ' Focus on daily habits, routines and wellbeing.' }, { role: 'user', content: message.trim() }],
-    })
-    res.json({ success: true, reply: completion.choices[0].message.content })
-  } catch (err) { res.status(500).json({ success: false, message: 'AI error.' }) }
-}
+/** Ephemeral one-shot — does NOT write Chat history. */
+exports.quick = asyncHandler(async (req, res) => {
+  const started = Date.now();
 
-// ── POST /api/ai/report ───────────────────────────────────────────────────────
-exports.report = async (req, res) => {
-  try {
-    const { topic } = req.body
-    if (!topic?.trim()) return res.status(400).json({ success: false, message: 'topic required' })
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini', temperature: 0.6, max_tokens: 1500,
-      messages: [
-        { role: 'system', content: 'You are a research analyst. Return JSON: { "summary": "200-300 word summary", "insights": [{"label":"...","value":"..."}], "actions": ["specific actionable step 1","step 2","step 3","step 4","step 5"] }' },
-        { role: 'user', content: `Detailed research report on: "${topic}"` },
-      ],
-    })
-    let report = {}
-    try { report = JSON.parse(completion.choices[0].message.content) } catch { report = { summary: completion.choices[0].message.content, insights: [], actions: [] } }
-    res.json({ success: true, report })
-  } catch (err) { res.status(500).json({ success: false, message: 'AI error.' }) }
-}
+  const mode = resolveModeOrThrow(req.body.mode || 'mentor');
+  const { prompt, context, model } = req.body;
+  if (!prompt?.trim()) throw new AppError('Prompt is required', 400);
 
-// ── POST /api/ai/roadmap ──────────────────────────────────────────────────────
-exports.roadmap = async (req, res) => {
+  await consumeAiCredit(req.user, 1);
   try {
-    const { goal, currentLevel = 'beginner' } = req.body
-    if (!goal?.trim()) return res.status(400).json({ success: false, message: 'goal required' })
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini', temperature: 0.7, max_tokens: 1500,
-      messages: [
-        { role: 'system', content: 'You are a career expert. Return JSON: { "phases": [{"title":"...","duration":"...","description":"100-150 word detailed description","steps":["specific step 1 (30-40 words)","step 2","step 3","step 4"]}] } — exactly 4 phases.' },
-        { role: 'user', content: `4-phase learning roadmap for "${goal}" at ${currentLevel} level. Each phase description 100-150 words, each step 30-40 words.` },
-      ],
-    })
-    let phases = []
-    try { phases = JSON.parse(completion.choices[0].message.content).phases || [] } catch { phases = [] }
-    res.json({ success: true, phases })
-  } catch (err) { res.status(500).json({ success: false, message: 'AI error.' }) }
-}
+    const result = await aiService.runMode(mode, [{ role: 'user', content: prompt }], context || '', {
+      model,
+    });
 
-// ── POST /api/ai/books ────────────────────────────────────────────────────────
-exports.books = async (req, res) => {
-  try {
-    const { topic } = req.body
-    if (!topic?.trim()) return res.status(400).json({ success: false, message: 'topic required' })
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini', temperature: 0.7, max_tokens: 1000,
-      messages: [
-        { role: 'system', content: 'You are a book expert. Return JSON: { "books": [{"title":"exact title","author":"exact author","reason":"50-70 word explanation of why this book is essential","category":"...","level":"Beginner|Intermediate|Advanced"}] }' },
-        { role: 'user', content: `8 essential books for "${topic}". Each reason must be 50-70 words explaining specific value.` },
-      ],
-    })
-    let books = []
-    try { books = JSON.parse(completion.choices[0].message.content).books || [] } catch { books = [] }
-    res.json({ success: true, books })
-  } catch (err) { res.status(500).json({ success: false, message: 'AI error.' }) }
-}
+    const live = isLiveAiResult(result);
+    if (!live) await refundAiCredit(req.user, 1);
 
-// ── GET /api/ai/dashboard-stats ───────────────────────────────────────────────
-exports.dashboardStats = async (req, res) => {
+    await require('../services/entitlements').recordAiUsage(req.user, {
+      mode,
+      model: result.model,
+      source: 'quick',
+      creditsUsed: live ? 1 : 0,
+      latencyMs: Date.now() - started,
+      promptChars: prompt.length,
+      replyChars: result.content.length,
+      success: live,
+      errorCode: live ? '' : 'local_fallback',
+      failureClass: live ? '' : 'local_fallback',
+    });
+
+    res.json({
+      success: true,
+      data: {
+        reply: result.content,
+        mode,
+        modeLabel: result.modeLabel,
+        model: result.model,
+        provider: result.provider,
+        recovered: Boolean(result.recovered) || !live,
+        saved: false,
+        credits: req.user.credits,
+      },
+    });
+  } catch (err) {
+    await refundAiCredit(req.user, 1);
+    throw err;
+  }
+});
+
+/** Specialized assistants — thin mode-mapped wrappers over run. */
+exports.assistant = (req, res, next) => {
+  const mapped = aiService.ASSISTANT_ROUTES[String(req.params.name || '').toLowerCase()];
+  if (!mapped) return next(new AppError('Unknown assistant', 404));
+  req.body = { ...req.body, mode: mapped };
+  return exports.run(req, res, next);
+};
+
+/** SSE streaming when OpenAI is configured; otherwise single-chunk recovery. */
+exports.stream = asyncHandler(async (req, res) => {
+  const started = Date.now();
+
+  const mode = resolveModeOrThrow(req.body.mode || 'mentor');
+  const { message, conversationId, context, model } = req.body;
+  if (!message?.trim()) throw new AppError('Message is required', 400);
+
+  await consumeAiCredit(req.user, 1);
+
+  let conversation;
   try {
-    const Goal = require('../models/Goal')
-    const Task = require('../models/Task')
-    const [goals, tasks, done, chat] = await Promise.all([
-      Goal.countDocuments({ userId: req.user._id }),
-      Task.countDocuments({ userId: req.user._id }),
-      Task.countDocuments({ userId: req.user._id, completed: true }),
-      Chat.findOne({ userId: req.user._id, session: 'mentor' }),
-    ])
-    res.json({ success: true, stats: { goals, tasks, taskDone: done, aiChats: Math.floor((chat?.messages?.length || 0) / 2) } })
-  } catch (err) { res.status(500).json({ success: false, message: 'Failed.' }) }
-}
+    if (conversationId) {
+      conversation = await findAccessible(Chat, req.user, conversationId);
+      if (!conversation) throw new AppError('Conversation not found', 404);
+    } else {
+      conversation = await Chat.create({
+        title: message.slice(0, 60),
+        mode,
+        model: model || '',
+        messages: [],
+        ...orgCreateStamp(req.user),
+      });
+    }
+
+    conversation.mode = mode;
+    if (model) conversation.model = aiService.resolveModel(model).id;
+    conversation.messages.push({ role: 'user', content: message });
+
+    const history = aiService.trimHistory(
+      conversation.messages.map((m) => ({
+        role: m.role === 'assistant' ? 'assistant' : 'user',
+        content: m.content,
+      }))
+    );
+
+    res.status(200);
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    if (typeof res.flushHeaders === 'function') res.flushHeaders();
+
+    const writeEvent = (payload) => {
+      res.write(`data: ${JSON.stringify(payload)}\n\n`);
+    };
+
+    writeEvent({ type: 'start', conversationId: conversation._id, mode });
+
+    const result = await aiService.streamMode(
+      mode,
+      history,
+      context || '',
+      { model: model || conversation.model, contextSummary: conversation.contextSummary },
+      (chunk) => writeEvent({ type: 'chunk', text: chunk })
+    );
+
+    conversation.messages.push({
+      role: 'assistant',
+      content: result.content,
+      model: result.model,
+    });
+    if (conversation.title === 'New conversation') conversation.title = message.slice(0, 60);
+    await conversation.save();
+
+    const live = isLiveAiResult(result);
+    if (!live) await refundAiCredit(req.user, 1);
+
+    await require('../services/entitlements').recordAiUsage(req.user, {
+      mode,
+      model: result.model,
+      source: 'stream',
+      creditsUsed: live ? 1 : 0,
+      latencyMs: Date.now() - started,
+      promptChars: message.length,
+      replyChars: result.content.length,
+      conversationId: conversation._id,
+      success: live,
+      errorCode: live ? '' : 'local_fallback',
+      failureClass: live ? '' : 'local_fallback',
+    });
+
+    writeEvent({
+      type: 'done',
+      reply: result.content,
+      conversationId: conversation._id,
+      model: result.model,
+      provider: result.provider,
+      streamed: Boolean(result.streamed),
+      recovered: Boolean(result.recovered) || !live,
+      credits: req.user.credits,
+    });
+    res.end();
+  } catch (err) {
+    await refundAiCredit(req.user, 1);
+    throw err;
+  }
+});

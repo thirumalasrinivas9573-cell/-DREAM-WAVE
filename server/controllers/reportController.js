@@ -1,48 +1,144 @@
+const path = require('path');
+const fs = require('fs');
 const Report = require('../models/Report');
-const { generateRDReport } = require('../services/openaiService');
+const Notification = require('../models/Notification');
+const aiService = require('../services/aiService');
+const analyticsService = require('../services/analyticsService');
+const { generatePDF } = require('../utils/pdfGenerator');
+const asyncHandler = require('../utils/asyncHandler');
+const { AppError } = require('../middleware/errorHandler');
+const { assertCanUseAi, consumeAiCredit, refundAiCredit, recordAiUsage } = require('../services/entitlements');
+const { orgCreateStamp, orgListFilter, findAccessible } = require('../utils/orgScope');
 
-// @desc    Generate comprehensive R&D report (2000-5000 words)
-// @route   POST /api/report
-exports.generateReport = async (req, res) => {
+exports.list = asyncHandler(async (req, res) => {
+  const filter = await orgListFilter(req.user);
+  const { parsePagination, paginationMeta } = require('../utils/pagination');
+  const { page, limit, skip } = parsePagination(req.query, { defaultLimit: 30 });
+  const [reports, total] = await Promise.all([
+    Report.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+    Report.countDocuments(filter),
+  ]);
+  res.json({
+    success: true,
+    data: { reports, pagination: paginationMeta(page, limit, total) },
+  });
+});
+
+exports.getOne = asyncHandler(async (req, res) => {
+  const report = await findAccessible(Report, req.user, req.params.id);
+  if (!report) throw new AppError('Report not found', 404);
+  res.json({ success: true, data: { report } });
+});
+
+exports.generate = asyncHandler(async (req, res) => {
+  await consumeAiCredit(req.user, 1);
   try {
-    const { goal } = req.body;
-    if (!goal?.trim()) return res.status(400).json({ success: false, message: 'Goal is required.' });
+  const stats = await analyticsService.getUserStats(req.user._id);
+  stats.streak = req.user.streak;
+  const generated = await aiService.generateReportSections(req.user.name, stats);
+  const title = generated.title || req.body.title || 'Performance Report';
+  const fileName = `report-${req.user._id}-${Date.now()}.pdf`;
+  const pdfPath = await generatePDF(
+    {
+      title,
+      career: req.body.career || 'Career Growth',
+      userName: req.user.name,
+      sections: generated.sections || [],
+    },
+    fileName
+  );
 
-    const reportData = await generateRDReport(goal.trim());
+  const report = await Report.create({
+    ...orgCreateStamp(req.user),
+    title,
+    type: req.body.type || 'performance',
+    career: req.body.career,
+    data: stats,
+    sections: generated.sections || [],
+    pdfPath,
+  });
 
-    const report = await Report.create({
-      user: req.user.id,
-      goal: goal.trim(),
-      report: reportData,
-    });
+  await Notification.create({
+    user: req.user._id,
+    title: 'Report ready',
+    message: `"${report.title}" has been generated`,
+    type: 'success',
+    link: '/reports',
+  });
 
-    res.status(201).json({ success: true, report });
-  } catch (error) {
-    console.error('[reportController.generateReport]', error.message);
-    res.status(500).json({ success: false, message: 'Report generation failed. Please try again.' });
+  const { safeEmit } = require('../utils/platformEvents');
+  await safeEmit(req.user, {
+    type: 'report_generated',
+    module: 'reports',
+    title: report.title,
+    refType: 'Report',
+    refId: report._id,
+    payload: { type: report.type },
+  });
+
+  res.status(201).json({ success: true, data: { report } });
+  } catch (err) {
+    await refundAiCredit(req.user, 1);
+    throw err;
   }
-};
+});
 
-// @desc    Get user reports
-// @route   GET /api/report
-exports.getReports = async (req, res) => {
+exports.remove = asyncHandler(async (req, res) => {
+  const report = await findAccessible(Report, req.user, req.params.id);
+  if (!report) throw new AppError('Report not found', 404);
+  if (report.pdfPath && fs.existsSync(report.pdfPath)) {
+    try {
+      fs.unlinkSync(report.pdfPath);
+    } catch {
+      /* ignore */
+    }
+  }
+  await report.deleteOne();
+  res.json({ success: true, message: 'Report deleted' });
+});
+
+exports.downloadPdf = asyncHandler(async (req, res) => {
+  const report = await findAccessible(Report, req.user, req.params.id);
+  if (!report) throw new AppError('Report not found', 404);
+  if (!report.pdfPath || !fs.existsSync(report.pdfPath)) {
+    const fileName = `report-${report._id}.pdf`;
+    report.pdfPath = await generatePDF(
+      {
+        title: report.title,
+        career: report.career,
+        userName: req.user.name,
+        sections: report.sections,
+      },
+      fileName
+    );
+    await report.save();
+  }
+  res.download(report.pdfPath, path.basename(report.pdfPath));
+});
+
+exports.analytics = asyncHandler(async (req, res) => {
+  const stats = await analyticsService.getUserStats(req.user._id);
+  stats.streak = req.user.streak;
+  stats.level = req.user.level;
+  stats.credits = req.user.credits;
+  let productivity = null;
+  let personalization = null;
   try {
-    const reports = await Report.find({ user: req.user.id }).sort({ createdAt: -1 });
-    res.json({ success: true, reports });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error.' });
+    const productivitySvc = require('../services/productivityIntelligenceService');
+    productivity = await productivitySvc.computeProductivityAnalytics(req.user, 'weekly');
+  } catch {
+    /* optional */
   }
-};
-
-// @desc    Download PDF (browser print)
-// @route   GET /api/report/:id/download
-exports.downloadPDF = async (req, res) => {
   try {
-    const report = await Report.findById(req.params.id);
-    if (!report) return res.status(404).json({ message: 'Report not found' });
-    if (report.user.toString() !== req.user.id) return res.status(401).json({ message: 'Not authorized' });
-    res.json({ success: true, report });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    const personalizationSvc = require('../services/personalizationIntelligenceService');
+    const profile = await personalizationSvc.getOrCreateProfile(req.user);
+    personalization = {
+      engagement: profile.engagement,
+      sync: profile.sync,
+      nextBest: profile.nextBest,
+    };
+  } catch {
+    /* optional */
   }
-};
+  res.json({ success: true, data: { stats, productivity, personalization } });
+});

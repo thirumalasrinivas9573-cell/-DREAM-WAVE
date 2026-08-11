@@ -1,19 +1,33 @@
 {
   "name": "dream-wave-ai",
   "version": "1.0.0",
-  "description": "Complete AI-powered career guidance platform",
+  "description": "Dream Wave AI — production AI career mentor, goals, learning & community platform",
+  "private": true,
   "scripts": {
-    "start":       "bash start.sh",
-    "dev":         "bash start.sh",
-    "server":      "cd server && node server.js",
-    "client":      "cd client && npm run dev",
-    "install:all": "npm install && cd client && npm install && cd ../server && npm install",
-    "build":       "cd client && npm run build"
+    "install:all": "npm install && npm install --prefix client && npm install --prefix server",
+    "dev": "concurrently -n server,client -c teal,cyan \"npm run server\" \"npm run client\"",
+    "server": "npm run dev --prefix server",
+    "client": "npm run dev --prefix client",
+    "build": "npm run build --prefix client",
+    "start": "npm start --prefix server",
+    "lint": "npm run lint --prefix client",
+    "arch:verify": "bash scripts/verify-boundaries.sh",
+    "test": "npm test --prefix server",
+    "ci": "npm run arch:verify && npm test && npm run build"
   },
   "devDependencies": {
-    "concurrently": "^8.2.0"
+    "concurrently": "^9.0.1"
   },
-  "keywords": ["ai", "career", "education", "mentor", "react", "nodejs", "openai"],
-  "author": "DREAM WAVE AI Team",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "ai",
+    "career",
+    "mentor",
+    "react",
+    "express",
+    "mongodb"
+  ],
   "license": "MIT"
 }

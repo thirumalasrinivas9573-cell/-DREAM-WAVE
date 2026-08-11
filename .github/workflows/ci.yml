@@ -1,0 +1,44 @@
+# CTO-007 — Merge gate: architecture boundaries + API smoke + client production build
+name: CI
+
+on:
+  push:
+    branches: [master, develop, 'feature/**']
+  pull_request:
+    branches: [master, develop]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  merge-gate:
+    name: arch:verify · test · build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NODE_ENV: test
+      PREFER_MEMORY_MONGO: '1'
+      JWT_SECRET: ci-test-jwt-secret-minimum-32-chars!!
+      JWT_REFRESH_SECRET: ci-test-refresh-secret-min-32-chars!
+      CLIENT_URL: http://localhost:5173
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            client/package-lock.json
+            server/package-lock.json
+
+      - name: Install dependencies
+        run: npm run install:all
+
+      - name: Merge gate (npm run ci)
+        run: npm run ci

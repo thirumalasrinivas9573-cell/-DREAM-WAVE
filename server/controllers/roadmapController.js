@@ -1,174 +1,210 @@
-const { generateRoadmap, FALLBACK_ROADMAP } = require("../services/aiRoadmapService");
-const { generateDailyTasks } = require("../services/aiTaskService");
-const Roadmap = require("../models/Roadmap");
-const Goal    = require("../models/Goal");
-const Task    = require("../models/Task");
+const Roadmap = require('../models/Roadmap');
+const Notification = require('../models/Notification');
+const aiService = require('../services/aiService');
+const asyncHandler = require('../utils/asyncHandler');
+const { AppError } = require('../middleware/errorHandler');
+const { pick } = require('../utils/helpers');
+const { assertCanUseAi, consumeAiCredit, refundAiCredit, recordAiUsage } = require('../services/entitlements');
+const { orgCreateStamp, orgListFilter, findAccessible } = require('../utils/orgScope');
 
-// ─────────────────────────────────────────────────────────────────────────────
-// POST /api/roadmap/generate
-// Generates a full specialist-level AI roadmap for a goal and saves it.
-// ─────────────────────────────────────────────────────────────────────────────
-exports.createRoadmap = async (req, res) => {
+const UPDATE_FIELDS = [
+  'title',
+  'career',
+  'description',
+  'skills',
+  'timeline',
+  'progress',
+  'status',
+  'kind',
+  'semesterLabel',
+  'placementFocus',
+];
+
+exports.list = asyncHandler(async (req, res) => {
+  const filter = await orgListFilter(req.user);
+  const { parsePagination, paginationMeta } = require('../utils/pagination');
+  const { page, limit, skip } = parsePagination(req.query, { defaultLimit: 30 });
+  const [roadmaps, total] = await Promise.all([
+    Roadmap.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+    Roadmap.countDocuments(filter),
+  ]);
+  res.json({
+    success: true,
+    data: { roadmaps, pagination: paginationMeta(page, limit, total) },
+  });
+});
+
+exports.getOne = asyncHandler(async (req, res) => {
+  const roadmap = await findAccessible(Roadmap, req.user, req.params.id);
+  if (!roadmap) throw new AppError('Roadmap not found', 404);
+  res.json({ success: true, data: { roadmap } });
+});
+
+exports.generate = asyncHandler(async (req, res) => {
+  await consumeAiCredit(req.user, 1);
   try {
-    const { goalTitle, category, goalId, age, education, skills, interests } = req.body;
+  const { career, level } = req.body;
+  const generated = await aiService.generateRoadmap(career, level || 'beginner');
+  const roadmap = await Roadmap.create({
+    ...orgCreateStamp(req.user),
+    title: generated.title,
+    career: generated.career || career,
+    description: generated.description || '',
+    skills: generated.skills || [],
+    timeline: generated.timeline || [],
+    progress: 0,
+  });
+  await Notification.create({
+    user: req.user._id,
+    title: 'Roadmap generated',
+    message: `"${roadmap.title}" is ready`,
+    type: 'info',
+    link: '/roadmap',
+  });
+  res.status(201).json({ success: true, data: { roadmap } });
+  } catch (err) {
+    await refundAiCredit(req.user, 1);
+    throw err;
+  }
+});
 
-    if (!goalId) {
-      return res.status(400).json({ success: false, message: "Goal ID is required." });
-    }
+exports.update = asyncHandler(async (req, res) => {
+  const roadmap = await findAccessible(Roadmap, req.user, req.params.id);
+  if (!roadmap) throw new AppError('Roadmap not found', 404);
+  Object.assign(roadmap, pick(req.body, UPDATE_FIELDS));
+  await roadmap.save();
+  res.json({ success: true, data: { roadmap } });
+});
 
-    // Build optional user context for richer AI output
-    const userContext = { age, education, skills, interests };
+exports.remove = asyncHandler(async (req, res) => {
+  const roadmap = await findAccessible(Roadmap, req.user, req.params.id);
+  if (!roadmap) throw new AppError('Roadmap not found', 404);
+  await roadmap.deleteOne();
+  res.json({ success: true, message: 'Roadmap deleted' });
+});
 
-    // 1. Generate the rich specialist roadmap
-    const roadmapData = await generateRoadmap(goalTitle, category, userContext);
-
-    // 2. Upsert roadmap in DB (one roadmap per goal per user)
-    const roadmap = await Roadmap.findOneAndUpdate(
-      { goalId, userId: req.user._id },
-      { data: roadmapData },
-      { upsert: true, new: true }
-    );
-
-    // 3. Auto-generate daily tasks from the roadmap (non-blocking)
-    try {
-      const { days } = await generateDailyTasks(goalTitle, category, roadmapData);
-
-      // Clear old roadmap tasks for this goal
-      await Task.deleteMany({ roadmapId: roadmap._id, userId: req.user._id });
-
-      const tasksToCreate = [];
-      days.forEach(dayInfo => {
-        dayInfo.tasks.forEach(task => {
-          tasksToCreate.push({
-            userId:        req.user._id,
-            goalId,
-            roadmapId:     roadmap._id,
-            day:           dayInfo.day,
-            type:          task.type,
-            title:         task.title,
-            description:   task.description,
-            estimatedTime: task.estimatedTime,
-            category,
-            completed:     false,
-          });
-        });
-      });
-
-      if (tasksToCreate.length > 0) {
-        await Task.insertMany(tasksToCreate);
-      }
-
-      // Reset goal progress since tasks are freshly generated
-      await Goal.findByIdAndUpdate(goalId, { progress: 0 });
-
-    } catch (taskErr) {
-      // Task generation failure should not fail the roadmap response
-      console.error("[roadmapController] Task generation failed:", taskErr.message);
-    }
-
-    res.json({ success: true, roadmap });
-
-  } catch (error) {
-    console.error("[roadmapController.createRoadmap]", error.message);
-
-    // Quota / rate-limit fallback -- return a usable roadmap instead of an error
-    const isQuota = error?.status === 429 || error?.code === 'insufficient_quota';
-    if (isQuota) {
-      try {
-        const { goalId } = req.body;
-        const roadmap = await Roadmap.findOneAndUpdate(
-          { goalId, userId: req.user._id },
-          { data: FALLBACK_ROADMAP },
-          { upsert: true, new: true }
-        );
-        return res.json({ success: true, roadmap, fallback: true });
-      } catch (fbErr) {
-        console.error("[roadmapController] Fallback save failed:", fbErr.message);
-      }
-    }
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to generate roadmap.",
-      details: error.message,
+exports.togglePhase = asyncHandler(async (req, res) => {
+  const roadmap = await findAccessible(Roadmap, req.user, req.params.id);
+  if (!roadmap) throw new AppError('Roadmap not found', 404);
+  const phase = roadmap.timeline.id(req.params.phaseId);
+  if (!phase) throw new AppError('Phase not found', 404);
+  phase.completed = !phase.completed;
+  const done = roadmap.timeline.filter((t) => t.completed).length;
+  roadmap.progress = roadmap.timeline.length
+    ? Math.round((done / roadmap.timeline.length) * 100)
+    : 0;
+  if (roadmap.progress === 100) roadmap.status = 'completed';
+  await roadmap.save();
+  if (roadmap.progress === 100) {
+    await Notification.create({
+      user: req.user._id,
+      title: 'Roadmap completed',
+      message: `You finished "${roadmap.title}"`,
+      type: 'success',
+      link: '/roadmap',
     });
   }
-};
+  res.json({ success: true, data: { roadmap } });
+});
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/roadmap/:goalId
-// Fetches the saved roadmap for a goal.
-// ─────────────────────────────────────────────────────────────────────────────
-exports.getRoadmap = async (req, res) => {
-  try {
-    const roadmap = await Roadmap.findOne({
-      goalId:  req.params.goalId,
-      userId:  req.user._id,
-    });
-
-    if (!roadmap) {
-      return res.status(404).json({ message: "No roadmap found for this goal." });
-    }
-
-    res.json({ success: true, roadmap });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+exports.updateSkill = asyncHandler(async (req, res) => {
+  const roadmap = await findAccessible(Roadmap, req.user, req.params.id);
+  if (!roadmap) throw new AppError('Roadmap not found', 404);
+  const skill = roadmap.skills.id(req.params.skillId);
+  if (!skill) throw new AppError('Skill not found', 404);
+  if (req.body.progress !== undefined) {
+    skill.progress = Math.min(100, Math.max(0, Number(req.body.progress) || 0));
   }
-};
+  if (req.body.level) skill.level = req.body.level;
+  await roadmap.save();
+  res.json({ success: true, data: { roadmap } });
+});
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PUT /api/roadmap/:goalId/task
-// Kept for backward compatibility -- marks a step as complete and updates
-// goal progress based on completed nextSteps.
-// ─────────────────────────────────────────────────────────────────────────────
-exports.updateTaskStatus = async (req, res) => {
+const ecosystem = require('../services/learningEcosystemService');
+
+exports.adapt = asyncHandler(async (req, res) => {
+  await consumeAiCredit(req.user, 1);
   try {
-    const { stepIndex, completed } = req.body;
-
-    const roadmap = await Roadmap.findOne({
-      goalId: req.params.goalId,
-      userId: req.user._id,
-    });
-
-    if (!roadmap) return res.status(404).json({ message: "Roadmap not found" });
-
-    // Update the nextSteps completion flag
-    if (
-      roadmap.data.nextSteps &&
-      Array.isArray(roadmap.data.nextSteps) &&
-      roadmap.data.nextSteps[stepIndex] !== undefined
-    ) {
-      roadmap.data.nextSteps[stepIndex].completed = completed;
-      roadmap.markModified('data');
-      await roadmap.save();
-
-      // Recalculate goal progress from completed steps
-      const total     = roadmap.data.nextSteps.length;
-      const done      = roadmap.data.nextSteps.filter(s => s.completed).length;
-      const progress  = Math.round((done / total) * 100);
-      await Goal.findByIdAndUpdate(req.params.goalId, { progress });
-
-      return res.json({ success: true, roadmap, progress });
-    }
-
-    // Legacy: phases-based roadmap (old format)
-    if (roadmap.data.phases && Array.isArray(roadmap.data.phases)) {
-      const { phaseIndex, taskIndex } = req.body;
-      roadmap.data.phases[phaseIndex].tasks[taskIndex].completed = completed;
-      roadmap.markModified('data');
-      await roadmap.save();
-
-      const allTasks      = roadmap.data.phases.flatMap(p => p.tasks);
-      const completedCount = allTasks.filter(t => t.completed).length;
-      const progress       = Math.round((completedCount / allTasks.length) * 100);
-      await Goal.findByIdAndUpdate(req.params.goalId, { progress });
-
-      return res.json({ success: true, roadmap, progress });
-    }
-
-    res.status(400).json({ message: "Invalid roadmap format for task update." });
-
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+  const roadmap = await findAccessible(Roadmap, req.user, req.params.id);
+  if (!roadmap) throw new AppError('Roadmap not found', 404);
+  const result = await ecosystem.adaptRoadmap(req.user, roadmap);
+  roadmap.adaptive = {
+    lastAdaptedAt: new Date(),
+    dependencies: result.dependencies,
+    milestones: result.milestones,
+  };
+  await roadmap.save();
+  await recordAiUsage(req.user, { ...({ mode: 'roadmap', source: 'specialized' }), creditsUsed: 1, success: true });
+  res.json({
+    success: true,
+    data: {
+      roadmap,
+      dependencies: result.dependencies,
+      milestones: result.milestones,
+      advice: result.advice,
+      changed: result.changed,
+    },
+  });
+  } catch (err) {
+    await refundAiCredit(req.user, 1);
+    throw err;
   }
-};
+});
+
+exports.milestones = asyncHandler(async (req, res) => {
+  const roadmap = await findAccessible(Roadmap, req.user, req.params.id);
+  if (!roadmap) throw new AppError('Roadmap not found', 404);
+  const milestones =
+    roadmap.adaptive?.milestones?.length > 0
+      ? roadmap.adaptive.milestones
+      : ecosystem.buildMilestones(roadmap);
+  const dependencies =
+    roadmap.adaptive?.dependencies?.length > 0
+      ? roadmap.adaptive.dependencies
+      : ecosystem.buildDependencies(roadmap.skills || []);
+  res.json({ success: true, data: { milestones, dependencies, progress: roadmap.progress } });
+});
+
+exports.generateAdaptive = asyncHandler(async (req, res) => {
+  await consumeAiCredit(req.user, 1);
+  try {
+  const { career, level } = req.body;
+  const generated = await aiService.generateRoadmap(career, level || 'beginner');
+  await recordAiUsage(req.user, { ...({ mode: 'roadmap', source: 'specialized' }), creditsUsed: 1, success: true });
+  const roadmap = await Roadmap.create({
+    ...orgCreateStamp(req.user),
+    title: generated.title,
+    career: generated.career || career,
+    description: generated.description || '',
+    skills: generated.skills || [],
+    timeline: generated.timeline || [],
+    progress: 0,
+  });
+  const adapted = await ecosystem.adaptRoadmap(req.user, roadmap);
+  roadmap.adaptive = {
+    lastAdaptedAt: new Date(),
+    dependencies: adapted.dependencies,
+    milestones: adapted.milestones,
+  };
+  await roadmap.save();
+  await Notification.create({
+    user: req.user._id,
+    title: 'Adaptive roadmap ready',
+    message: `"${roadmap.title}" includes dependencies and milestones`,
+    type: 'info',
+    link: '/roadmap',
+  });
+  res.status(201).json({
+    success: true,
+    data: {
+      roadmap,
+      dependencies: adapted.dependencies,
+      milestones: adapted.milestones,
+      advice: adapted.advice,
+    },
+  });
+  } catch (err) {
+    await refundAiCredit(req.user, 1);
+    throw err;
+  }
+});

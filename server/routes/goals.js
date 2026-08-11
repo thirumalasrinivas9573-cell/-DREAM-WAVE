@@ -1,18 +1,17 @@
-const express = require('express')
-const router  = express.Router()
-const auth    = require('../middleware/auth')
-const {
-  createGoal,
-  getGoals,
-  updateGoal,
-  deleteGoal,
-  generateAIPlan,
-} = require('../controllers/goalController')
+const express = require('express');
+const ctrl = require('../controllers/goalController');
+const { protect } = require('../middleware/auth');
+const { zodValidate } = require('../middleware/validate');
+const schemas = require('../config/schemas');
 
-router.get('/',              auth, getGoals)
-router.post('/',             auth, createGoal)
-router.put('/:id',           auth, updateGoal)
-router.delete('/:id',        auth, deleteGoal)
-router.post('/:id/ai-plan',  auth, generateAIPlan)
+const router = express.Router();
+router.use(protect);
+router.get('/', zodValidate({ query: schemas.paginationQuery }), ctrl.list);
+router.post('/', zodValidate(schemas.goal), ctrl.create);
+router.get('/:id', ctrl.getOne);
+router.put('/:id', zodValidate(schemas.goalUpdate), ctrl.update);
+router.delete('/:id', ctrl.remove);
+router.patch('/:id/progress', zodValidate(schemas.goalProgress), ctrl.updateProgress);
+router.patch('/:id/milestones/:milestoneId', ctrl.toggleMilestone);
 
-module.exports = router
+module.exports = router;
