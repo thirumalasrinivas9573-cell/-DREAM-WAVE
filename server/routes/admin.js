@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
@@ -12,6 +13,15 @@ router.get('/analytics', ap.getAnalytics);
 router.get('/logs', ap.listLogs);
 router.get('/users', ap.listUsers);
 router.patch('/users/:id/suspend', ap.suspendUser);
+=======
+const express = require('express')
+const router  = express.Router()
+const auth    = require('../middleware/auth')
+const requireRole = require('../middleware/requireRole')
+const { getStats } = require('../controllers/analyticsController')
+
+router.get('/stats', auth, requireRole('admin'), getStats)
+>>>>>>> feature/ui-threejs
 
 router.get('/institutions', ap.listInstitutions);
 router.patch('/institutions/:id/approve', ap.approveInstitution);

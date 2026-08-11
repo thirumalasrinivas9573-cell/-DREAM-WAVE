@@ -16,6 +16,13 @@ import { InstitutionPageHeader, DataToolbar } from "@/components/institution/ins
 import { useAuth } from "@/components/providers/auth-provider";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { COMPANY_ROUTES } from "@/constants/partnership";
 import { RELATIONSHIP_TYPES } from "@/types/partnership";
 import { usePartnershipStore } from "@/store/partnership-store";
@@ -24,6 +31,8 @@ import type { DiscoverableInstitution, OrgSummary, Partnership } from "@/types/p
 export function InstitutionNetworkPage() {
   const { token } = useAuth();
   const fetchAll = usePartnershipStore((s) => s.fetchAll);
+  const fetchCollaborationDashboard = usePartnershipStore((s) => s.fetchCollaborationDashboard);
+  const collaborationDashboard = usePartnershipStore((s) => s.collaborationDashboard);
   const fetchPartnerships = usePartnershipStore((s) => s.fetchPartnerships);
   const searchInstitutions = usePartnershipStore((s) => s.searchInstitutions);
   const hydrated = usePartnershipStore((s) => s.hydrated);
@@ -42,8 +51,11 @@ export function InstitutionNetworkPage() {
   const [page, setPage] = useState(1);
 
   useEffect(() => {
-    if (token) void fetchAll(token);
-  }, [token, fetchAll]);
+    if (token) {
+      void fetchAll(token);
+      void fetchCollaborationDashboard(token);
+    }
+  }, [token, fetchAll, fetchCollaborationDashboard]);
 
   useEffect(() => {
     if (!token) return;
@@ -99,6 +111,31 @@ export function InstitutionNetworkPage() {
 
       {error ? <Alert variant="error">{error}</Alert> : null}
       {stats ? <PartnershipMetricGrid stats={stats} variant="company" /> : null}
+
+      {collaborationDashboard ? (
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card className="md:col-span-1">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Collaboration</CardTitle>
+              <CardDescription>Active partners and pending requests</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <p>
+                <span className="text-muted-foreground">Active partners:</span>{" "}
+                {collaborationDashboard.counts.active}
+              </p>
+              <p>
+                <span className="text-muted-foreground">Incoming requests:</span>{" "}
+                {collaborationDashboard.counts.pendingIncoming}
+              </p>
+              <p>
+                <span className="text-muted-foreground">Outgoing requests:</span>{" "}
+                {collaborationDashboard.counts.pendingOutgoing}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         {(

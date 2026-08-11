@@ -5,6 +5,8 @@ const { SORT_FIELDS, LEGACY_TO_LIFECYCLE } = require('../constants/institutionSt
 const {
   isCertificateVisible,
   isDocumentVisible,
+  isProjectVisible,
+  isAchievementVisible,
   serializeVisibleCertificate,
   serializeAchievement,
 } = require('../utils/institutionStudentPrivacy')
@@ -61,7 +63,11 @@ function initials(name) {
 
 function serializeDirectory(doc) {
   const o = doc.toObject ? doc.toObject() : doc
-  const projects = (o.sharedProjects || []).slice(0, 3).map((p) => p.title).filter(Boolean)
+  const projects = (o.sharedProjects || [])
+    .filter(isProjectVisible)
+    .slice(0, 3)
+    .map((p) => p.title)
+    .filter(Boolean)
   return {
     id: o._id.toString(),
     studentId: o.studentId,
@@ -128,7 +134,9 @@ function serializeDetail(doc, notes = []) {
     softSkills: o.softSkills || [],
     programmingLanguages: o.programmingLanguages || [],
     languagesKnown: o.languagesKnown || [],
-    projects: (o.sharedProjects || []).map((p, i) => ({
+    projects: (o.sharedProjects || [])
+      .filter(isProjectVisible)
+      .map((p, i) => ({
       id: `proj-${i}`,
       title: p.title,
       role: p.role,
@@ -146,7 +154,9 @@ function serializeDetail(doc, notes = []) {
       .filter(isCertificateVisible)
       .map(serializeVisibleCertificate),
     researchPapers: o.researchPapers || [],
-    achievements: (o.achievements || []).map(serializeAchievement),
+    achievements: (o.achievements || [])
+      .filter(isAchievementVisible)
+      .map(serializeAchievement),
     documents: (o.documents || [])
       .filter(isDocumentVisible)
       .map((d, i) => ({

@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AiPageHeader } from "@/components/ai/ai-shared";
 import { CareerIntelNav } from "@/components/ai/career/career-nav";
 import { EmptyState } from "@/components/common/empty-state";
 import { Spinner } from "@/components/common/spinner";
+import { useAuth } from "@/components/providers/auth-provider";
+import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,34 +17,96 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useCareerIntelStore } from "@/store/career-intel-store";
-import type { CareerJobStatus } from "@/types/career-intelligence";
+import {
+  studentRecruitmentApi,
+  type StudentApplication,
+  type StudentOpportunity,
+} from "@/lib/api/student-recruitment";
 
 export function CareerJobsPage() {
-  const hydrate = useCareerIntelStore((s) => s.hydrate);
-  const hydrated = useCareerIntelStore((s) => s.hydrated);
-  const jobs = useCareerIntelStore((s) => s.jobs);
-  const setJobStatus = useCareerIntelStore((s) => s.setJobStatus);
-  const [filter, setFilter] = useState<"all" | CareerJobStatus | "internship">(
-    "all",
-  );
+  const { token, user } = useAuth();
+  const useLiveApi = Boolean(token) && user?.role === "student";
+
+  const [opportunities, setOpportunities] = useState<StudentOpportunity[]>([]);
+  const [applications, setApplications] = useState<StudentApplication[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<"all" | "recommended" | "internship" | "applied">("all");
+  const [hasInstitutionLink, setHasInstitutionLink] = useState(true);
+
+  const load = useCallback(async () => {
+    if (!token || !useLiveApi) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const [browseRes, appsRes] = await Promise.all([
+        studentRecruitmentApi.browseOpportunities(token, {
+          recommendedOnly: filter === "recommended" ? "true" : undefined,
+          opportunityType: filter === "internship" ? "internship" : undefined,
+        }),
+        studentRecruitmentApi.listApplications(token),
+      ]);
+      setOpportunities(browseRes.items);
+      setApplications(appsRes.applications);
+      setHasInstitutionLink(browseRes.hasInstitutionLink);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load opportunities");
+    } finally {
+      setLoading(false);
+    }
+  }, [token, useLiveApi, filter]);
 
   useEffect(() => {
-    if (!hydrated) hydrate();
-  }, [hydrate, hydrated]);
+    void load();
+  }, [load]);
+
+  const appliedIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const app of applications) {
+      if (app.campusOpportunityId) ids.add(app.campusOpportunityId);
+      if (app.jobId) ids.add(app.jobId);
+      if (app.internshipId) ids.add(app.internshipId);
+    }
+    return ids;
+  }, [applications]);
 
   const filtered = useMemo(() => {
-    return jobs.filter((job) => {
-      if (filter === "all") return true;
-      if (filter === "internship") return job.type === "internship";
-      return job.status === filter;
-    });
-  }, [filter, jobs]);
+    if (filter === "applied") {
+      return opportunities.filter((item) => appliedIds.has(item.id));
+    }
+    return opportunities;
+  }, [appliedIds, filter, opportunities]);
 
-  if (!hydrated) {
+  async function handleApply(item: StudentOpportunity) {
+    if (!token) return;
+    try {
+      await studentRecruitmentApi.apply(token, item.sourceType, item.id);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Application failed");
+    }
+  }
+
+  if (!useLiveApi) {
+    return (
+      <div className="container-app page-stack flex flex-1 flex-col py-8 md:py-10">
+        <AiPageHeader
+          title="Job matching"
+          description="Sign in as a student linked to an institution to browse live placement opportunities."
+        />
+        <CareerIntelNav />
+        <EmptyState
+          title="Live recruitment requires a student account"
+          description="Connect your student profile to an institution to discover and apply to campus opportunities."
+        />
+      </div>
+    );
+  }
+
+  if (loading && !opportunities.length) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
-        <Spinner label="Loading job matches" />
+        <Spinner label="Loading opportunities" />
       </div>
     );
   }
@@ -51,9 +115,18 @@ export function CareerJobsPage() {
     <div className="container-app page-stack flex flex-1 flex-col py-8 md:py-10">
       <AiPageHeader
         title="Job matching"
-        description="Recommended jobs, internships, company matches, and application tracking."
+        description="Live placement opportunities with explainable eligibility and skill evidence matching."
       />
       <CareerIntelNav />
+
+      {error ? <Alert variant="error">{error}</Alert> : null}
+
+      {!hasInstitutionLink ? (
+        <EmptyState
+          title="Institution link required"
+          description="Your account must be linked to an institution student record to browse campus opportunities."
+        />
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         {(
@@ -61,7 +134,6 @@ export function CareerJobsPage() {
             { id: "all", label: "All" },
             { id: "recommended", label: "Recommended" },
             { id: "internship", label: "Internships" },
-            { id: "saved", label: "Saved" },
             { id: "applied", label: "Applied" },
           ] as const
         ).map((item) => (
@@ -79,66 +151,69 @@ export function CareerJobsPage() {
 
       {filtered.length === 0 ? (
         <EmptyState
-          title="No matching roles"
-          description="Adjust filters or save roles from recommendations."
+          title="No matching opportunities"
+          description="No open campus, job, or internship opportunities match your current filters."
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((job) => (
-            <Card
-              key={job.id}
-              className="transition-transform hover:-translate-y-0.5"
-            >
-              <CardHeader>
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <CardTitle className="text-base">{job.title}</CardTitle>
-                    <CardDescription>
-                      {job.company} · {job.location}
-                    </CardDescription>
+          {filtered.map((item) => {
+            const applied = appliedIds.has(item.id);
+            const rec = item.recommendation;
+            return (
+              <Card key={`${item.sourceType}-${item.id}`} className="transition-transform hover:-translate-y-0.5">
+                <CardHeader>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <CardTitle className="text-base">{item.title}</CardTitle>
+                      <CardDescription>
+                        {item.companyName || "Institution opportunity"}
+                        {item.location ? ` · ${item.location}` : ""}
+                      </CardDescription>
+                    </div>
+                    <Badge variant="outline">
+                      {rec.explainableScore?.skillCoverage ?? 0}% skills
+                    </Badge>
                   </div>
-                  <Badge variant="outline">{job.matchScore}% match</Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  <Badge>{job.type}</Badge>
-                  <Badge
-                    variant={
-                      job.eligibility === "eligible" ? "default" : "secondary"
-                    }
-                  >
-                    {job.eligibility}
-                  </Badge>
-                  {job.salary ? (
-                    <Badge variant="outline">{job.salary}</Badge>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    <Badge>{item.opportunityType}</Badge>
+                    <Badge
+                      variant={
+                        rec.eligibility.result === "ELIGIBLE"
+                          ? "default"
+                          : rec.eligibility.result === "NEEDS_REVIEW"
+                            ? "secondary"
+                            : "outline"
+                      }
+                    >
+                      {rec.eligibility.result.replace(/_/g, " ")}
+                    </Badge>
+                  </div>
+                  {item.requiredSkills.length ? (
+                    <p className="text-muted-foreground text-xs">
+                      Skills: {item.requiredSkills.join(", ")}
+                    </p>
                   ) : null}
-                </div>
-                <p className="text-muted-foreground text-xs">
-                  Skills: {job.skills.join(", ")}
-                </p>
-                <div className="flex flex-wrap gap-2">
+                  {rec.signals.length ? (
+                    <ul className="text-muted-foreground list-disc pl-4 text-xs">
+                      {rec.signals.slice(0, 3).map((signal) => (
+                        <li key={signal}>{signal}</li>
+                      ))}
+                    </ul>
+                  ) : null}
                   <Button
                     type="button"
                     size="sm"
-                    variant="outline"
-                    onClick={() => setJobStatus(job.id, "saved")}
-                    disabled={job.status === "saved"}
+                    onClick={() => void handleApply(item)}
+                    disabled={applied || rec.eligibility.result === "NOT_ELIGIBLE"}
                   >
-                    Save
+                    {applied ? "Applied" : "Apply"}
                   </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => setJobStatus(job.id, "applied")}
-                    disabled={job.status === "applied"}
-                  >
-                    Mark applied
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

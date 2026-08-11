@@ -37,10 +37,13 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { INSTITUTION_ROUTES } from "@/constants/institution";
 import { institutionCommandCenterApi } from "@/lib/api/institution-command-center";
+import { institutionIntelligenceApi, type SupportSignalItem } from "@/lib/api/institution-intelligence";
 import { isInstitutionDemoDataEnabled } from "@/lib/institution-data-mode";
 import { cn } from "@/lib/utils";
 import type { CommandCenterOverview, ExecutiveAction, ExecutiveAnalytics, InstitutionSignal } from "@/types/command-center";
 import { TIME_PERIOD_OPTIONS } from "@/types/command-center";
+import { InstitutionIntelligencePanel } from "@/components/institution/command-center/institution-intelligence-panel";
+import { InstitutionBiPanel } from "@/components/institution/command-center/institution-bi-panel";
 
 type CommandTab =
   | "executive"
@@ -56,6 +59,7 @@ type CommandTab =
   | "signals"
   | "insights"
   | "actions"
+  | "business-intelligence"
   | "copilot";
 
 const TABS: Array<{ id: CommandTab; label: string }> = [
@@ -72,6 +76,7 @@ const TABS: Array<{ id: CommandTab; label: string }> = [
   { id: "signals", label: "Signals" },
   { id: "insights", label: "Executive Insights" },
   { id: "actions", label: "Action Center" },
+  { id: "business-intelligence", label: "Business Intelligence" },
   { id: "copilot", label: "AI Copilot" },
 ];
 
@@ -391,7 +396,14 @@ export function InstitutionCommandCenter() {
             <ExecutiveAnalyticsTab analytics={executiveAnalytics} />
           ) : null}
           {tab === "cross-system" && modules ? <CrossSystemTab overview={overview} /> : null}
-          {tab === "academic" && modules ? <AcademicTab students={modules.students} /> : null}
+          {tab === "academic" && modules && token ? (
+            <AcademicIntelligenceTab
+              token={token}
+              students={modules.students}
+              {...(department ? { department } : {})}
+              {...(academicYear ? { academicYear } : {})}
+            />
+          ) : null}
           {tab === "placement" && modules ? <PlacementTab placement={modules.placement} /> : null}
           {tab === "industry" && overview ? <IndustryTab industry={overview.industryIntelligence} /> : null}
           {tab === "research" && overview ? (
@@ -403,7 +415,22 @@ export function InstitutionCommandCenter() {
           {tab === "signals" && overview ? <SignalsTab signals={overview.signals} /> : null}
           {tab === "insights" && overview ? <InsightsTab insights={overview.executiveInsights} /> : null}
           {tab === "actions" && overview ? <ActionsTab actions={overview.actions} /> : null}
-          {tab === "copilot" && overview ? <CopilotTab insights={overview.copilotInsights} /> : null}
+          {tab === "business-intelligence" && token ? (
+            <InstitutionBiPanel
+              token={token}
+              {...(department ? { department } : {})}
+            />
+          ) : null}
+          {tab === "copilot" && overview && token ? (
+            <div className="space-y-8">
+              <CopilotTab insights={overview.copilotInsights} />
+              <InstitutionIntelligencePanel
+                token={token}
+                {...(department ? { department } : {})}
+                {...(academicYear ? { academicYear } : {})}
+              />
+            </div>
+          ) : null}
         </>
       )}
 
@@ -549,20 +576,82 @@ function CrossSystemTab({ overview }: { overview: CommandCenterOverview }) {
   );
 }
 
-function AcademicTab({ students }: { students: CommandCenterOverview["modules"]["students"] }) {
+function AcademicIntelligenceTab({
+  token,
+  students,
+  department,
+  academicYear,
+}: {
+  token: string;
+  students: CommandCenterOverview["modules"]["students"];
+  department?: string;
+  academicYear?: string;
+}) {
+  const [supportItems, setSupportItems] = useState<SupportSignalItem[]>([]);
+  const [programCount, setProgramCount] = useState(0);
+
+  useEffect(() => {
+    void Promise.all([
+      institutionIntelligenceApi.getSupportSignals(token, { department, academicYear, limit: "8" }),
+      institutionIntelligenceApi.getPrograms(token, { department, academicYear }),
+    ]).then(([supportRes, programRes]) => {
+      setSupportItems(supportRes.support.items || []);
+      setProgramCount(programRes.programs.departments?.length || 0);
+    }).catch(() => {
+      setSupportItems([]);
+      setProgramCount(0);
+    });
+  }, [token, department, academicYear]);
+
   if (!students.hasData) {
     return <EmptyState title="No student data" description="Register students to populate academic intelligence." />;
   }
+
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <InstitutionMetricCard label="Total Students" value={students.totalStudents} hint="Enrolled" icon={Users} />
-      <InstitutionMetricCard label="Active Students" value={students.activeStudents} hint="Active status" icon={Activity} />
-      <InstitutionMetricCard label="Average CGPA" value={students.avgCgpa || "—"} hint="Institution average" icon={Award} />
-      <InstitutionMetricCard label="Average Attendance" value={`${students.avgAttendance}%`} hint="Institution average" icon={CalendarDays} />
-      <InstitutionMetricCard label="Placement Eligible" value={students.placementEligible} hint="Ready to apply" icon={Target} />
-      <InstitutionMetricCard label="Placed Students" value={students.placedStudents} hint="Confirmed placements" icon={Briefcase} />
-      <InstitutionMetricCard label="Shared Projects" value={students.withSharedProjects} hint="Portfolio visibility" icon={Lightbulb} />
-      <InstitutionMetricCard label="Missing Documents" value={students.missingRequiredDocuments} hint="Needs attention" icon={BookOpen} />
+    <div className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <InstitutionMetricCard label="Total Students" value={students.totalStudents} hint="Enrolled" icon={Users} />
+        <InstitutionMetricCard label="Active Students" value={students.activeStudents} hint="Active status" icon={Activity} />
+        <InstitutionMetricCard label="Average CGPA" value={students.avgCgpa || "—"} hint="Institution average" icon={Award} />
+        <InstitutionMetricCard label="Average Attendance" value={`${students.avgAttendance}%`} hint="Institution average" icon={CalendarDays} />
+        <InstitutionMetricCard label="Placement Eligible" value={students.placementEligible} hint="Ready to apply" icon={Target} />
+        <InstitutionMetricCard label="Placed Students" value={students.placedStudents} hint="Confirmed placements" icon={Briefcase} />
+        <InstitutionMetricCard label="Departments Tracked" value={programCount} hint="Program intelligence" icon={BookOpen} />
+        <InstitutionMetricCard label="Support Signals" value={supportItems.length} hint="May require review" icon={HeartPulse} />
+      </div>
+
+      {supportItems.length ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Academic support signals</CardTitle>
+            <CardDescription>
+              Advisory indicators based on configured thresholds — not automatic judgments.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {supportItems.slice(0, 8).map((item) => (
+              <div key={item.studentId} className="rounded-lg border p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-medium">{item.studentName}</p>
+                  <Badge variant="outline">{item.department || "—"}</Badge>
+                </div>
+                <ul className="text-muted-foreground mt-2 space-y-1 text-sm">
+                  {item.signals.map((signal) => (
+                    <li key={`${item.studentId}-${signal.type}`}>
+                      {signal.label}: {signal.detail}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : (
+        <EmptyState
+          title="No support signals"
+          description="Students are within configured academic thresholds or insufficient attendance/performance data exists."
+        />
+      )}
     </div>
   );
 }

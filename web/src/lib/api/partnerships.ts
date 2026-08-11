@@ -1,13 +1,16 @@
 import { apiRequest } from "@/lib/api/client";
 import type {
+  CollaborationDashboard,
   CreatePartnershipRequestPayload,
   Partnership,
   PartnershipActivity,
   PartnershipDocument,
   PartnershipRespondAction,
   PartnershipStats,
+  PartnershipWorkspace,
   PlatformNotification,
   RelationshipType,
+  SharingScope,
 } from "@/types/partnership";
 
 type Pagination = {
@@ -23,9 +26,49 @@ function authOpts(token: string) {
 
 export const partnershipsApi = {
   getMeta: (token: string) =>
-    apiRequest<{ success: boolean; relationshipTypes: RelationshipType[] }>(
+    apiRequest<{ success: boolean; relationshipTypes: RelationshipType[]; sharingScopes?: SharingScope[] }>(
       "/partnerships/meta",
       authOpts(token),
+    ),
+
+  getCollaborationDashboard: (token: string) =>
+    apiRequest<{ success: boolean; dashboard: CollaborationDashboard }>(
+      "/partnerships/collaboration/dashboard",
+      authOpts(token),
+    ),
+
+  getWorkspace: (token: string, id: string) =>
+    apiRequest<{ success: boolean; workspace: PartnershipWorkspace }>(
+      `/partnerships/${id}/workspace`,
+      authOpts(token),
+    ),
+
+  updateScope: (token: string, id: string, scopes: SharingScope[]) =>
+    apiRequest<{ success: boolean; partnership: Partnership }>(
+      `/partnerships/${id}/scope`,
+      { method: "PATCH", body: { scopes }, token },
+    ),
+
+  pause: (token: string, id: string) =>
+    apiRequest<{ success: boolean; partnership: Partnership }>(
+      `/partnerships/${id}/pause`,
+      { method: "POST", token },
+    ),
+
+  cancel: (token: string, id: string) =>
+    apiRequest<{ success: boolean; partnership: Partnership }>(
+      `/partnerships/${id}/cancel`,
+      { method: "POST", token },
+    ),
+
+  getAiInsights: (
+    token: string,
+    id: string,
+    intent = "PARTNERSHIP_SUMMARY",
+  ) =>
+    apiRequest<{ success: boolean; intent: string; source: string; insight: Record<string, unknown> }>(
+      `/partnerships/${id}/ai/insights`,
+      { method: "POST", body: { intent }, token },
     ),
 
   getStats: (token: string) =>

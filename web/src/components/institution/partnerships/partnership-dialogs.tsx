@@ -14,7 +14,18 @@ import {
   type DiscoverableCompany,
   type DiscoverableInstitution,
   type RelationshipType,
+  type SharingScope,
 } from "@/types/partnership";
+
+const SHARING_SCOPE_OPTIONS: SharingScope[] = [
+  "recruitment",
+  "placement",
+  "events",
+  "opportunities",
+  "projects",
+  "research",
+  "programs",
+];
 
 type PartnershipRequestDialogProps = {
   open: boolean;
@@ -45,6 +56,7 @@ export function PartnershipRequestDialog({
   const [contactEmail, setContactEmail] = useState("");
   const [startDate, setStartDate] = useState("");
   const [expectedDuration, setExpectedDuration] = useState("");
+  const [requestedScopes, setRequestedScopes] = useState<SharingScope[]>(["recruitment", "placement"]);
 
   const targetName = targetCompany?.name || targetInstitution?.name || "organization";
 
@@ -56,6 +68,7 @@ export function PartnershipRequestDialog({
       proposedCollaboration,
       contactPerson: { name: contactName, email: contactEmail },
       expectedDuration,
+      requestedScopes,
       ...(startDate ? { startDate } : {}),
       ...(initiatorRole === "institution" && targetCompany
         ? { companyId: targetCompany._id }
@@ -135,13 +148,33 @@ export function PartnershipRequestDialog({
             />
           </div>
         </div>
+        <div className="space-y-2">
+          <Label>Requested sharing scopes</Label>
+          <div className="flex flex-wrap gap-2">
+            {SHARING_SCOPE_OPTIONS.map((scope) => (
+              <label key={scope} className="flex items-center gap-1.5 text-sm">
+                <input
+                  type="checkbox"
+                  checked={requestedScopes.includes(scope)}
+                  onChange={(e) => {
+                    setRequestedScopes((prev) =>
+                      e.target.checked ? [...prev, scope] : prev.filter((s) => s !== scope),
+                    );
+                  }}
+                />
+                {scope}
+              </label>
+            ))}
+          </div>
+          <p className="text-muted-foreground text-xs">Scopes are reviewed on acceptance. Does not auto-send external communication.</p>
+        </div>
         {error ? <p className="text-destructive text-sm">{error}</p> : null}
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button onClick={() => void handleSubmit()} disabled={loading}>
-            {loading ? "Sending…" : "Send request"}
+            {loading ? "Saving…" : "Save & send request"}
           </Button>
         </div>
       </div>

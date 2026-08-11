@@ -6,20 +6,46 @@ import { AuthAlert } from "@/components/auth/auth-alert";
 import { Spinner } from "@/components/common/spinner";
 import { EntityForm } from "@/components/institution/entity-form";
 import { InstitutionPageHeader } from "@/components/institution/institution-ui";
+import { useAuth } from "@/components/providers/auth-provider";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { institutionFoundationApi, type InstitutionFoundationProfile } from "@/lib/api/institution-foundation";
+import { isInstitutionDemoDataEnabled } from "@/lib/institution-data-mode";
 import { useInstitutionStore } from "@/store/institution-store";
 import type { InstitutionProfile, InstitutionSettings } from "@/types/institution";
 
 export function InstitutionProfilePage() {
+  const { token } = useAuth();
+  const useLiveApi = Boolean(token) && !isInstitutionDemoDataEnabled();
   const hydrated = useInstitutionStore((s) => s.hydrated);
   const hydrate = useInstitutionStore((s) => s.hydrate);
   const profile = useInstitutionStore((s) => s.profile);
   const updateProfile = useInstitutionStore((s) => s.updateProfile);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!hydrated) hydrate();
   }, [hydrate, hydrated]);
+
+  useEffect(() => {
+    if (!useLiveApi || !token) return;
+    void institutionFoundationApi.getProfile(token).then((res) => {
+      updateProfile({
+        name: res.profile.name,
+        type: (res.profile.type as InstitutionProfile["type"]) || "college",
+        code: res.profile.code,
+        email: res.profile.email,
+        phone: res.profile.phone,
+        website: res.profile.website,
+        address: res.profile.address,
+        city: res.profile.city,
+        state: res.profile.state,
+        country: res.profile.country,
+        description: res.profile.description,
+      });
+    });
+  }, [useLiveApi, token, updateProfile]);
 
   if (!hydrated) {
     return (
@@ -39,8 +65,11 @@ export function InstitutionProfilePage() {
         <AuthAlert
           variant="success"
           title="Profile updated"
-          description="Institution profile details were saved locally."
+          description={useLiveApi ? "Institution profile synced to the platform." : "Institution profile details were saved locally."}
         />
+      ) : null}
+      {error ? (
+        <AuthAlert variant="error" title="Save failed" description={error} />
       ) : null}
       <Card className="max-w-2xl">
         <CardHeader>
@@ -93,11 +122,34 @@ export function InstitutionProfilePage() {
                 },
               ]}
               onCancel={() => setSaved(false)}
-              onSubmit={(values) => {
-                updateProfile(values as unknown as Partial<InstitutionProfile>);
-                setSaved(true);
+              onSubmit={async (values) => {
+                setError(null);
+                setLoading(true);
+                try {
+                  if (useLiveApi && token) {
+                    const payload: Partial<InstitutionFoundationProfile> = {};
+                    if (values.name) payload.name = values.name;
+                    if (values.type) payload.type = values.type;
+                    if (values.code) payload.code = values.code;
+                    if (values.email) payload.email = values.email;
+                    if (values.phone) payload.phone = values.phone;
+                    if (values.website) payload.website = values.website;
+                    if (values.address) payload.address = values.address;
+                    if (values.city) payload.city = values.city;
+                    if (values.state) payload.state = values.state;
+                    if (values.country) payload.country = values.country;
+                    if (values.description) payload.description = values.description;
+                    await institutionFoundationApi.updateProfile(token, payload);
+                  }
+                  updateProfile(values as unknown as Partial<InstitutionProfile>);
+                  setSaved(true);
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : "Failed to save profile");
+                } finally {
+                  setLoading(false);
+                }
               }}
-              submitLabel="Save profile"
+              submitLabel={loading ? "Saving…" : "Save profile"}
             />
           </div>
         </CardHeader>

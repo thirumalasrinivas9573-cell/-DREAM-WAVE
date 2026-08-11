@@ -15,6 +15,10 @@ import { EmptyState } from "@/components/common/empty-state";
 import { Spinner } from "@/components/common/spinner";
 import { DashboardCustomizer } from "@/components/dashboard/dashboard-customizer";
 import {
+  PersonalizedHomePanel,
+  PersonalizedRecommendationsPanel,
+} from "@/components/personalization/personalized-panels";
+import {
   ActivityTimeline,
   ContinueCard,
   DashboardSection,
@@ -36,7 +40,6 @@ import {
 import { KNOWLEDGE_ROUTES } from "@/constants/knowledge";
 import {
   getBookById,
-  getTrendingBooks,
   KNOWLEDGE_CATALOG,
 } from "@/constants/knowledge-catalog";
 import { LEARN_ROUTES } from "@/constants/learn";
@@ -46,9 +49,6 @@ import {
 } from "@/constants/learn-catalog";
 import {
   ACCENT_OPTIONS,
-  CAREER_PATH_RECS,
-  CERTIFICATION_RECS,
-  PROJECT_RECS,
 } from "@/constants/personalization";
 import { ROUTES } from "@/constants/routes";
 import { WORKSPACE_ROUTES } from "@/constants/workspace";
@@ -319,16 +319,6 @@ export function StudentDashboard({ name, goal }: StudentDashboardProps) {
     }));
   }, [milestones]);
 
-  const recommendedBooks = useMemo(() => getTrendingBooks(3), []);
-  const recommendedAnimations = useMemo(
-    () => LEARN_CATALOG.slice(0, 3),
-    [],
-  );
-  const recommendedLessons = useMemo(
-    () =>
-      LEARN_CATALOG.filter((item) => item.topic === "fundamentals").slice(0, 3),
-    [],
-  );
 
   const dailySummary = useMemo(() => {
     const parts = [
@@ -451,6 +441,9 @@ export function StudentDashboard({ name, goal }: StudentDashboardProps) {
                 <ExportButton onClick={exportSummary} />
               </div>
             </CardHeader>
+            <CardContent className="space-y-4">
+              <PersonalizedHomePanel />
+            </CardContent>
           </Card>
         );
 
@@ -499,64 +492,9 @@ export function StudentDashboard({ name, goal }: StudentDashboardProps) {
           <DashboardSection
             key={id}
             title="AI recommendations"
-            description="Lessons, books, videos, animations, projects, certifications, and career paths."
+            description="Personalized from your career goal, skills, and opportunities."
           >
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {recommendedLessons.map((item) => (
-                <ContinueCard
-                  key={`lesson-${item.id}`}
-                  href={LEARN_ROUTES.detail(item.id)}
-                  title={item.title}
-                  meta="Recommended lesson"
-                  badge="Lesson"
-                />
-              ))}
-              {recommendedBooks.map((book) => (
-                <ContinueCard
-                  key={`book-${book.id}`}
-                  href={KNOWLEDGE_ROUTES.detail(book.id)}
-                  title={book.title}
-                  meta="Recommended book"
-                  badge="Book"
-                />
-              ))}
-              {recommendedAnimations.map((item) => (
-                <ContinueCard
-                  key={`anim-${item.id}`}
-                  href={LEARN_ROUTES.watch(item.id)}
-                  title={item.title}
-                  meta="Recommended animation / video"
-                  badge="Video"
-                />
-              ))}
-              {PROJECT_RECS.map((item) => (
-                <ContinueCard
-                  key={item.title}
-                  href={item.href}
-                  title={item.title}
-                  meta={item.detail}
-                  badge="Project"
-                />
-              ))}
-              {CERTIFICATION_RECS.map((item) => (
-                <ContinueCard
-                  key={item.title}
-                  href={item.href}
-                  title={item.title}
-                  meta={item.detail}
-                  badge="Cert"
-                />
-              ))}
-              {CAREER_PATH_RECS.map((item) => (
-                <ContinueCard
-                  key={item.title}
-                  href={item.href}
-                  title={item.title}
-                  meta={item.detail}
-                  badge="Career"
-                />
-              ))}
-            </div>
+            <PersonalizedRecommendationsPanel />
           </DashboardSection>
         );
 

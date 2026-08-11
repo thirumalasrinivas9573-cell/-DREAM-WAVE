@@ -75,5 +75,6 @@ const companySchema = new mongoose.Schema(
 )
 
 companySchema.index({ name: 'text', industry: 'text', location: 'text' })
+companySchema.index({ isPublic: 1, name: 1 })
 
 module.exports = mongoose.model('Company', companySchema)

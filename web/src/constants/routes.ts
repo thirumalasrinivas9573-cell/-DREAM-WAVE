@@ -20,7 +20,14 @@ export const ROUTES = {
   institution: "/institution",
   research: "/research",
   community: "/community",
+  events: "/events",
+  opportunities: "/opportunities",
+  marketplace: "/marketplace",
+  marketplaceCompare: "/marketplace/compare",
+  notifications: "/notifications",
   workspace: "/workspace",
+  personalization: "/personalization",
+  search: "/search",
 } as const;
 
 export type AppRoute = (typeof ROUTES)[keyof typeof ROUTES];

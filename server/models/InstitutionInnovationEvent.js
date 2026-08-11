@@ -1,6 +1,24 @@
 const mongoose = require('mongoose')
 const { INNOVATION_EVENT_TYPES, EVENT_STATUSES } = require('../constants/institutionIncubation')
 
+const hackathonDetailsSchema = new mongoose.Schema(
+  {
+    teamSizeMin: { type: Number, default: 1, min: 1 },
+    teamSizeMax: { type: Number, default: 4, min: 1 },
+    submissionDeadline: { type: Date, default: null },
+    problemStatements: [{ title: String, description: String }],
+    themes: [{ type: String, trim: true }],
+    tracks: [{ type: String, trim: true }],
+    rules: { type: String, trim: true, default: '' },
+    judgingCriteria: [{ name: String, weight: Number }],
+    prizes: [{ label: String, description: String }],
+    website: { type: String, trim: true, default: '' },
+    city: { type: String, trim: true, default: '' },
+    country: { type: String, trim: true, default: '' },
+  },
+  { _id: false },
+)
+
 const registrationSchema = new mongoose.Schema(
   {
     registrantUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
@@ -37,6 +55,8 @@ const institutionInnovationEventSchema = new mongoose.Schema(
     registrations: [registrationSchema],
     outcomes: { type: String, trim: true, default: '' },
     linkedStartupIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'InstitutionStartup' }],
+    hackathonDetails: { type: hackathonDetailsSchema, default: null },
+    requiredSkills: [{ type: String, trim: true }],
     createdByUserId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

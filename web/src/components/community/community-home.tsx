@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/common/empty-state";
 import { Spinner } from "@/components/common/spinner";
 import { CommunityNav, CommunityPageHeader } from "@/components/community/community-nav";
 import { SmartStatCard } from "@/components/dashboard/dashboard-ui";
+import { useAuth } from "@/components/providers/auth-provider";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -17,20 +18,44 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { COMMUNITY_ROUTES } from "@/constants/community";
+import { communityApi } from "@/lib/api/community";
+import { mapCommunityApiPost } from "@/lib/community/map-post";
 import { cn } from "@/lib/utils";
 import { useCommunityStore } from "@/store/community-store";
 
 export function CommunityHomePage() {
+  const { token } = useAuth();
   const hydrate = useCommunityStore((s) => s.hydrate);
   const hydrated = useCommunityStore((s) => s.hydrated);
   const communities = useCommunityStore((s) => s.communities);
-  const posts = useCommunityStore((s) => s.posts);
+  const seedPosts = useCommunityStore((s) => s.posts);
   const mentors = useCommunityStore((s) => s.mentors);
   const activity = useCommunityStore((s) => s.activity);
+  const [livePosts, setLivePosts] = useState(seedPosts);
 
   useEffect(() => {
     if (!hydrated) hydrate();
   }, [hydrate, hydrated]);
+
+  const loadLive = useCallback(async () => {
+    if (!token) {
+      setLivePosts(seedPosts);
+      return;
+    }
+    try {
+      const data = await communityApi.getFeed(token, { mode: "for_you", limit: "12" });
+      setLivePosts((data.posts ?? []).map(mapCommunityApiPost));
+    } catch {
+      setLivePosts(seedPosts);
+    }
+  }, [token, seedPosts]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    void loadLive();
+  }, [hydrated, loadLive]);
+
+  const posts = token ? livePosts : seedPosts;
 
   const trending = useMemo(
     () => communities.filter((item) => item.trending),

@@ -13,6 +13,29 @@
     "test": "node --require ./tests/mongoSetup.js --test tests/*.test.js",
     "verify": "node scripts/verify-connection.js",
     "verify:partnerships": "node scripts/verify-partnerships.js",
+    "verify:partnership-collaboration": "node scripts/verify-partnership-collaboration.js",
+    "verify:institution-programs": "node scripts/verify-institution-programs.js",
+    "verify:ecosystem-intelligence": "node scripts/verify-ecosystem-intelligence.js",
+    "verify:program-intelligence": "node scripts/verify-program-intelligence.js",
+    "verify:ecosystem-automation": "node scripts/verify-ecosystem-automation.js",
+    "verify:executive-intelligence": "node scripts/verify-executive-intelligence.js",
+    "verify:multi-agent-orchestration": "node scripts/verify-multi-agent-orchestration.js",
+    "verify:context-personalization": "node scripts/verify-context-personalization.js",
+    "verify:knowledge-discovery": "node scripts/verify-knowledge-discovery.js",
+    "verify:research-workspace": "node scripts/verify-research-workspace.js",
+    "verify:adaptive-learning": "node scripts/verify-adaptive-learning.js",
+    "verify:project-intelligence": "node scripts/verify-project-intelligence.js",
+    "verify:career-readiness": "node scripts/verify-career-readiness.js",
+    "verify:opportunity-intelligence": "node scripts/verify-opportunity-intelligence.js",
+    "verify:application-intelligence": "node scripts/verify-application-intelligence.js",
+    "verify:career-operating-system": "node scripts/verify-career-operating-system.js",
+    "verify:goal-execution": "node scripts/verify-goal-execution.js",
+    "verify:talent-intelligence": "node scripts/verify-talent-intelligence.js",
+    "verify:talent-marketplace": "node scripts/verify-talent-marketplace.js",
+    "verify:campus-command-center": "node scripts/verify-campus-command-center.js",
+    "verify:partnership-intelligence": "node scripts/verify-partnership-intelligence.js",
+    "verify:industry-opportunity": "node scripts/verify-industry-opportunity.js",
+    "verify:career-copilot": "node scripts/verify-career-copilot.js",
     "verify:recruitment": "node scripts/verify-recruitment.js",
     "verify:institution-students": "node scripts/verify-institution-students.js",
     "verify:institution-placements": "node scripts/verify-institution-placements.js",
@@ -20,6 +43,14 @@
     "verify:institution-incubation": "node scripts/verify-institution-incubation.js",
     "verify:institution-alumni": "node scripts/verify-institution-alumni.js",
     "verify:institution-command-center": "node scripts/verify-institution-command-center.js",
+    "verify:ecosystem-foundation": "node scripts/verify-ecosystem-foundation.js",
+    "verify:student-recruitment": "node scripts/verify-student-recruitment.js",
+    "verify:institution-intelligence": "node scripts/verify-institution-intelligence.js",
+    "verify:community-network": "node scripts/verify-community-network.js",
+    "verify:business-intelligence": "node scripts/verify-business-intelligence.js",
+    "verify:event-opportunity": "node scripts/verify-event-opportunity.js",
+    "verify:opportunity-matching": "node scripts/verify-opportunity-matching.js",
+    "verify:platform-notifications": "node scripts/verify-platform-notifications.js",
     "verify:institution-all": "node scripts/verify-institution-students.js && node scripts/verify-institution-placements.js && node scripts/verify-institution-research.js && node scripts/verify-institution-incubation.js && node scripts/verify-institution-alumni.js && node scripts/verify-institution-command-center.js && node scripts/verify-recruitment.js"
   },
   "dependencies": {
@@ -52,9 +83,14 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+<<<<<<< HEAD
     "mongodb-memory-server": "^10.4.3",
     "nodemon": "^3.0.1",
     "supertest": "^7.2.2"
+=======
+    "nodemon": "^3.0.1",
+    "socket.io-client": "^4.8.3"
+>>>>>>> feature/ui-threejs
   },
   "keywords": [
     "ai",

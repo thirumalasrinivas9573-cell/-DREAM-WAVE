@@ -63,11 +63,16 @@ server/reports/*
 # ── Local caches / binary downloads (never commit mongod) ───────────────────────
 .vite
 coverage
+<<<<<<< HEAD
 server/tests/.cache
 server/.cache
 web/node_modules
 web/.next
 web/out
+=======
+server/tests/.cache/
+server/.cache/
+>>>>>>> feature/ui-threejs
 **/.cache/
 **/mongodb-memory-server/
 *.node

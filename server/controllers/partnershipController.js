@@ -14,6 +14,17 @@ const {
   isValidObjectId,
   RELATIONSHIP_TYPES,
 } = require('../services/partnershipService')
+const {
+  getCollaborationDashboard,
+  getPartnershipWorkspace,
+  updateSharingScopes,
+  pausePartnership,
+  cancelPartnership,
+  linkEntity,
+  unlinkEntity,
+  SHARING_SCOPES,
+} = require('../services/partnershipCollaborationService')
+const { generateCollaborationInsight, AI_INTENTS } = require('../services/partnershipAiService')
 
 function getIo(req) {
   return req.app.get('io')
@@ -34,6 +45,16 @@ function serializeList(items) {
   return items.map((item) => serialize(item))
 }
 
+function actorFromReq(req) {
+  const role = req.user.role === 'institution' || req.user.role === 'company' ? req.user.role : null
+  return {
+    userId: req.user._id,
+    role,
+    institution: req.institution,
+    company: req.company,
+  }
+}
+
 /** POST /api/partnerships/requests */
 exports.createRequest = async (req, res) => {
   try {
@@ -48,6 +69,7 @@ exports.createRequest = async (req, res) => {
       startDate,
       expectedDuration,
       supportingDocuments,
+      requestedScopes,
     } = req.body
 
     if (!relationshipType) {
@@ -95,6 +117,7 @@ exports.createRequest = async (req, res) => {
       startDate,
       expectedDuration,
       supportingDocuments,
+      requestedScopes,
       io: getIo(req),
     })
 
@@ -167,7 +190,163 @@ exports.getStats = async (req, res) => {
 
 /** GET /api/partnerships/meta */
 exports.getMeta = (_req, res) => {
-  res.json({ success: true, relationshipTypes: RELATIONSHIP_TYPES })
+  res.json({ success: true, relationshipTypes: RELATIONSHIP_TYPES, sharingScopes: SHARING_SCOPES })
+}
+
+/** GET /api/partnerships/collaboration/dashboard */
+exports.getCollaborationDashboard = async (req, res) => {
+  try {
+    let orgId
+    let role
+    if (req.user.role === 'institution' && req.institution) {
+      orgId = req.institution._id
+      role = 'institution'
+    } else if (req.user.role === 'company' && req.company) {
+      orgId = req.company._id
+      role = 'company'
+    } else {
+      return res.status(403).json({ success: false, message: 'Access denied' })
+    }
+
+    const dashboard = await getCollaborationDashboard(orgId, role)
+    res.json({ success: true, dashboard })
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Failed to load collaboration dashboard',
+    })
+  }
+}
+
+/** GET /api/partnerships/:id/workspace */
+exports.getWorkspace = async (req, res) => {
+  try {
+    const workspace = await getPartnershipWorkspace(req.params.id, actorFromReq(req))
+    res.json({ success: true, workspace })
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Failed to load workspace',
+    })
+  }
+}
+
+/** PATCH /api/partnerships/:id/scope */
+exports.updateScope = async (req, res) => {
+  try {
+    const { scopes } = req.body
+    if (!Array.isArray(scopes)) {
+      return res.status(400).json({ success: false, message: 'scopes array is required' })
+    }
+    const partnership = await updateSharingScopes(
+      req.params.id,
+      scopes,
+      actorFromReq(req),
+      getIo(req),
+    )
+    res.json({ success: true, partnership: serialize(partnership) })
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Failed to update scope',
+    })
+  }
+}
+
+/** POST /api/partnerships/:id/pause */
+exports.pausePartnership = async (req, res) => {
+  try {
+    const partnership = await pausePartnership(req.params.id, actorFromReq(req), getIo(req))
+    res.json({ success: true, partnership: serialize(partnership) })
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Failed to pause partnership',
+    })
+  }
+}
+
+/** POST /api/partnerships/:id/cancel */
+exports.cancelPartnership = async (req, res) => {
+  try {
+    const partnership = await cancelPartnership(req.params.id, actorFromReq(req), getIo(req))
+    res.json({ success: true, partnership: serialize(partnership) })
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Failed to cancel partnership',
+    })
+  }
+}
+
+/** POST /api/partnerships/:id/accept */
+exports.acceptPartnership = async (req, res) => {
+  req.body = { action: 'accept', responseMessage: req.body?.responseMessage }
+  return exports.respondToRequest(req, res)
+}
+
+/** POST /api/partnerships/:id/reject */
+exports.rejectPartnership = async (req, res) => {
+  req.body = { action: 'decline', responseMessage: req.body?.responseMessage }
+  return exports.respondToRequest(req, res)
+}
+
+/** POST /api/partnerships/:id/links/:entityType/:entityId */
+exports.linkEntity = async (req, res) => {
+  try {
+    const workspace = await linkEntity(
+      req.params.id,
+      req.params.entityType,
+      req.params.entityId,
+      actorFromReq(req),
+      getIo(req),
+    )
+    res.json({ success: true, workspace })
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Failed to link entity',
+    })
+  }
+}
+
+/** DELETE /api/partnerships/:id/links/:entityType/:entityId */
+exports.unlinkEntity = async (req, res) => {
+  try {
+    const workspace = await unlinkEntity(
+      req.params.id,
+      req.params.entityType,
+      req.params.entityId,
+      actorFromReq(req),
+    )
+    res.json({ success: true, workspace })
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Failed to unlink entity',
+    })
+  }
+}
+
+/** POST /api/partnerships/:id/ai/insights */
+exports.getAiInsights = async (req, res) => {
+  try {
+    const intent = req.body?.intent || 'PARTNERSHIP_SUMMARY'
+    if (!AI_INTENTS.includes(intent)) {
+      return res.status(400).json({ success: false, message: 'Invalid AI intent' })
+    }
+    const result = await generateCollaborationInsight({
+      partnershipId: req.params.id,
+      actor: actorFromReq(req),
+      intent,
+    })
+    res.json({ success: true, ...result })
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Failed to generate insights',
+    })
+  }
 }
 
 /** GET /api/partnerships/:id */

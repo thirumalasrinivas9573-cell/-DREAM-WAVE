@@ -4,6 +4,7 @@ import { create } from "zustand";
 
 import { discoveryApi, partnershipsApi } from "@/lib/api/partnerships";
 import type {
+  CollaborationDashboard,
   CreatePartnershipRequestPayload,
   DiscoverableCompany,
   DiscoverableInstitution,
@@ -12,7 +13,9 @@ import type {
   PartnershipDocument,
   PartnershipRespondAction,
   PartnershipStats,
+  PartnershipWorkspace,
   RelationshipType,
+  SharingScope,
 } from "@/types/partnership";
 
 type PartnershipState = {
@@ -27,6 +30,8 @@ type PartnershipState = {
   discoveredInstitutions: DiscoverableInstitution[];
   discoveryPagination: { page: number; pageCount: number; total: number };
   currentPartnership: Partnership | null;
+  workspace: PartnershipWorkspace | null;
+  collaborationDashboard: CollaborationDashboard | null;
   activity: PartnershipActivity[];
   documents: PartnershipDocument[];
   fetchAll: (token: string) => Promise<void>;
@@ -54,6 +59,11 @@ type PartnershipState = {
     token: string,
     filters?: Record<string, string | undefined>,
   ) => Promise<void>;
+  fetchWorkspace: (token: string, id: string) => Promise<void>;
+  fetchCollaborationDashboard: (token: string) => Promise<void>;
+  updateScope: (token: string, id: string, scopes: SharingScope[]) => Promise<void>;
+  pausePartnership: (token: string, id: string) => Promise<void>;
+  cancelPartnership: (token: string, id: string) => Promise<void>;
   fetchActivity: (token: string, id: string) => Promise<void>;
   fetchDocuments: (token: string, id: string) => Promise<void>;
   addDocument: (
@@ -76,6 +86,8 @@ export const usePartnershipStore = create<PartnershipState>((set, get) => ({
   discoveredInstitutions: [],
   discoveryPagination: { page: 1, pageCount: 1, total: 0 },
   currentPartnership: null,
+  workspace: null,
+  collaborationDashboard: null,
   activity: [],
   documents: [],
 
@@ -133,14 +145,18 @@ export const usePartnershipStore = create<PartnershipState>((set, get) => ({
   fetchPartnership: async (token, id) => {
     set({ loading: true, error: null });
     try {
-      const [partnershipRes, activityRes, docsRes] = await Promise.all([
+      const [partnershipRes, workspaceRes, activityRes, docsRes] = await Promise.all([
         partnershipsApi.get(token, id),
+        partnershipsApi.getWorkspace(token, id),
         partnershipsApi.getActivity(token, id),
         partnershipsApi.listDocuments(token, id),
       ]);
       set({
         currentPartnership: partnershipRes.partnership,
-        activity: activityRes.activity,
+        workspace: workspaceRes.workspace,
+        activity: workspaceRes.workspace.recentActivity?.length
+          ? workspaceRes.workspace.recentActivity
+          : activityRes.activity,
         documents: docsRes.documents,
         loading: false,
       });
@@ -149,8 +165,47 @@ export const usePartnershipStore = create<PartnershipState>((set, get) => ({
         loading: false,
         error: err instanceof Error ? err.message : "Partnership unavailable",
         currentPartnership: null,
+        workspace: null,
       });
     }
+  },
+
+  fetchWorkspace: async (token, id) => {
+    try {
+      const res = await partnershipsApi.getWorkspace(token, id);
+      set({
+        workspace: res.workspace,
+        activity: res.workspace.recentActivity || get().activity,
+      });
+    } catch {
+      /* non-fatal */
+    }
+  },
+
+  fetchCollaborationDashboard: async (token) => {
+    try {
+      const res = await partnershipsApi.getCollaborationDashboard(token);
+      set({ collaborationDashboard: res.dashboard });
+    } catch {
+      /* non-fatal */
+    }
+  },
+
+  updateScope: async (token, id, scopes) => {
+    await partnershipsApi.updateScope(token, id, scopes);
+    await get().fetchPartnership(token, id);
+  },
+
+  pausePartnership: async (token, id) => {
+    await partnershipsApi.pause(token, id);
+    await get().fetchPartnership(token, id);
+    await get().fetchAll(token);
+  },
+
+  cancelPartnership: async (token, id) => {
+    await partnershipsApi.cancel(token, id);
+    await get().fetchPartnership(token, id);
+    await get().fetchAll(token);
   },
 
   createRequest: async (token, payload) => {
@@ -247,5 +302,11 @@ export const usePartnershipStore = create<PartnershipState>((set, get) => ({
   },
 
   clearCurrent: () =>
-    set({ currentPartnership: null, activity: [], documents: [], error: null }),
+    set({
+      currentPartnership: null,
+      workspace: null,
+      activity: [],
+      documents: [],
+      error: null,
+    }),
 }));

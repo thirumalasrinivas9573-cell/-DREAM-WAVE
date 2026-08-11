@@ -614,8 +614,12 @@ exports.resetPassword = async (req, res) => {
   }
 };
 
+<<<<<<< HEAD
 const VALID_ROLES = ['student', 'institution', 'company', 'admin'];
 const SELF_ASSIGNABLE_ROLES = ['student', 'institution', 'company'];
+=======
+const VALID_ROLES = ['student', 'institution', 'company'];
+>>>>>>> feature/ui-threejs
 
 exports.completeOnboarding = async (req, res) => {
   try {

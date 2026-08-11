@@ -8,10 +8,16 @@ const {
   requireCompanyPermission,
 } = require('../middleware/companyPermission')
 const recruitmentController = require('../controllers/recruitmentController')
+const businessIntelligenceController = require('../controllers/businessIntelligenceController')
 
 const companyAuth = [auth, requireRole('company'), resolveOrganization, resolveCompanyMember]
 
 router.get('/meta', companyAuth, recruitmentController.getMeta)
+router.get('/bi/dashboard', companyAuth, requireCompanyPermission('analytics.read'), businessIntelligenceController.getCompanyDashboard)
+router.get('/bi/funnel', companyAuth, requireCompanyPermission('analytics.read'), businessIntelligenceController.getCompanyFunnel)
+router.get('/bi/skills', companyAuth, requireCompanyPermission('analytics.read'), businessIntelligenceController.getCompanySkills)
+router.get('/bi/trends', companyAuth, requireCompanyPermission('analytics.read'), businessIntelligenceController.getCompanyTrends)
+router.post('/bi/ai/insights', companyAuth, requireCompanyPermission('analytics.read'), businessIntelligenceController.getCompanyAiInsights)
 router.get('/analytics', companyAuth, requireCompanyPermission('analytics.read'), recruitmentController.getAnalytics)
 router.get('/stats', companyAuth, requireCompanyPermission('analytics.read'), recruitmentController.getStats)
 router.get('/funnel', companyAuth, requireCompanyPermission('analytics.read'), recruitmentController.getFunnel)
@@ -65,6 +71,11 @@ router.post('/applications/:id/assessments', companyAuth, requireCompanyPermissi
 router.post('/applications/:id/offer', companyAuth, requireCompanyPermission('offers.manage'), recruitmentController.releaseOffer)
 router.post('/applications/:applicationId/offer/draft', companyAuth, requireCompanyPermission('offers.manage'), recruitmentController.createOfferDraft)
 router.patch('/applications/:applicationId/onboarding', companyAuth, requireCompanyPermission('applications.manage'), recruitmentController.updateOnboarding)
+router.get('/applications/:id/intelligence', companyAuth, requireCompanyPermission('applications.read'), recruitmentController.getCandidateIntelligence)
+router.post('/applications/:id/ai-summary', companyAuth, requireCompanyPermission('applications.read'), recruitmentController.getCandidateAiSummary)
+router.post('/applications/:id/interview-questions', companyAuth, requireCompanyPermission('interviews.manage'), recruitmentController.suggestInterviewQuestions)
+router.post('/applications/compare', companyAuth, requireCompanyPermission('applications.read'), recruitmentController.compareCandidates)
+
 router.get('/applications/:id/transitions', companyAuth, requireCompanyPermission('applications.read'), recruitmentController.getAllowedTransitions)
 
 router.post('/offers/:id/action', companyAuth, requireCompanyPermission('offers.manage'), recruitmentController.transitionOffer)
@@ -76,6 +87,7 @@ router.post('/jobs', companyAuth, requireCompanyPermission('jobs.manage'), recru
 router.get('/jobs/:id', companyAuth, requireCompanyPermission('jobs.manage'), recruitmentController.getJob)
 router.patch('/jobs/:id', companyAuth, requireCompanyPermission('jobs.manage'), recruitmentController.updateJob)
 router.post('/jobs/:id/action', companyAuth, requireCompanyPermission('jobs.manage'), recruitmentController.transitionJob)
+router.post('/jobs/:id/ai-analysis', companyAuth, requireCompanyPermission('jobs.manage'), recruitmentController.analyzeJob)
 
 router.get('/internships', companyAuth, requireCompanyPermission('jobs.manage'), recruitmentController.listInternships)
 router.post('/internships', companyAuth, requireCompanyPermission('jobs.manage'), recruitmentController.createInternship)

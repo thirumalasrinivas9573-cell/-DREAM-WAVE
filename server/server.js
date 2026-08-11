@@ -78,6 +78,8 @@ const mjRoutes        = require('./routes/mj')
 const partnershipRoutes = require('./routes/partnerships')
 const platformNotificationRoutes = require('./routes/platformNotifications')
 const recruitmentRoutes = require('./routes/recruitment')
+const jwt = require('jsonwebtoken')
+const { setSocketIo } = require('./services/socketRegistry')
 
 const app    = express()
 const server = http.createServer(app)
@@ -115,6 +117,19 @@ const io = new Server(server, {
   transports: ['websocket', 'polling'],
 })
 app.set('io', io)
+setSocketIo(io)
+
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token || socket.handshake.query?.token
+  if (!token) return next(new Error('Unauthorized'))
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET)
+    socket.userId = decoded.id?.toString?.() || String(decoded.id)
+    next()
+  } catch {
+    next(new Error('Unauthorized'))
+  }
+})
 
 io.use(async (socket, next) => {
   try {
@@ -137,8 +152,20 @@ io.use(async (socket, next) => {
 })
 
 io.on('connection', socket => {
+<<<<<<< HEAD
   log.info(`Socket connected: ${socket.id}`)
   socket.join(`user:${socket.user._id}`)
+=======
+  log.info(`Socket connected: ${socket.id} user=${socket.userId}`)
+  if (socket.userId) {
+    socket.join(`user:${socket.userId}`)
+  }
+  socket.on('join', userId => {
+    if (userId && userId.toString() === socket.userId) {
+      socket.join(`user:${userId}`)
+    }
+  })
+>>>>>>> feature/ui-threejs
   socket.on('disconnect', () => { log.info(`Socket disconnected: ${socket.id}`) })
 })
 
@@ -234,6 +261,17 @@ app.get('/api/test',  (_req, res) => res.json({ success: true, message: 'Dream W
 
 // ── API Routes ────────────────────────────────────────────────────────────────
 app.use('/api/auth',      authRoutes)
+app.use('/api/ai/orchestration', require('./routes/multiAgentOrchestration'))
+app.use('/api/personalization', require('./routes/contextPersonalization'))
+app.use('/api/search', require('./routes/knowledgeDiscovery'))
+app.use('/api/research/workspace', require('./routes/researchWorkspace'))
+app.use('/api/learning', require('./routes/adaptiveLearning'))
+app.use('/api/projects', require('./routes/projectIntelligence'))
+app.use('/api/career/readiness', require('./routes/careerReadiness'))
+app.use('/api/opportunities/intelligence', require('./routes/opportunityIntelligence'))
+app.use('/api/applications/workspace', require('./routes/applicationIntelligence'))
+app.use('/api/career/command-center', require('./routes/careerOperatingSystem'))
+app.use('/api/career/execution', require('./routes/goalExecution'))
 app.use('/api/ai',        aiRoutes)
 app.use('/api/ai',        aiExtRoutes)
 app.use('/api/goals',     goalRoutes)
@@ -244,10 +282,13 @@ app.use('/api/admin',     adminRoutes)
 // Lasya institution sub-modules (specific paths before general /api/institution)
 app.use('/api/institution/students', require('./routes/institutionStudents'))
 app.use('/api/institution/placements', require('./routes/institutionPlacements'))
+app.use('/api/institution/programs', require('./routes/institutionPrograms'))
+app.use('/api/company/programs', require('./routes/institutionPrograms'))
 app.use('/api/institution/research', require('./routes/institutionResearch'))
 app.use('/api/institution/incubation', require('./routes/institutionIncubation'))
 app.use('/api/institution/alumni', require('./routes/institutionAlumni'))
 app.use('/api/institution/command-center', require('./routes/institutionCommandCenter'))
+<<<<<<< HEAD
 app.use('/api/institution', institutionRoutes)
 app.use('/api/company',   companyRoutes)
 app.use('/api/discovery', discoveryRoutes)
@@ -276,6 +317,25 @@ app.use('/api/mj',        mjRoutes)
 app.use('/api/partnerships', partnershipRoutes)
 app.use('/api/platform-notifications', platformNotificationRoutes)
 app.use('/api/recruitment', recruitmentRoutes)
+=======
+app.use('/api/institution/foundation', require('./routes/institutionFoundation'))
+app.use('/api/institution/intelligence', require('./routes/institutionIntelligence'))
+app.use('/api/institution/bi', require('./routes/institutionBusinessIntelligence'))
+app.use('/api/student/recruitment', require('./routes/studentRecruitment'))
+app.use('/api/student/opportunities', require('./routes/studentOpportunities'))
+app.use('/api/student/programs', require('./routes/studentPrograms'))
+app.use('/api/student/ecosystem', require('./routes/studentEcosystem'))
+app.use('/api/ecosystem/intelligence', require('./routes/ecosystemIntelligence'))
+app.use('/api/operations', require('./routes/ecosystemAutomation'))
+app.use('/api/institution/executive-intelligence', require('./routes/executiveIntelligence'))
+app.use('/api/student/talent', require('./routes/studentTalent'))
+app.use('/api/student/career-copilot', require('./routes/careerCopilot'))
+app.use('/api/marketplace', require('./routes/talentMarketplace'))
+app.use('/api/company/talent', require('./routes/companyTalent'))
+app.use('/api/institution/talent-intelligence', require('./routes/institutionTalentIntelligence'))
+app.use('/api/institution/campus-command-center', require('./routes/campusCommandCenter'))
+app.use('/api/events', require('./routes/events'))
+>>>>>>> feature/ui-threejs
 
 // ── Global error handler ──────────────────────────────────────────────────────
 app.use((err, req, res, _next) => {
