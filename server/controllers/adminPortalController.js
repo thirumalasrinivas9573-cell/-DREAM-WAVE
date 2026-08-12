@@ -34,7 +34,7 @@ exports.getOverview = async (req, res) => {
     const [
       users, students, institutions, companies, books, jobs, internships, events,
       pendingPromotions, pendingReviews, openReports, scholarships, courses,
-      dau, mau, searches,
+      dau, mau, searches, verifiedUsers, recentLogins, suspendedUsers, institutionUsers,
     ] = await Promise.all([
       User.countDocuments(),
       User.countDocuments({ role: 'student' }),
@@ -52,6 +52,10 @@ exports.getOverview = async (req, res) => {
       PlatformAnalytics.distinct('userId', { day: today, userId: { $ne: null } }),
       PlatformAnalytics.distinct('userId', { day: { $gte: day30 }, userId: { $ne: null } }),
       SearchIndex.countDocuments({ day: today }),
+      User.countDocuments({ emailVerified: true }),
+      User.countDocuments({ lastLoginAt: { $gte: sinceDay } }),
+      User.countDocuments({ $or: [{ suspended: true }, { accountStatus: { $in: ['SUSPENDED', 'DISABLED'] } }] }),
+      User.countDocuments({ role: 'institution' }),
     ]);
 
     res.json({
@@ -73,6 +77,10 @@ exports.getOverview = async (req, res) => {
         dailyActiveUsers: dau.length,
         monthlyActiveUsers: mau.length,
         searchesToday: searches,
+        verifiedUsers,
+        recentSignIns30d: recentLogins,
+        suspendedUsers,
+        institutionUsers,
       },
     });
   } catch (err) {
@@ -123,16 +131,91 @@ exports.getAnalytics = async (req, res) => {
 exports.listUsers = async (req, res) => {
   try {
     const filter = {};
-    if (req.query.role) filter.role = req.query.role;
+    if (req.query.role && ['student', 'institution', 'company', 'admin'].includes(req.query.role)) {
+      filter.role = req.query.role;
+    }
+    if (req.query.accountStatus && ['ACTIVE', 'SUSPENDED', 'DISABLED', 'PENDING_VERIFICATION'].includes(req.query.accountStatus)) {
+      filter.accountStatus = req.query.accountStatus;
+    }
+    if (req.query.emailVerified === 'true') filter.emailVerified = true;
+    if (req.query.emailVerified === 'false') filter.emailVerified = false;
     if (req.query.q) {
       const query = new RegExp(escapeRegex(String(req.query.q).slice(0, 120)), 'i');
       filter.$or = [
         { name: query },
         { email: query },
+        { organizationName: query },
       ];
     }
-    const items = await User.find(filter).select('-password').sort('-createdAt').limit(100);
-    res.json({ success: true, items });
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const skip = (page - 1) * limit;
+
+    const [users, total] = await Promise.all([
+      User.find(filter)
+        .select('name email role organizationName institutionId emailVerified emailVerifiedAt accountStatus suspended createdAt lastLoginAt')
+        .sort('-createdAt')
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      User.countDocuments(filter),
+    ]);
+
+    const institutionIds = [...new Set(users.map((u) => u.institutionId).filter(Boolean).map(String))];
+    const ownedInstitutionUserIds = users.filter((u) => u.role === 'institution').map((u) => u._id);
+    const [linkedInstitutions, ownedInstitutions] = await Promise.all([
+      institutionIds.length
+        ? Institution.find({ _id: { $in: institutionIds } }).select('name status verified').lean()
+        : [],
+      ownedInstitutionUserIds.length
+        ? Institution.find({
+          $or: [
+            { ownerId: { $in: ownedInstitutionUserIds } },
+            { ownerUserId: { $in: ownedInstitutionUserIds } },
+          ],
+        }).select('name status verified ownerId ownerUserId').lean()
+        : [],
+    ]);
+    const linkedById = Object.fromEntries(linkedInstitutions.map((i) => [String(i._id), i]));
+    const ownedByUser = {};
+    for (const inst of ownedInstitutions) {
+      const key = String(inst.ownerUserId || inst.ownerId);
+      ownedByUser[key] = inst;
+    }
+
+    const items = users.map((u) => {
+      const owned = ownedByUser[String(u._id)];
+      const linked = u.institutionId ? linkedById[String(u.institutionId)] : null;
+      const institution = owned || linked || null;
+      return {
+        _id: u._id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        organizationName: u.organizationName || '',
+        institutionId: institution?._id || u.institutionId || null,
+        institutionName: institution?.name || u.organizationName || '',
+        institutionStatus: institution?.status || null,
+        emailVerified: Boolean(u.emailVerified),
+        emailVerifiedAt: u.emailVerifiedAt || null,
+        accountStatus: u.accountStatus || (u.suspended ? 'SUSPENDED' : 'ACTIVE'),
+        suspended: Boolean(u.suspended),
+        createdAt: u.createdAt,
+        lastLoginAt: u.lastLoginAt || null,
+      };
+    });
+
+    // Optional institution-name filter after enrichment (bounded list only).
+    const institutionFilter = String(req.query.institution || '').trim().toLowerCase();
+    const filtered = institutionFilter
+      ? items.filter((item) => String(item.institutionName || '').toLowerCase().includes(institutionFilter))
+      : items;
+
+    res.json({
+      success: true,
+      items: filtered,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -141,13 +224,83 @@ exports.listUsers = async (req, res) => {
 exports.suspendUser = async (req, res) => {
   try {
     const suspended = req.body.suspended !== false;
-    const user = await User.findByIdAndUpdate(req.params.id, { suspended }, { new: true }).select('-password');
+    const accountStatus = suspended ? 'SUSPENDED' : 'ACTIVE';
+    if (String(req.params.id) === String(req.user._id) && suspended) {
+      return res.status(400).json({ success: false, message: 'Admins cannot suspend their own account.' });
+    }
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { suspended, accountStatus },
+      { new: true },
+    ).select('-password -verificationOTP -resetPasswordOTP -phoneOTP -passwordHistory');
     if (!user) return res.status(404).json({ success: false, message: 'Not found' });
-    await logAdmin(req.user._id, suspended ? 'suspend_user' : 'unsuspend_user', 'user', user._id);
+    await logAdmin(
+      req.user._id,
+      suspended ? 'suspend_user' : 'unsuspend_user',
+      'user',
+      user._id,
+      `accountStatus=${accountStatus}`,
+    );
     if (suspended) {
       await createForUser(user._id, { title: 'Account suspended', body: 'Your Dream Wave account was suspended by an admin.', type: 'system' }).catch(() => {});
     }
     res.json({ success: true, user });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.updateUserAccess = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select('-password');
+    if (!user) return res.status(404).json({ success: false, message: 'Not found' });
+    if (String(user._id) === String(req.user._id)) {
+      return res.status(400).json({ success: false, message: 'Admins cannot change their own access here.' });
+    }
+
+    const allowedRoles = ['student', 'institution', 'company', 'admin'];
+    const allowedStatuses = ['ACTIVE', 'SUSPENDED', 'DISABLED', 'PENDING_VERIFICATION'];
+    const updates = [];
+
+    if (req.body.role !== undefined) {
+      if (!allowedRoles.includes(req.body.role)) {
+        return res.status(400).json({ success: false, message: 'Invalid role.' });
+      }
+      // Frontend/self-signup never grants admin; only Dream Wave admins can assign it here.
+      if (user.role !== req.body.role) {
+        updates.push(`role:${user.role}->${req.body.role}`);
+        user.role = req.body.role;
+      }
+    }
+
+    if (req.body.accountStatus !== undefined) {
+      if (!allowedStatuses.includes(req.body.accountStatus)) {
+        return res.status(400).json({ success: false, message: 'Invalid account status.' });
+      }
+      updates.push(`accountStatus:${user.accountStatus}->${req.body.accountStatus}`);
+      user.accountStatus = req.body.accountStatus;
+      user.suspended = req.body.accountStatus === 'SUSPENDED' || req.body.accountStatus === 'DISABLED';
+    }
+
+    if (!updates.length) {
+      return res.status(400).json({ success: false, message: 'No valid access fields provided.' });
+    }
+
+    await user.save();
+    await logAdmin(req.user._id, 'update_user_access', 'user', user._id, updates.join('; '));
+    res.json({
+      success: true,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        accountStatus: user.accountStatus,
+        suspended: user.suspended,
+        emailVerified: user.emailVerified,
+        lastLoginAt: user.lastLoginAt,
+      },
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -165,9 +318,13 @@ exports.listInstitutions = async (req, res) => {
 
 exports.approveInstitution = async (req, res) => {
   try {
-    const inst = await Institution.findByIdAndUpdate(req.params.id, { status: 'approved' }, { new: true });
+    const inst = await Institution.findByIdAndUpdate(
+      req.params.id,
+      { status: 'approved', verified: true },
+      { new: true },
+    );
     if (!inst) return res.status(404).json({ success: false, message: 'Not found' });
-    await logAdmin(req.user._id, 'approve_institution', 'institution', inst._id);
+    await logAdmin(req.user._id, 'approve_institution', 'institution', inst._id, 'verified=true');
     if (inst.ownerId) {
       await createForUser(inst.ownerId, {
         title: 'Institution approved',
@@ -184,7 +341,11 @@ exports.approveInstitution = async (req, res) => {
 
 exports.suspendInstitution = async (req, res) => {
   try {
-    const inst = await Institution.findByIdAndUpdate(req.params.id, { status: 'suspended' }, { new: true });
+    const inst = await Institution.findByIdAndUpdate(
+      req.params.id,
+      { status: 'suspended', verified: false },
+      { new: true },
+    );
     if (!inst) return res.status(404).json({ success: false, message: 'Not found' });
     await logAdmin(req.user._id, 'suspend_institution', 'institution', inst._id);
     res.json({ success: true, institution: inst });

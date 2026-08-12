@@ -17,6 +17,8 @@ export default function AdminDashboard() {
   const [bookForm, setBookForm] = useState({ title: '', author: '', pdfUrl: '', category: 'General' })
   const [broadcast, setBroadcast] = useState({ title: '', body: '', link: '', role: 'student' })
   const [userQ, setUserQ] = useState('')
+  const [userRole, setUserRole] = useState('')
+  const [userStatus, setUserStatus] = useState('')
 
   const loadOverview = useCallback(async () => {
     const ov = await adminApi.overview()
@@ -46,7 +48,11 @@ export default function AdminDashboard() {
         })
       }
       if (name === 'Users') {
-        const r = await adminApi.users({ q: userQ || undefined })
+        const r = await adminApi.users({
+          q: userQ || undefined,
+          role: userRole || undefined,
+          accountStatus: userStatus || undefined,
+        })
         setData({ users: r.data.items || [] })
       }
       if (name === 'Institutions') {
@@ -96,7 +102,7 @@ export default function AdminDashboard() {
     } catch (err) {
       setMsg(err.response?.data?.message || 'Failed to load')
     }
-  }, [loadOverview, userQ])
+  }, [loadOverview, userQ, userRole, userStatus])
 
   useEffect(() => { loadTab(tab) }, [tab, loadTab])
 
@@ -233,16 +239,56 @@ export default function AdminDashboard() {
           {tab === 'Users' && (
             <>
               <h1 style={{ marginTop: 0 }}>Manage users</h1>
-              <form onSubmit={(e) => { e.preventDefault(); loadTab('Users') }} style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                <input value={userQ} onChange={(e) => setUserQ(e.target.value)} placeholder="Search name or email" style={inp} />
+              <p style={{ color: '#9CA3AF', fontSize: '0.85rem' }}>
+                Passwords, OTPs, and tokens are never shown. Role changes are admin-only and audited.
+              </p>
+              <form onSubmit={(e) => { e.preventDefault(); loadTab('Users') }} style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                <input value={userQ} onChange={(e) => setUserQ(e.target.value)} placeholder="Search name, email, institution" style={inp} />
+                <select value={userRole} onChange={(e) => setUserRole(e.target.value)} style={inp} aria-label="Filter role">
+                  <option value="">All roles</option>
+                  <option value="student">student</option>
+                  <option value="institution">institution</option>
+                  <option value="company">company</option>
+                  <option value="admin">admin</option>
+                </select>
+                <select value={userStatus} onChange={(e) => setUserStatus(e.target.value)} style={inp} aria-label="Filter status">
+                  <option value="">All statuses</option>
+                  <option value="ACTIVE">ACTIVE</option>
+                  <option value="SUSPENDED">SUSPENDED</option>
+                  <option value="DISABLED">DISABLED</option>
+                  <option value="PENDING_VERIFICATION">PENDING_VERIFICATION</option>
+                </select>
                 <Btn onClick={() => loadTab('Users')}>Search</Btn>
               </form>
               {(data.users || []).map((u) => (
-                <Row key={u._id} label={`${u.name} · ${u.email} · ${u.role}${u.suspended ? ' · SUSPENDED' : ''}`} actions={
-                  <Btn danger onClick={() => adminApi.suspendUser(u._id, { suspended: !u.suspended }).then(refresh)}>
-                    {u.suspended ? 'Unsuspend' : 'Suspend'}
-                  </Btn>
-                }
+                <Row
+                  key={u._id}
+                  label={`${u.name} · ${u.email} · ${u.role} · ${u.accountStatus || (u.suspended ? 'SUSPENDED' : 'ACTIVE')} · verified:${u.emailVerified ? 'yes' : 'no'} · ${u.institutionName || u.organizationName || 'no institution'} · last login:${u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString() : 'never'}`}
+                  actions={
+                    <>
+                      <select
+                        defaultValue={u.role || ''}
+                        aria-label={`Change role for ${u.email}`}
+                        style={{ ...inp, width: 130 }}
+                        onChange={(e) => {
+                          const role = e.target.value
+                          if (!role || role === u.role) return
+                          adminApi.updateUserAccess(u._id, { role }).then(() => { setMsg(`Role updated for ${u.email}`); refresh() }).catch((err) => setMsg(err.response?.data?.message || 'Role update failed'))
+                        }}
+                      >
+                        <option value="student">student</option>
+                        <option value="institution">institution</option>
+                        <option value="company">company</option>
+                        <option value="admin">admin</option>
+                      </select>
+                      <Btn danger onClick={() => adminApi.suspendUser(u._id, { suspended: !(u.suspended || u.accountStatus === 'SUSPENDED') }).then(refresh)}>
+                        {(u.suspended || u.accountStatus === 'SUSPENDED') ? 'Restore' : 'Suspend'}
+                      </Btn>
+                      <Btn danger onClick={() => adminApi.updateUserAccess(u._id, { accountStatus: u.accountStatus === 'DISABLED' ? 'ACTIVE' : 'DISABLED' }).then(refresh)}>
+                        {u.accountStatus === 'DISABLED' ? 'Enable' : 'Disable'}
+                      </Btn>
+                    </>
+                  }
                 />
               ))}
             </>

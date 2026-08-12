@@ -13,8 +13,8 @@ const fieldStyle = (accent) => ({
 })
 
 /**
- * Shared production login for Institution & Company (and reusable).
- * Email/mobile + password → Email OTP or Mobile OTP. Portal-scoped.
+ * Shared production login for Institution & Company.
+ * Email/mobile + password (no login OTP). Reset-password still uses email code.
  */
 export default function PortalLoginForm({
   portal,
@@ -26,26 +26,6 @@ export default function PortalLoginForm({
   cssClass = '',
 }) {
   const auth = usePortalAuth(portal)
-
-  const channelBtn = (channel, label) => (
-    <button
-      type="button"
-      onClick={() => auth.setOtpChannel(channel)}
-      style={{
-        flex: 1,
-        padding: '8px 10px',
-        borderRadius: 8,
-        border: `1px solid ${auth.otpChannel === channel ? accent : `${accent}33`}`,
-        background: auth.otpChannel === channel ? `${accent}22` : 'transparent',
-        color: accentLight,
-        cursor: 'pointer',
-        fontSize: '0.8rem',
-        fontWeight: 600,
-      }}
-    >
-      {label}
-    </button>
-  )
 
   return (
     <div className={cssClass} style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24 }}>
@@ -63,7 +43,7 @@ export default function PortalLoginForm({
           <div style={{ fontSize: '2.5rem', marginBottom: 8 }}>{icon}</div>
           <h1 style={{ margin: '0 0 6px', fontSize: '1.5rem' }}>{portalLabel}</h1>
           <p style={{ margin: 0, opacity: 0.6, fontSize: '0.875rem' }}>
-            Email or mobile · password · email/mobile OTP
+            Email or mobile · password
           </p>
         </div>
 
@@ -102,16 +82,6 @@ export default function PortalLoginForm({
             </button>
             <button type="button" onClick={() => auth.setForgot(false)} style={{ background: 'none', border: 'none', color: accentLight, cursor: 'pointer' }}>← Back to login</button>
           </form>
-        ) : auth.step === 'otp' ? (
-          <form onSubmit={auth.handleOtp} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <p style={{ textAlign: 'center', fontSize: '0.85rem', color: accentLight, margin: 0 }}>{auth.info}</p>
-            <OtpInput value={auth.otp} onChange={auth.setOtp} accent={accent} />
-            {auth.error && <div style={{ color: '#F87171', fontSize: '0.82rem', textAlign: 'center' }}>{auth.error}</div>}
-            <button type="submit" disabled={auth.loading || auth.otp.length < 6} style={{ padding: '12px', borderRadius: 10, border: 'none', background: accent, color: '#0B1220', fontWeight: 700, cursor: 'pointer' }}>
-              {auth.loading ? 'Verifying...' : 'Verify & Sign In'}
-            </button>
-            <button type="button" onClick={auth.backToCredentials} style={{ background: 'none', border: 'none', color: accentLight, cursor: 'pointer' }}>← Back</button>
-          </form>
         ) : (
           <form onSubmit={auth.handleCredentials} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <input
@@ -132,10 +102,6 @@ export default function PortalLoginForm({
               autoComplete="current-password"
               style={fieldStyle(accent)}
             />
-            <div style={{ display: 'flex', gap: 8 }}>
-              {channelBtn('email', 'Email OTP')}
-              {channelBtn('phone', 'Mobile OTP')}
-            </div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.82rem', color: accentLight }}>
               <input type="checkbox" checked={auth.remember} onChange={(e) => auth.setRemember(e.target.checked)} />
               Remember me

@@ -214,6 +214,7 @@
   .portfolio-nav,.portfolio-footer button { display:none; }
   .public-portfolio { background:#fff;color:#111; }
 }
+@media (max-width: 720px) {
   .portfolio-cover { height:150px; }
   .portfolio-person { grid-template-columns:1fr;padding:0 18px 20px; }
   .portfolio-avatar { width:96px;height:96px;margin-top:-42px;border-radius:25px; }

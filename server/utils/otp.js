@@ -3,9 +3,22 @@
  */
 const crypto = require('crypto');
 
-const OTP_TTL_MS = 5 * 60 * 1000;       // 5 minutes
+const OTP_TTL_MS = 10 * 60 * 1000;      // 10 minutes (student pilot email verification)
 const RESEND_COOLDOWN_MS = 60 * 1000;   // 60 seconds
 const MAX_ATTEMPTS = 5;
+
+/** Basic RFC-like email syntax — any provider, no allowlist. */
+function isValidEmailFormat(email) {
+  const value = String(email || '').trim();
+  if (!value || value.length > 254) return false;
+  // Reject obvious junk; allow college/custom domains
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+    && !value.includes('..')
+    && !value.startsWith('.')
+    && !value.endsWith('.')
+    && !value.endsWith('@')
+    && !value.startsWith('@');
+}
 
 function generateOtp() {
   return String(crypto.randomInt(100000, 999999));
@@ -48,4 +61,5 @@ module.exports = {
   isOtpValid,
   canResend,
   assertAttempts,
+  isValidEmailFormat,
 };

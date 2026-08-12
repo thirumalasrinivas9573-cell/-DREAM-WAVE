@@ -60,6 +60,7 @@ export default function Roadmap() {
   const data = draft?.data || {}
   const progress = draft?.progress?.percent ?? selectedGoal?.progress ?? 0
   const dirty = useMemo(() => architectureFields.some((field) => JSON.stringify(draft?.[field] || []) !== JSON.stringify(roadmap?.[field] || [])), [draft, roadmap])
+  const transparency = data?.transparency || null
 
   useEffect(() => {
     let cancelled = false
@@ -266,6 +267,17 @@ export default function Roadmap() {
 
         {error && <ErrorState title="Roadmap action failed" message={error} onRetry={() => loadRoadmap(selectedGoalId)} />}
         {fallback && <div className="alert alert-warning">The existing AI service used its fallback roadmap because the generation provider was unavailable.</div>}
+        {transparency && (
+          <div className="alert alert-info">
+            <strong>{transparency.label === 'SYSTEM-GENERATED FALLBACK' ? 'SYSTEM-GENERATED FALLBACK' : 'Roadmap transparency'}</strong>
+            <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
+              {transparency.confirmedUserData?.length > 0 && <span>Confirmed user data: {transparency.confirmedUserData.join(', ')}</span>}
+              {transparency.databaseSignals?.length > 0 && <span>Database signals: {transparency.databaseSignals.join(', ')}</span>}
+              {transparency.aiInferences?.length > 0 && <span>AI/system inference: {transparency.aiInferences.join(', ')}</span>}
+              {transparency.needsUserConfirmation?.length > 0 && <span>Needs confirmation: {transparency.needsUserConfirmation.join(', ')}</span>}
+            </div>
+          </div>
+        )}
         {generating && <LoadingState label="Generating the existing AI roadmap and learning records…" rows={6} />}
 
         {!loadingGoals && !goals.length && (

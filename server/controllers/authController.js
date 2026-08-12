@@ -9,6 +9,7 @@ const {
   isOtpValid,
   canResend,
   assertAttempts,
+  isValidEmailFormat,
 } = require('../utils/otp');
 const { sendOtpEmail, sendWelcomeEmail, sendPasswordResetEmail } = require('../services/emailService');
 const { sendOTP: twilioSendOTP, verifyOTP: twilioVerifyOTP } = require('../services/twilioVerify');
@@ -70,8 +71,24 @@ async function completeLoginSession(req, res, user, options = {}) {
     })
   }
 
+  if (user.accountStatus === 'DISABLED' || user.accountStatus === 'SUSPENDED' || user.suspended) {
+    return res.status(403).json({
+      success: false,
+      code: user.accountStatus === 'DISABLED' ? 'ACCOUNT_DISABLED' : 'ACCOUNT_SUSPENDED',
+      message: user.accountStatus === 'DISABLED'
+        ? 'Account disabled. Contact support.'
+        : 'Account suspended. Contact support.',
+    })
+  }
+
   await bootstrapPortalProfile(user);
   await clearLoginFailures(user);
+  // Server-owned login activity — never accept client-provided lastLoginAt.
+  user.lastLoginAt = new Date();
+  if (!user.accountStatus || user.accountStatus === 'PENDING_VERIFICATION') {
+    user.accountStatus = user.emailVerified ? 'ACTIVE' : 'PENDING_VERIFICATION';
+  }
+  await user.save();
   const ua = req.headers['user-agent'] || '';
   const remember = options.remember !== undefined
     ? Boolean(options.remember)
@@ -91,6 +108,7 @@ async function completeLoginSession(req, res, user, options = {}) {
   return res.json({
     success: true,
     message: 'Login successful',
+    emailVerified: Boolean(user.emailVerified),
     token,
     accessToken: token,
     accessTokenTtl: ACCESS_TTL,
@@ -108,11 +126,15 @@ const publicUser = (user) => ({
   credits: user.credits,
   streak: user.streak,
   emailVerified: Boolean(user.emailVerified),
+  emailVerifiedAt: user.emailVerifiedAt || null,
   phone: user.phone || '',
   phoneVerified: Boolean(user.phoneVerified),
   profileImage: user.profileImage,
   certificates: user.certificates,
   role: user.role || null,
+  accountStatus: user.accountStatus || (user.suspended ? 'SUSPENDED' : 'ACTIVE'),
+  lastLoginAt: user.lastLoginAt || null,
+  institutionId: user.institutionId || null,
   onboardingCompleted: Boolean(user.onboardingCompleted),
   organizationName: user.organizationName || '',
   learningGoal: user.learningGoal || '',
@@ -228,12 +250,19 @@ exports.signup = async (req, res) => {
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Name, email, and password are required' });
     }
+    const normalized = String(email).toLowerCase().trim();
+    if (!isValidEmailFormat(normalized)) {
+      return res.status(400).json({
+        success: false,
+        code: 'INVALID_EMAIL',
+        message: 'Enter a valid email address.',
+      });
+    }
     const strength = validatePasswordStrength(password);
     if (!strength.ok) {
       return res.status(400).json({ message: strength.message });
     }
 
-    const normalized = String(email).toLowerCase().trim();
     const studentExists = await findByEmailAndPortal(normalized, 'student');
     if (studentExists) {
       return res.status(400).json({
@@ -248,35 +277,17 @@ exports.signup = async (req, res) => {
       name: String(name).trim().slice(0, 120),
       email: normalized,
       password,
-      emailVerified: false,
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
       registrationComplete: true,
       role: 'student',
     });
 
-    try {
-      await issueEmailOtp(user, 'verification');
-    } catch (mailErr) {
-      console.error('[auth] signup email delivery failed:', mailErr.message);
-      return res.status(503).json({
-        success: false,
-        message: 'Account created but we could not send the verification email. Try resend OTP.',
-        requiresVerification: true,
-        email: user.email,
-      });
-    }
-
-    res.status(201).json({
-      success: true,
-      requiresVerification: true,
-      message: 'Account created. Enter the verification code sent to your email before signing in.',
-      email: user.email,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        emailVerified: false,
-        role: user.role,
-      },
+    // Email/OTP verification disabled — issue session immediately after signup.
+    return completeLoginSession(req, res, user, {
+      remember: true,
+      portal: 'student',
+      identifier: normalized,
     });
   } catch (error) {
     return fail(res, error);
@@ -285,7 +296,7 @@ exports.signup = async (req, res) => {
 
 /**
  * Login — email or mobile + password for ONE portal account.
- * On success: send OTP challenge scoped to that portal user.
+ * Email/OTP verification disabled: password success issues a session directly.
  */
 exports.login = async (req, res) => {
   try {
@@ -328,7 +339,7 @@ exports.login = async (req, res) => {
     if (user.registrationComplete === false) {
       return res.status(403).json({
         success: false,
-        message: 'Please finish registration (mobile verification) before signing in.',
+        message: 'Please finish registration before signing in.',
         requiresRegistration: true,
       });
     }
@@ -340,49 +351,26 @@ exports.login = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
-    if (user.suspended) {
+    if (user.accountStatus === 'DISABLED') {
+      await recordLoginEvent(req, { user, success: false, reason: 'disabled', portal, identifier: id });
+      return res.status(403).json({ success: false, code: 'ACCOUNT_DISABLED', message: 'Account disabled. Contact support.' });
+    }
+    if (user.suspended || user.accountStatus === 'SUSPENDED') {
       await recordLoginEvent(req, { user, success: false, reason: 'suspended', portal, identifier: id });
-      return res.status(403).json({ success: false, message: 'Account suspended. Contact support.' });
+      return res.status(403).json({ success: false, code: 'ACCOUNT_SUSPENDED', message: 'Account suspended. Contact support.' });
     }
 
-    const otpChannel = req.body.otpChannel || 'email';
-
-    if (otpChannel === 'email') {
-      await issueEmailOtp(user, 'login');
-      const challengeToken = issueEmailLoginChallenge(user, portalRole);
-      return res.json({
-        success: true,
-        requiresOtp: true,
-        requiresEmailOtp: true,
-        otpChannel: 'email',
-        message: 'Verification code sent to your email.',
-        challengeToken,
-        email: user.email,
-        portal: portalRole,
-        expiresInSeconds: 300,
-      });
+    // Auto-mark verified for legacy accounts created under the old OTP flow.
+    if (!user.emailVerified) {
+      user.emailVerified = true;
+      user.emailVerifiedAt = user.emailVerifiedAt || new Date();
+      await user.save();
     }
 
-    if (!user.phone || !user.phoneVerified) {
-      return res.status(403).json({
-        success: false,
-        message: 'This account has no verified mobile number. Use email OTP or complete registration.',
-        code: 'PHONE_REQUIRED',
-      });
-    }
-
-    await twilioSendOTP(user.phone);
-    const challengeToken = issueLoginChallenge(user, portalRole);
-
-    res.json({
-      success: true,
-      requiresOtp: true,
-      otpChannel: 'phone',
-      message: 'OTP sent successfully.',
-      challengeToken,
-      phoneMasked: maskPhone(user.phone),
+    return completeLoginSession(req, res, user, {
+      remember: req.body?.remember !== false,
       portal: portalRole,
-      expiresInSeconds: 300,
+      identifier: id,
     });
   } catch (error) {
     return fail(res, error);
@@ -441,7 +429,8 @@ exports.forgotPassword = async (req, res) => {
 exports.resendOtp = async (req, res) => {
   try {
     const { email, purpose, portal } = req.body;
-    if (!email || !['verify', 'reset'].includes(purpose)) {
+    const resolvedPurpose = purpose === 'verification' ? 'verify' : purpose;
+    if (!email || !['verify', 'reset'].includes(resolvedPurpose)) {
       return res.status(400).json({ message: 'Email and purpose (verify|reset) are required' });
     }
 
@@ -451,26 +440,177 @@ exports.resendOtp = async (req, res) => {
     };
 
     const normalized = String(email).toLowerCase().trim();
+    if (!isValidEmailFormat(normalized)) {
+      return res.json(base); // anti-enumeration
+    }
     if (!PORTAL_ROLES.includes(portal)) {
       return res.status(400).json({ success: false, code: 'PORTAL_REQUIRED', message: 'portal is required for OTP resend.' });
     }
     const user = await findByEmailAndPortal(normalized, portal);
     if (!user) return res.json(base);
 
-    if (purpose === 'verify') {
-      await issueEmailOtp(user, 'verification');
+    if (resolvedPurpose === 'verify') {
+      if (user.emailVerified) {
+        return res.json(base);
+      }
+      try {
+        await issueEmailOtp(user, 'verification');
+      } catch (mailErr) {
+        if (mailErr.statusCode === 429) {
+          return res.status(429).json({
+            success: false,
+            code: 'RESEND_COOLDOWN',
+            message: mailErr.message || 'Please wait before requesting another code.',
+            emailDelivery: false,
+          });
+        }
+        return res.status(503).json({
+          success: false,
+          code: mailErr.code || 'EMAIL_DELIVERY_FAILED',
+          message: 'Unable to send verification email. Please try again.',
+          emailDelivery: false,
+        });
+      }
     } else {
-      await createPasswordReset({
-        user,
-        req,
-        emailFn: sendPasswordResetEmail,
-      });
+      try {
+        await createPasswordReset({
+          user,
+          req,
+          emailFn: sendPasswordResetEmail,
+        });
+      } catch (mailErr) {
+        if (mailErr.statusCode === 429) {
+          return res.status(429).json({
+            success: false,
+            code: 'RESEND_COOLDOWN',
+            message: mailErr.message || 'Please wait before requesting another code.',
+            emailDelivery: false,
+          });
+        }
+        return res.status(503).json({
+          success: false,
+          code: mailErr.code || 'EMAIL_DELIVERY_FAILED',
+          message: 'Unable to send reset email. Please try again.',
+          emailDelivery: false,
+        });
+      }
     }
 
-    res.json(base);
+    res.json({
+      ...base,
+      emailDelivery: true,
+      message: 'Verification code sent.',
+      expiresInSeconds: Math.floor(OTP_TTL_MS / 1000),
+      cooldownSeconds: Math.floor(require('../utils/otp').RESEND_COOLDOWN_MS / 1000),
+    });
   } catch (error) {
     return fail(res, error);
   }
+};
+
+/** Canonical alias: POST /auth/resend-verification */
+exports.resendVerification = async (req, res) => {
+  req.body = { ...req.body, purpose: 'verify' };
+  return exports.resendOtp(req, res);
+};
+
+/**
+ * Change email for an unverified account (student pilot).
+ * Requires current email + password + newEmail + portal.
+ */
+exports.changeEmail = async (req, res) => {
+  try {
+    const { email, newEmail, password, portal } = req.body;
+    if (!email || !newEmail || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'email, newEmail, and password are required',
+      });
+    }
+    if (!PORTAL_ROLES.includes(portal)) {
+      return res.status(400).json({ success: false, code: 'PORTAL_REQUIRED', message: 'portal is required.' });
+    }
+    const current = String(email).toLowerCase().trim();
+    const next = String(newEmail).toLowerCase().trim();
+    if (!isValidEmailFormat(current) || !isValidEmailFormat(next)) {
+      return res.status(400).json({ success: false, code: 'INVALID_EMAIL', message: 'Enter a valid email address.' });
+    }
+    if (current === next) {
+      return res.status(400).json({ success: false, message: 'New email must be different from the current email.' });
+    }
+
+    const user = await findByEmailAndPortal(current, portal);
+    if (!user) {
+      return res.status(400).json({ success: false, message: 'Unable to update email for that account.' });
+    }
+    if (user.emailVerified) {
+      return res.status(403).json({
+        success: false,
+        code: 'EMAIL_ALREADY_VERIFIED',
+        message: 'Verified emails cannot be changed from this flow.',
+      });
+    }
+    const match = await user.comparePassword(password);
+    if (!match) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+
+    const taken = await findByEmailAndPortal(next, portal);
+    if (taken && String(taken._id) !== String(user._id)) {
+      return res.status(400).json({
+        success: false,
+        code: 'PORTAL_EXISTS',
+        message: portalAlreadyExistsMessage(portal),
+      });
+    }
+
+    // Invalidate outstanding OTPs for old email/user
+    const Otp = require('../models/Otp');
+    await Otp.updateMany(
+      { userId: user._id, consumedAt: null },
+      { $set: { consumedAt: new Date() } },
+    );
+
+    user.email = next;
+    user.emailVerified = false;
+    user.emailVerifiedAt = null;
+    user.verificationOTP = null;
+    user.verificationOTPExpires = null;
+    user.emailOtpAttempts = 0;
+    user.emailOtpSentAt = null; // allow immediate OTP to new address
+    await user.save();
+
+    try {
+      await issueEmailOtp(user, 'verification');
+    } catch (mailErr) {
+      console.error('[auth] change-email delivery failed:', mailErr.code || mailErr.message);
+      return res.status(503).json({
+        success: false,
+        code: mailErr.code || 'EMAIL_DELIVERY_FAILED',
+        message: 'Email updated but we could not send the verification code. Please try resend.',
+        emailDelivery: false,
+        requiresEmailVerification: true,
+        email: user.email,
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Email updated. Verification code sent to your new address.',
+      emailDelivery: true,
+      requiresEmailVerification: true,
+      email: user.email,
+      expiresInSeconds: Math.floor(OTP_TTL_MS / 1000),
+    });
+  } catch (error) {
+    return fail(res, error);
+  }
+};
+
+/** Canonical alias: POST /auth/verify-email  { email, otp, portal } */
+exports.verifyEmail = async (req, res) => {
+  req.body = { ...req.body, purpose: 'verify' };
+  return exports.verifyOtp(req, res);
 };
 
 exports.verifyOtp = async (req, res) => {
@@ -527,15 +667,26 @@ exports.verifyOtp = async (req, res) => {
         }
       }
       user.emailVerified = true;
+      user.emailVerifiedAt = new Date();
       user.verificationOTP = null;
       user.verificationOTPExpires = null;
       user.emailOtpAttempts = 0;
       await user.save();
 
+      // Invalidate any remaining verification OTPs for this account
+      try {
+        const Otp = require('../models/Otp');
+        await Otp.updateMany(
+          { userId: user._id, purpose: 'verification', consumedAt: null },
+          { $set: { consumedAt: new Date() } },
+        );
+      } catch (_) { /* non-fatal */ }
+
       // Mid-signup for Institution/Company — verify only, do not issue a session yet
       if (user.registrationComplete === false) {
         return res.json({
           success: true,
+          emailVerified: true,
           message: 'Email verified successfully',
           email: user.email,
           portal: user.role,
@@ -544,10 +695,12 @@ exports.verifyOtp = async (req, res) => {
         });
       }
 
-      return completeLoginSession(req, res, user, {
+      // Prefer session for student pilot after verify; also include emailVerified flag
+      const sessionRes = await completeLoginSession(req, res, user, {
         remember: req.body?.remember !== false,
         portal: portal || user.role,
       });
+      return sessionRes;
     }
 
     const resetCheck = await consumePasswordReset({ userId: user._id, otp });
@@ -614,12 +767,8 @@ exports.resetPassword = async (req, res) => {
   }
 };
 
-<<<<<<< HEAD
 const VALID_ROLES = ['student', 'institution', 'company', 'admin'];
 const SELF_ASSIGNABLE_ROLES = ['student', 'institution', 'company'];
-=======
-const VALID_ROLES = ['student', 'institution', 'company'];
->>>>>>> feature/ui-threejs
 
 exports.completeOnboarding = async (req, res) => {
   try {
@@ -803,30 +952,31 @@ exports.portalInit = async (req, res) => {
         email: normalized,
         password: tempPassword,
         role: portal,
-        emailVerified: false,
-        phoneVerified: false,
+        emailVerified: true,
+        emailVerifiedAt: new Date(),
+        phoneVerified: true,
         registrationComplete: false,
         onboardingCompleted: false,
       });
       await user.save();
     } else {
       user.name = String(name).trim();
-      user.emailVerified = false;
+      user.emailVerified = true;
+      user.emailVerifiedAt = user.emailVerifiedAt || new Date();
+      user.phoneVerified = true;
       await user.save();
     }
 
-    await issueEmailOtp(user, 'verification');
+    // Email/OTP verification disabled — continue to password step.
     const registrationToken = issueRegistrationChallenge(user, portal);
 
     res.status(201).json({
       success: true,
-      message: 'Verification code sent to your email',
+      message: 'Continue with organization details and password.',
       email: normalized,
       portal,
       registrationToken,
-      step: 'verify-email',
-      resendAfterSeconds: 60,
-      expiresInSeconds: 300,
+      step: 'password',
     });
   } catch (error) {
     return fail(res, error);
@@ -848,10 +998,6 @@ exports.portalSendPhone = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'Registration session not found. Start again.' });
     }
-    if (!user.emailVerified) {
-      return res.status(400).json({ message: 'Verify email before mobile verification' });
-    }
-
     let e164 = String(phone).trim();
     if (!e164.startsWith('+')) {
       const cc = String(countryCode || '+91').startsWith('+') ? countryCode : `+${countryCode || '91'}`;
@@ -962,10 +1108,6 @@ exports.portalComplete = async (req, res) => {
     const registration = await readRegistrationAccount(registrationToken, portal);
     const user = registration?.user;
     if (!user) return res.status(404).json({ message: 'Registration session not found' });
-    if (!user.emailVerified || !user.phoneVerified) {
-      return res.status(400).json({ message: 'Email and mobile must be verified first' });
-    }
-
     user.password = password;
     user.registrationComplete = true;
     user.onboardingCompleted = true;
@@ -1056,8 +1198,9 @@ exports.verifyLoginEmailOtp = async (req, res) => {
     user.verificationOTPExpires = null;
     user.emailOtpAttempts = 0;
     user.emailVerified = true;
+    user.emailVerifiedAt = new Date();
     await user.save();
-    return completeLoginSession(req, res, user, {
+  return completeLoginSession(req, res, user, {
       remember: req.body?.remember !== false,
       portal: portal || user.role,
     });
@@ -1167,3 +1310,4 @@ exports.listLoginHistory = async (req, res) => {
 
 /** Profile alias for /me */
 exports.getProfile = exports.getMe;
+exports.publicUser = publicUser;

@@ -4,8 +4,8 @@ import OtpInput from '@shared/components/auth/OtpInput'
 import usePortalAuth from '@shared/auth/usePortalAuth'
 
 /**
- * Student login — NeuralBg shell preserved.
- * Auth via shared portal auth (email/mobile + password + email/mobile OTP).
+ * Student login — email/mobile + password (no email/OTP verification).
+ * Password-reset still uses a one-time email code.
  */
 export default function Login() {
   const auth = usePortalAuth('student')
@@ -25,7 +25,7 @@ export default function Login() {
 
         <div className="card" style={{ background: 'rgba(13,13,23,0.9)', border: '1px solid rgba(139,92,246,0.2)' }}>
           <h2 style={{ marginBottom: 22, fontSize: '1.25rem' }}>
-            {auth.forgot ? 'Reset password' : auth.step === 'otp' ? 'Verify code' : 'Welcome back'}
+            {auth.forgot ? 'Reset password' : 'Welcome back'}
           </h2>
 
           {auth.forgot === 'otp' ? (
@@ -56,16 +56,6 @@ export default function Login() {
               </button>
               <button type="button" className="btn btn-ghost" onClick={() => auth.setForgot(false)}>← Back to login</button>
             </form>
-          ) : auth.step === 'otp' ? (
-            <form onSubmit={auth.handleOtp} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>{auth.info}</p>
-              <OtpInput value={auth.otp} onChange={auth.setOtp} accent="#8B5CF6" />
-              {auth.error && <div className="alert alert-error">{auth.error}</div>}
-              <button type="submit" className="btn btn-primary btn-lg" disabled={auth.loading || auth.otp.length < 6} style={{ width: '100%' }}>
-                {auth.loading ? 'Verifying…' : 'Verify & Sign In →'}
-              </button>
-              <button type="button" className="btn btn-ghost" onClick={auth.backToCredentials}>← Back</button>
-            </form>
           ) : (
             <form onSubmit={auth.handleCredentials} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div className="form-group">
@@ -78,58 +68,27 @@ export default function Login() {
                 <input type="password" className="input" value={auth.password} onChange={(e) => auth.setPassword(e.target.value)}
                   placeholder="••••••••" required autoComplete="current-password" />
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  type="button"
-                  className={`btn ${auth.otpChannel === 'email' ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{ flex: 1, fontSize: '0.8rem' }}
-                  onClick={() => auth.setOtpChannel('email')}
-                >
-                  Email OTP
-                </button>
-                <button
-                  type="button"
-                  className={`btn ${auth.otpChannel === 'phone' ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{ flex: 1, fontSize: '0.8rem' }}
-                  onClick={() => auth.setOtpChannel('phone')}
-                >
-                  Mobile OTP
-                </button>
-              </div>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.845rem', color: 'var(--text-muted)' }}>
                 <input type="checkbox" checked={auth.remember} onChange={(e) => auth.setRemember(e.target.checked)} />
                 Remember me
               </label>
               {auth.error && <div className="alert alert-error">{auth.error}</div>}
               {auth.signupCta && (
-                <Link
-                  to={auth.signupCta}
-                  className="btn btn-secondary"
-                  style={{ width: '100%', textAlign: 'center', textDecoration: 'none' }}
-                >
-                  Create Student Account
-                </Link>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  Need this portal? <Link to={auth.signupCta} style={{ color: '#C4B5FD' }}>Create account</Link>
+                </p>
               )}
-              {auth.info && <div className="alert alert-success">{auth.info}</div>}
-              <button type="submit" className="btn btn-primary btn-lg" disabled={auth.loading} style={{ marginTop: 4, width: '100%' }}>
-                {auth.loading ? <><div className="spinner" style={{ borderTopColor: 'white' }} /> Signing in…</> : 'Sign In →'}
+              <button type="submit" className="btn btn-primary btn-lg" disabled={auth.loading} style={{ width: '100%' }}>
+                {auth.loading ? 'Signing in…' : 'Sign In →'}
               </button>
-              <button
-                type="button"
-                onClick={() => { auth.setForgot(true); auth.setResetEmail(String(auth.identifier).includes('@') ? auth.identifier : ''); auth.setError(''); auth.setInfo('') }}
-                style={{ background: 'none', border: 'none', color: 'var(--purple-light)', cursor: 'pointer', fontSize: '0.845rem' }}
-              >
-                Forgot password?
-              </button>
+              <button type="button" className="btn btn-ghost" onClick={() => auth.setForgot(true)}>Forgot password?</button>
             </form>
           )}
 
-          {!auth.forgot && auth.step === 'credentials' && (
-            <p style={{ marginTop: 18, textAlign: 'center', fontSize: '0.845rem', color: 'var(--text-muted)' }}>
-              New to Dream Wave?{' '}
-              <Link to="/student/signup" style={{ color: 'var(--purple-light)', fontWeight: 600 }}>Create account</Link>
-              <br />
-              <Link to="/" style={{ color: 'var(--purple-light)' }}>← Back to portal selection</Link>
+          {!auth.forgot && (
+            <p style={{ marginTop: 18, textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              New here?{' '}
+              <Link to="/student/signup" style={{ color: '#C4B5FD' }}>Create account</Link>
             </p>
           )}
         </div>

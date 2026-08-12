@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { authApi } from '../../services/api'
-import OtpInput from './OtpInput'
 import { setSelectedPortal } from '../../auth/portalSession'
 
 export default function PortalSignupForm({
@@ -17,10 +16,6 @@ export default function PortalSignupForm({
   const [step, setStep] = useState('account')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
-  const [countryCode, setCountryCode] = useState('+91')
-  const [emailOtp, setEmailOtp] = useState('')
-  const [phoneOtp, setPhoneOtp] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [organizationName, setOrganizationName] = useState('')
@@ -35,42 +30,9 @@ export default function PortalSignupForm({
       setSelectedPortal(portal)
       const { data } = await authApi.portalInit({ name, email, portal })
       setRegistrationToken(data.registrationToken)
-      setStep('email-otp')
+      setStep(data.step === 'password' ? 'password' : 'password')
     } catch (err) {
       setError(err.response?.data?.message || 'Could not start registration')
-    } finally { setLoading(false) }
-  }
-
-  const verifyEmail = async (e) => {
-    e.preventDefault()
-    setError(''); setLoading(true)
-    try {
-      await authApi.verifyOtp({ email, otp: emailOtp, purpose: 'verify', portal, registrationToken })
-      setStep('phone')
-    } catch (err) {
-      setError(err.response?.data?.message || 'Invalid code')
-    } finally { setLoading(false) }
-  }
-
-  const sendPhone = async (e) => {
-    e.preventDefault()
-    setError(''); setLoading(true)
-    try {
-      await authApi.portalSendPhone({ phone, countryCode, portal, registrationToken })
-      setStep('phone-otp')
-    } catch (err) {
-      setError(err.response?.data?.message || 'Could not send SMS')
-    } finally { setLoading(false) }
-  }
-
-  const verifyPhone = async (e) => {
-    e.preventDefault()
-    setError(''); setLoading(true)
-    try {
-      await authApi.portalVerifyPhone({ otp: phoneOtp, portal, registrationToken })
-      setStep('password')
-    } catch (err) {
-      setError(err.response?.data?.message || 'Invalid code')
     } finally { setLoading(false) }
   }
 
@@ -107,35 +69,7 @@ export default function PortalSignupForm({
             <input placeholder="Full name" value={name} onChange={e => setName(e.target.value)} required className="portal-input" style={inputStyle(accent)} />
             <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required className="portal-input" style={inputStyle(accent)} />
             {error && <Err msg={error} />}
-            <button type="submit" disabled={loading} style={btnStyle(accent)}>{loading ? 'Sending...' : 'Continue'}</button>
-          </form>
-        )}
-
-        {step === 'email-otp' && (
-          <form onSubmit={verifyEmail} style={{ display: 'grid', gap: 14 }}>
-            <p style={{ textAlign: 'center', fontSize: '0.85rem', color: accentLight }}>Enter the code sent to {email}</p>
-            <OtpInput value={emailOtp} onChange={setEmailOtp} accent={accent} />
-            {error && <Err msg={error} />}
-            <button type="submit" disabled={loading || emailOtp.length < 6} style={btnStyle(accent)}>Verify Email</button>
-          </form>
-        )}
-
-        {step === 'phone' && (
-          <form onSubmit={sendPhone} style={{ display: 'grid', gap: 12 }}>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input value={countryCode} onChange={e => setCountryCode(e.target.value)} style={{ ...inputStyle(accent), width: 72 }} />
-              <input placeholder="Mobile number" value={phone} onChange={e => setPhone(e.target.value)} required style={{ ...inputStyle(accent), flex: 1 }} />
-            </div>
-            {error && <Err msg={error} />}
-            <button type="submit" disabled={loading} style={btnStyle(accent)}>Send SMS Code</button>
-          </form>
-        )}
-
-        {step === 'phone-otp' && (
-          <form onSubmit={verifyPhone} style={{ display: 'grid', gap: 14 }}>
-            <OtpInput value={phoneOtp} onChange={setPhoneOtp} accent={accent} />
-            {error && <Err msg={error} />}
-            <button type="submit" disabled={loading || phoneOtp.length < 6} style={btnStyle(accent)}>Verify Mobile</button>
+            <button type="submit" disabled={loading} style={btnStyle(accent)}>{loading ? 'Continuing…' : 'Continue'}</button>
           </form>
         )}
 

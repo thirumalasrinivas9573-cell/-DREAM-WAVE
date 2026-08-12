@@ -1233,7 +1233,58 @@ async function analytics(user) {
   };
 }
 
+function isEnabled() {
+  const flag = process.env.INTELLIGENCE_V3_ENABLED
+  if (flag === undefined || flag === '') return true
+  return !['0', 'false', 'off', 'no'].includes(String(flag).toLowerCase())
+}
+
+/** Compatibility shims used by mentor / intelligence / personal knowledge layers. */
+async function syncFromCanonical(userId, { force = false } = {}) {
+  const User = require('../models/User')
+  const user = await User.findById(userId).select('_id organizationId').lean()
+  if (!user) return { synced: false, reason: 'USER_NOT_FOUND' }
+  if (force) {
+    await rebuildGraph({ user: user._id, organizationId: user.organizationId || null })
+    return { synced: true, forced: true }
+  }
+  scheduleRebuild({ user: user._id, organizationId: user.organizationId || null })
+  return { synced: true, forced: false, scheduled: true }
+}
+
+async function getGraphSummary(userId) {
+  const User = require('../models/User')
+  const user = await User.findById(userId).select('_id organizationId').lean()
+  if (!user) return { nodes: 0, edges: 0, topics: [], skills: [] }
+  const summary = await analytics(user)
+  return {
+    nodes: summary.nodeCount || 0,
+    edges: summary.edgeCount || 0,
+    byKind: summary.byKind || {},
+    readiness: summary.skillGrowth?.readiness || null,
+    topics: summary.learningPatterns?.nextBestTopic ? [summary.learningPatterns.nextBestTopic] : [],
+    skills: summary.skillGrowth?.gaps || [],
+    raw: summary,
+  }
+}
+
+async function getRelatedContext(userId, { entityType, entityId, limit = 8 } = {}) {
+  const label = [entityType, entityId].filter(Boolean).join(':')
+  if (!label) return []
+  const related = await relatedContent(label, { limit }).catch(() => [])
+  return (related || []).map((item) => ({
+    relation: item.type || item.kind || 'related',
+    to: item.label || item.key || item.title || 'related item',
+    label: item.kind || item.type || '',
+    item,
+  }))
+}
+
 module.exports = {
+  isEnabled,
+  syncFromCanonical,
+  getGraphSummary,
+  getRelatedContext,
   normKey,
   upsertNode,
   upsertEdge,

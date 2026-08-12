@@ -80,17 +80,13 @@
     "socket.io": "^4.8.3",
     "stripe": "^22.0.0",
     "twilio": "^5.13.1",
-    "zod": "^3.23.8"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
-<<<<<<< HEAD
     "mongodb-memory-server": "^10.4.3",
     "nodemon": "^3.0.1",
+    "socket.io-client": "^4.8.3",
     "supertest": "^7.2.2"
-=======
-    "nodemon": "^3.0.1",
-    "socket.io-client": "^4.8.3"
->>>>>>> feature/ui-threejs
   },
   "keywords": [
     "ai",

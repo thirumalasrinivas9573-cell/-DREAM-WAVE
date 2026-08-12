@@ -1,6 +1,6 @@
 /**
  * Shared portal authentication hook — Student / Institution / Company.
- * Same backend; portal-scoped redirects and role checks.
+ * Password login only (email/OTP verification disabled). Reset-password still uses email code.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
@@ -8,10 +8,8 @@ import { authApi } from '../services/api'
 import {
   clearOtpChallenge,
   getSelectedPortal,
-  loadOtpChallenge,
   portalDashboard,
   portalSignupPath,
-  saveOtpChallenge,
   setSelectedPortal,
   wrongPortalMessage,
 } from './portalSession'
@@ -20,8 +18,6 @@ export default function usePortalAuth(portalProp) {
   const portal = getSelectedPortal(portalProp) || portalProp
   const {
     login,
-    verifyLoginEmailOtp,
-    verifyPhoneOtp,
     goToPortal,
     logout,
     rememberedEmail,
@@ -30,37 +26,19 @@ export default function usePortalAuth(portalProp) {
   const [identifier, setIdentifier] = useState(rememberedEmail())
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(Boolean(rememberedEmail()))
-  const [otpChannel, setOtpChannel] = useState(
-    portal === 'student' ? 'email' : 'email', // all portals support both; default email
-  )
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
   const [loading, setLoading] = useState(false)
   const [step, setStep] = useState('credentials')
-  const [challenge, setChallenge] = useState(null)
-  const [otp, setOtp] = useState('')
   const [forgot, setForgot] = useState(false)
   const [resetEmail, setResetEmail] = useState('')
   const [resetOtp, setResetOtp] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [signupCta, setSignupCta] = useState(null)
 
-  // Lock portal for this login surface (survives refresh)
   useEffect(() => {
     if (portalProp) setSelectedPortal(portalProp)
   }, [portalProp])
-
-  // Restore OTP challenge after refresh
-  useEffect(() => {
-    const saved = loadOtpChallenge()
-    if (!saved || saved.portal !== portal) return
-    setChallenge(saved)
-    setStep('otp')
-    setIdentifier(saved.identifier || '')
-    setOtpChannel(saved.otpChannel || 'email')
-    setInfo(saved.info || '')
-    setRemember(Boolean(saved.remember))
-  }, [portal])
 
   const dashboardPath = portalDashboard(portal)
 
@@ -99,38 +77,7 @@ export default function usePortalAuth(portalProp) {
     e?.preventDefault?.()
     setError(''); setInfo(''); setSignupCta(null); setLoading(true)
     try {
-      let channel = otpChannel
-      let data
-      try {
-        data = await login(identifier, password, portal, { otpChannel: channel, remember })
-      } catch (err) {
-        // Mobile OTP unavailable → fall back to email OTP (same portal)
-        if (err.response?.data?.code === 'PHONE_REQUIRED' && channel === 'phone') {
-          channel = 'email'
-          setOtpChannel('email')
-          data = await login(identifier, password, portal, { otpChannel: 'email', remember })
-        } else {
-          throw err
-        }
-      }
-      if (data.requiresOtp) {
-        const nextInfo = data.requiresEmailOtp || data.otpChannel === 'email'
-          ? `Code sent to ${data.email || identifier}`
-          : `Code sent to ${data.phoneMasked || 'your phone'}`
-        const challengePayload = {
-          ...data,
-          portal,
-          identifier,
-          remember,
-          otpChannel: data.otpChannel || channel,
-          info: nextInfo,
-        }
-        setChallenge(challengePayload)
-        saveOtpChallenge(challengePayload)
-        setStep('otp')
-        setInfo(nextInfo)
-        return
-      }
+      const data = await login(identifier, password, portal, { remember })
       await finishLogin(data)
     } catch (err) {
       const payload = err.response?.data || {}
@@ -144,35 +91,6 @@ export default function usePortalAuth(portalProp) {
         setSignupCta(null)
       }
     } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleOtp = async (e) => {
-    e?.preventDefault?.()
-    if (otp.length < 6) return setError('Enter the 6-digit code')
-    setError(''); setLoading(true)
-    try {
-      const rememberEmail = remember && String(identifier).includes('@') ? identifier : null
-      const channel = challenge?.otpChannel || otpChannel
-      let data
-      if (challenge?.requiresEmailOtp || channel === 'email') {
-        data = await verifyLoginEmailOtp(
-          challenge.challengeToken,
-          otp,
-          rememberEmail,
-          remember,
-          portal,
-        )
-      } else {
-        data = await verifyPhoneOtp({
-          code: otp,
-          challengeToken: challenge.challengeToken,
-        }, rememberEmail, remember, portal)
-      }
-      await finishLogin(data)
-    } catch (err) {
-      setError(err.response?.data?.message || 'Invalid or expired code.')
       setLoading(false)
     }
   }
@@ -217,9 +135,7 @@ export default function usePortalAuth(portalProp) {
 
   const backToCredentials = () => {
     setStep('credentials')
-    setOtp('')
     setError('')
-    setChallenge(null)
     clearOtpChallenge()
   }
 
@@ -229,19 +145,21 @@ export default function usePortalAuth(portalProp) {
     identifier, setIdentifier,
     password, setPassword,
     remember, setRemember,
-    otpChannel, setOtpChannel,
+    otpChannel: 'email', setOtpChannel: () => {},
     error, setError,
     info, setInfo,
     loading,
     step,
-    challenge,
-    otp, setOtp,
+    challenge: null,
+    otp: '', setOtp: () => {},
     forgot, setForgot,
     resetEmail, setResetEmail,
     resetOtp, setResetOtp,
     newPassword, setNewPassword,
     handleCredentials,
-    handleOtp,
+    handleOtp: () => {},
+    handleEmailVerify: () => {},
+    handleResendEmailVerify: () => {},
     handleForgot,
     handleReset,
     backToCredentials,

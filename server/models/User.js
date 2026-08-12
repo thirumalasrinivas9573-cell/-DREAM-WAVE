@@ -89,6 +89,10 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  emailVerifiedAt: {
+    type: Date,
+    default: null,
+  },
   verificationOTP: {
     type: String,
     default: null,
@@ -113,6 +117,26 @@ const userSchema = new mongoose.Schema({
   suspended: {
     type: Boolean,
     default: false,
+  },
+  // Server-owned lifecycle. Clients must never write this field.
+  accountStatus: {
+    type: String,
+    enum: ['ACTIVE', 'SUSPENDED', 'DISABLED', 'PENDING_VERIFICATION'],
+    default: 'ACTIVE',
+    index: true,
+  },
+  // Server-owned. Updated only on successful authentication events.
+  lastLoginAt: {
+    type: Date,
+    default: null,
+    index: true,
+  },
+  // Canonical institution link for students (optional until verified/linked).
+  institutionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Institution',
+    default: null,
+    index: true,
   },
   onboardingCompleted: {
     type: Boolean,

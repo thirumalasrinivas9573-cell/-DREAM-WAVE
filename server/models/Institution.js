@@ -29,14 +29,9 @@ const institutionSchema = new mongoose.Schema({
   },
   code: { type: String, trim: true, default: '' },
 
-<<<<<<< HEAD
   establishedYear: { type: Number, default: null },
   ranking: { type: Number, default: null, index: true },
   verified: { type: Boolean, default: true },
-=======
-institutionSchema.index({ name: 'text', city: 'text', country: 'text' })
-institutionSchema.index({ isPublic: 1, name: 1 })
->>>>>>> feature/ui-threejs
 
   logo: { type: String, default: '' },
   logoUrl: { type: String, trim: true, default: '' },

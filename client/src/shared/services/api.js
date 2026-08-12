@@ -93,8 +93,11 @@ export const authApi = {
   onboarding: (data) => api.post('/auth/onboarding', data),
   forgotPassword: (data) => api.post('/auth/forgot-password', data),
   verifyOtp:      (data) => api.post('/auth/verify-otp', data),
+  verifyEmail:    (data) => api.post('/auth/verify-email', data),
   resetPassword:  (data) => api.post('/auth/reset-password', data),
   resendOtp:      (data) => api.post('/auth/resend-otp', data),
+  resendVerification: (data) => api.post('/auth/resend-verification', data),
+  changeEmail:    (data) => api.post('/auth/change-email', data),
   sendPhoneOtp:   (data) => api.post('/auth/send-phone-otp', data),
   verifyPhoneOtp: (data) => api.post('/auth/verify-phone-otp', data),
   portalInit:        (data) => api.post('/auth/portal/init', data),
@@ -425,6 +428,25 @@ export const researchApi = {
   summarizeSource: (id, sourceId) => api.post(`/research/projects/${id}/sources/${sourceId}/summarize`),
 }
 
+export const researchWorkspaceApi = {
+  list: (params) => api.get('/research/workspace', { params }),
+  create: (data) => api.post('/research/workspace', data),
+  get: (id) => api.get(`/research/workspace/${id}`),
+  update: (id, data) => api.patch(`/research/workspace/${id}`, data),
+  dashboard: (id) => api.get(`/research/workspace/${id}/dashboard`),
+  addSource: (id, data) => api.post(`/research/workspace/${id}/sources`, data),
+  removeSource: (id, sourceRefId) => api.delete(`/research/workspace/${id}/sources/${sourceRefId}`),
+  collectSources: (id, data) => api.post(`/research/workspace/${id}/sources/collect`, data),
+  extractEvidence: (id) => api.post(`/research/workspace/${id}/evidence/extract`),
+  synthesize: (id) => api.post(`/research/workspace/${id}/synthesize`),
+  generateReport: (id, data) => api.post(`/research/workspace/${id}/reports`, data || {}),
+  reviewReport: (id, reportId) => api.post(`/research/workspace/${id}/reports/${reportId}/review`),
+  approveReport: (id, reportId) => api.post(`/research/workspace/${id}/reports/${reportId}/approve`),
+  exportReport: (id, reportId) => api.get(`/research/workspace/${id}/reports/${reportId}/export`, { responseType: 'blob' }),
+  addNote: (id, data) => api.post(`/research/workspace/${id}/notes`, data),
+  chat: (id, data) => api.post(`/research/workspace/${id}/chat`, data),
+}
+
 export const academicsApi = {
   overview: () => api.get('/academics/overview'),
   updateProfile: (data) => api.put('/academics/profile', data),
@@ -491,6 +513,7 @@ export const adminApi = {
   reviews: (params) => api.get('/admin/reviews', { params }),
   moderateReview: (id, data) => api.patch(`/admin/reviews/${id}`, data),
   suspendUser: (id, data) => api.patch(`/admin/users/${id}/suspend`, data || { suspended: true }),
+  updateUserAccess: (id, data) => api.patch(`/admin/users/${id}/access`, data),
   books: () => api.get('/admin/books'),
   archiveBook: (id) => api.patch(`/admin/books/${id}/archive`),
   jobs: () => api.get('/admin/jobs'),
@@ -594,8 +617,8 @@ export const roadmapApi = {
 // ── Reports ───────────────────────────────────────────────────────────────────
 export const reportApi = {
   getAll:   ()     => api.get('/report'),
-  generate: (data) => api.post('/report', data),
-  download: (id)   => api.get(`/report/${id}/download`, { responseType: 'blob' }),
+  generate: (data) => api.post('/report/generate', data),
+  download: (id)   => api.get(`/report/${id}/pdf`, { responseType: 'blob' }),
 }
 
 export const mentorApi = {

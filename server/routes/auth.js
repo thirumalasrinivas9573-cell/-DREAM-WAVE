@@ -10,7 +10,10 @@ const {
   getProfile,
   forgotPassword,
   resendOtp,
+  resendVerification,
   verifyOtp,
+  verifyEmail,
+  changeEmail,
   resetPassword,
   completeOnboarding,
   sendPhoneOtp,
@@ -40,8 +43,11 @@ router.get('/me', auth, getMe);
 router.get('/profile', auth, getProfile);
 router.post('/forgot-password', forgotPassword);
 router.post('/resend-otp', resendOtp);
+router.post('/resend-verification', resendVerification);
 router.post('/verify-otp', verifyOtp);
 router.post('/verify-email-otp', verifyOtp);
+router.post('/verify-email', verifyEmail);
+router.post('/change-email', changeEmail);
 router.post('/reset-password', resetPassword);
 router.post('/onboarding', auth, completeOnboarding);
 

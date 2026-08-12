@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 const Promotion = require('../models/Promotion');
 const Institution = require('../models/Institution');
 const CompanyProfile = require('../models/CompanyProfile');
@@ -172,10 +171,6 @@ exports.getHome = async (req, res) => {
 };
 
 // ── Institution ↔ Company partnership discovery (feature/ui-threejs) ───────────
-=======
-const { searchCompanies, searchInstitutions } = require('../services/partnershipService')
-const { PUBLIC_COMPANY_FIELDS, PUBLIC_INSTITUTION_FIELDS } = require('../constants/ecosystemProfiles')
->>>>>>> feature/ui-threejs
 
 /** GET /api/discovery/companies */
 exports.searchCompanies = async (req, res) => {
@@ -248,15 +243,10 @@ exports.searchInstitutions = async (req, res) => {
 /** GET /api/discovery/companies/:id */
 exports.getCompany = async (req, res) => {
   try {
-<<<<<<< HEAD
-    const Company = require('../models/Company');
-    const company = await Company.findOne({ _id: req.params.id, isPublic: true }).lean();
-=======
     const Company = require('../models/Company')
     const company = await Company.findOne({ _id: req.params.id, isPublic: true })
       .select(PUBLIC_COMPANY_FIELDS)
       .lean()
->>>>>>> feature/ui-threejs
     if (!company) {
       return res.status(404).json({ success: false, message: 'Company not found' });
     }
@@ -269,14 +259,10 @@ exports.getCompany = async (req, res) => {
 /** GET /api/discovery/institutions/:id */
 exports.getInstitution = async (req, res) => {
   try {
-<<<<<<< HEAD
-    const institution = await Institution.findOne({ _id: req.params.id, isPublic: true }).lean();
-=======
     const Institution = require('../models/Institution')
     const institution = await Institution.findOne({ _id: req.params.id, isPublic: true })
       .select(PUBLIC_INSTITUTION_FIELDS)
       .lean()
->>>>>>> feature/ui-threejs
     if (!institution) {
       return res.status(404).json({ success: false, message: 'Institution not found' });
     }

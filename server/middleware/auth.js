@@ -26,7 +26,10 @@ const auth = async (req, res, next) => {
       return res.status(401).json({ success: false, code: 'TOKEN_INVALID', message: 'Session is not valid.' });
     }
 
-    if (user.suspended) {
+    if (user.accountStatus === 'DISABLED') {
+      return res.status(403).json({ success: false, code: 'ACCOUNT_DISABLED', message: 'Account disabled. Contact support.' });
+    }
+    if (user.suspended || user.accountStatus === 'SUSPENDED') {
       return res.status(403).json({ success: false, code: 'ACCOUNT_SUSPENDED', message: 'Account suspended. Contact support.' });
     }
 
@@ -42,4 +45,19 @@ const auth = async (req, res, next) => {
   }
 };
 
+// Compatibility aliases for merged route modules that import { protect }.
+const protect = auth;
+const authorize = (...roles) => (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ success: false, code: 'AUTH_REQUIRED', message: 'Authentication required.' });
+  }
+  if (roles.length && !roles.includes(req.user.role)) {
+    return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Insufficient permissions.' });
+  }
+  return next();
+};
+
 module.exports = auth;
+module.exports.auth = auth;
+module.exports.protect = protect;
+module.exports.authorize = authorize;

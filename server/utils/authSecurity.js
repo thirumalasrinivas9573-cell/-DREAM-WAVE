@@ -132,10 +132,20 @@ async function verifySecureEmailOtp({ email, purpose, otp, userId = null }) {
   if (!doc) {
     return { ok: false, message: 'Invalid or expired verification code' };
   }
-  assertAttempts(doc.attempts);
+  if ((doc.attempts || 0) >= (doc.maxAttempts || MAX_ATTEMPTS)) {
+    doc.consumedAt = new Date();
+    await doc.save();
+    return { ok: false, message: 'Too many verification attempts. Request a new code.', code: 'OTP_LOCKED' };
+  }
   if (!isOtpValid(doc.codeHash, doc.expiresAt, otp)) {
     doc.attempts += 1;
+    if (doc.attempts >= (doc.maxAttempts || MAX_ATTEMPTS)) {
+      doc.consumedAt = new Date();
+    }
     await doc.save();
+    if (doc.consumedAt) {
+      return { ok: false, message: 'Too many verification attempts. Request a new code.', code: 'OTP_LOCKED' };
+    }
     return { ok: false, message: 'Invalid or expired verification code' };
   }
   doc.consumedAt = new Date();

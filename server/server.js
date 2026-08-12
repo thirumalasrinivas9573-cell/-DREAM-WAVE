@@ -78,7 +78,6 @@ const mjRoutes        = require('./routes/mj')
 const partnershipRoutes = require('./routes/partnerships')
 const platformNotificationRoutes = require('./routes/platformNotifications')
 const recruitmentRoutes = require('./routes/recruitment')
-const jwt = require('jsonwebtoken')
 const { setSocketIo } = require('./services/socketRegistry')
 
 const app    = express()
@@ -152,20 +151,18 @@ io.use(async (socket, next) => {
 })
 
 io.on('connection', socket => {
-<<<<<<< HEAD
   log.info(`Socket connected: ${socket.id}`)
-  socket.join(`user:${socket.user._id}`)
-=======
-  log.info(`Socket connected: ${socket.id} user=${socket.userId}`)
-  if (socket.userId) {
+  if (socket.user?._id) {
+    socket.join(`user:${socket.user._id}`)
+  } else if (socket.userId) {
     socket.join(`user:${socket.userId}`)
   }
   socket.on('join', userId => {
-    if (userId && userId.toString() === socket.userId) {
+    const uid = socket.user?._id?.toString() || socket.userId
+    if (userId && uid && userId.toString() === uid.toString()) {
       socket.join(`user:${userId}`)
     }
   })
->>>>>>> feature/ui-threejs
   socket.on('disconnect', () => { log.info(`Socket disconnected: ${socket.id}`) })
 })
 
@@ -249,7 +246,21 @@ const connectDB = async (attempt = 1) => {
 connectDB()
 
 // ── Health ────────────────────────────────────────────────────────────────────
-app.get('/health', (_req, res) => res.json({ status: 'OK', ts: Date.now(), env: process.env.NODE_ENV }))
+// Minimal probe for Render / load balancers — no secrets, no DB credentials.
+const healthPayload = () => ({ status: 'ok' })
+app.get('/health', (_req, res) => res.json(healthPayload()))
+app.get('/api/health', (_req, res) => {
+  const mongoState = mongoose.connection.readyState
+  const mongo = mongoState === 1 ? 'up' : mongoState === 2 ? 'connecting' : 'down'
+  const status = mongo === 'up' ? 'ok' : 'degraded'
+  return res.json({
+    success: true,
+    status,
+    mongo,
+    version: require('./package.json').version,
+    time: new Date().toISOString(),
+  })
+})
 app.get('/ready', async (_req, res) => {
   const ready = mongoose.connection.readyState === 1
   if (!ready) {
@@ -266,6 +277,7 @@ app.use('/api/personalization', require('./routes/contextPersonalization'))
 app.use('/api/search', require('./routes/knowledgeDiscovery'))
 app.use('/api/research/workspace', require('./routes/researchWorkspace'))
 app.use('/api/learning', require('./routes/adaptiveLearning'))
+app.use('/api/adaptive', require('./routes/adaptive'))
 app.use('/api/projects', require('./routes/projectIntelligence'))
 app.use('/api/career/readiness', require('./routes/careerReadiness'))
 app.use('/api/opportunities/intelligence', require('./routes/opportunityIntelligence'))
@@ -288,7 +300,6 @@ app.use('/api/institution/research', require('./routes/institutionResearch'))
 app.use('/api/institution/incubation', require('./routes/institutionIncubation'))
 app.use('/api/institution/alumni', require('./routes/institutionAlumni'))
 app.use('/api/institution/command-center', require('./routes/institutionCommandCenter'))
-<<<<<<< HEAD
 app.use('/api/institution', institutionRoutes)
 app.use('/api/company',   companyRoutes)
 app.use('/api/discovery', discoveryRoutes)
@@ -317,7 +328,6 @@ app.use('/api/mj',        mjRoutes)
 app.use('/api/partnerships', partnershipRoutes)
 app.use('/api/platform-notifications', platformNotificationRoutes)
 app.use('/api/recruitment', recruitmentRoutes)
-=======
 app.use('/api/institution/foundation', require('./routes/institutionFoundation'))
 app.use('/api/institution/intelligence', require('./routes/institutionIntelligence'))
 app.use('/api/institution/bi', require('./routes/institutionBusinessIntelligence'))
@@ -335,7 +345,6 @@ app.use('/api/company/talent', require('./routes/companyTalent'))
 app.use('/api/institution/talent-intelligence', require('./routes/institutionTalentIntelligence'))
 app.use('/api/institution/campus-command-center', require('./routes/campusCommandCenter'))
 app.use('/api/events', require('./routes/events'))
->>>>>>> feature/ui-threejs
 
 // ── Global error handler ──────────────────────────────────────────────────────
 app.use((err, req, res, _next) => {

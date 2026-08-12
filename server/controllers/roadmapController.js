@@ -1,10 +1,13 @@
 const mongoose = require('mongoose')
-const { generateRoadmap, FALLBACK_ROADMAP } = require('../services/aiRoadmapService')
+const { generateRoadmap, buildFallbackRoadmap } = require('../services/aiRoadmapService')
 const { validateRoadmapPayload } = require('../services/roadmapValidator')
 const { generateDailyTasks } = require('../services/aiTaskService')
 const Roadmap = require('../models/Roadmap')
 const Goal = require('../models/Goal')
 const Task = require('../models/Task')
+const UserProfile = require('../models/UserProfile')
+const LearningProfile = require('../models/LearningProfile')
+const LearningProgress = require('../models/LearningProgress')
 const notificationService = require('../services/notificationService')
 const { syncGoalProgress } = require('../services/progressEngine')
 
@@ -37,6 +40,133 @@ function emptyRoadmapData(goal) {
     books: [],
     tips: [],
   }
+}
+
+function uniqueStrings(items = [], limit = 10) {
+  return [...new Set((items || []).map((item) => String(item || '').trim()).filter(Boolean))].slice(0, limit)
+}
+
+function slug(value) {
+  return String(value || '').trim().toLowerCase()
+}
+
+async function loadUserContext(userId, goal, overrides = {}) {
+  const [profile, learningProfile, progressItems] = await Promise.all([
+    UserProfile.findOne({ userId }).lean(),
+    LearningProfile.findOne({ user: userId }).lean(),
+    LearningProgress.find({ user: userId }).sort({ updatedAt: -1 }).limit(12).lean(),
+  ])
+
+  const confirmedSkills = uniqueStrings(Array.isArray(overrides.skills) ? overrides.skills : String(overrides.skills || '').split(','))
+  const profileSkills = uniqueStrings(profile?.skills || [])
+  const interests = uniqueStrings(Array.isArray(overrides.interests) ? overrides.interests : String(overrides.interests || '').split(',').concat(profile?.interests || []))
+  const focusAreas = uniqueStrings([...(profile?.learningPreferences?.focusAreas || []), ...(learningProfile?.focusAreas || [])])
+  const strengths = uniqueStrings((learningProfile?.strengths || []).map((item) => item.skill))
+  const weaknesses = uniqueStrings((learningProfile?.weaknesses || []).map((item) => item.skill))
+  const completedProgress = (progressItems || []).filter((item) => item.completed)
+
+  return {
+    age: overrides.age || '',
+    education: overrides.education || '',
+    goalTitle: goal.title,
+    goalCategory: goal.category,
+    goalDescription: goal.description || '',
+    targetRole: profile?.targetRole || '',
+    currentRole: profile?.currentRole || '',
+    currentLevel: goal.difficulty || '',
+    weeklyStudyHours: goal.weeklyStudyHours || 0,
+    deadline: goal.deadline || null,
+    confirmedSkills,
+    profileSkills,
+    interests,
+    focusAreas,
+    learningStyle: learningProfile?.learningStyle || '',
+    preferredPace: learningProfile?.preferredPace || '',
+    learningStrengths: strengths,
+    learningWeaknesses: weaknesses,
+    progressEvidence: completedProgress.slice(0, 6).map((item) => `${item.label} (${item.kind})`),
+    recentLearning: progressItems.slice(0, 6).map((item) => ({
+      label: item.label,
+      kind: item.kind,
+      percent: item.percent,
+      completed: item.completed,
+    })),
+    databaseSignals: uniqueStrings([
+      goal.description && 'goal description',
+      profile?.targetRole && 'target role',
+      profileSkills.length && 'stored skills',
+      interests.length && 'interests',
+      focusAreas.length && 'focus areas',
+      strengths.length && 'learning strengths',
+      progressItems.length && 'recent learning progress',
+    ]),
+  }
+}
+
+function attachTransparency(data, context, fallback = false) {
+  const confirmedUserData = uniqueStrings([
+    'goal title',
+    context.goalDescription ? 'goal description' : '',
+    context.currentLevel ? 'current level' : '',
+    context.weeklyStudyHours ? 'weekly study hours' : '',
+    context.confirmedSkills.length ? 'confirmed skills' : '',
+    context.interests.length ? 'interests' : '',
+  ], 8)
+
+  return {
+    ...data,
+    transparency: {
+      confirmedUserData,
+      databaseSignals: context.databaseSignals || [],
+      aiInferences: fallback ? ['stage ordering', 'skill-gap prioritization'] : ['skill-gap prioritization', 'stage sequencing', 'resource suggestions'],
+      needsUserConfirmation: uniqueStrings([
+        !context.targetRole ? 'target role' : '',
+        !context.confirmedSkills.length ? 'current skills' : '',
+        !context.deadline ? 'deadline' : '',
+        !context.weeklyStudyHours ? 'weekly study hours' : '',
+      ]),
+      label: fallback ? 'SYSTEM-GENERATED FALLBACK' : 'AI_GENERATED_WITH_CONTEXT',
+    },
+  }
+}
+
+function preserveGeneratedProgress(existingRoadmap, roadmapData) {
+  if (!existingRoadmap) return roadmapData
+  const nextStepsByTitle = new Map((existingRoadmap.data?.nextSteps || []).map((step) => [slug(step.title), step]))
+  const stageByTitle = new Map((existingRoadmap.learningStages || []).map((stage) => [slug(stage.title), stage]))
+
+  return {
+    ...roadmapData,
+    nextSteps: (roadmapData.nextSteps || []).map((step) => {
+      const existing = nextStepsByTitle.get(slug(step.title))
+      return existing ? { ...step, completed: Boolean(existing.completed) } : step
+    }),
+    learningStages: (roadmapData.learningStages || []).map((stage, index) => {
+      const existing = stageByTitle.get(slug(stage.title))
+      return existing ? {
+        ...stage,
+        order: index + 1,
+        status: existing.status || stage.status,
+        progress: Number.isFinite(existing.progress) ? existing.progress : stage.progress,
+      } : stage
+    }),
+  }
+}
+
+function preserveGeneratedTasks(existingTasks = [], tasksToCreate = []) {
+  const existingByTitle = new Map(existingTasks.map((task) => [slug(task.title), task]))
+  return tasksToCreate.map((task) => {
+    const existing = existingByTitle.get(slug(task.title))
+    if (!existing) return task
+    return {
+      ...task,
+      completed: Boolean(existing.completed),
+      completedAt: existing.completedAt || undefined,
+      status: existing.status || (existing.completed ? 'completed' : task.status || 'todo'),
+      progress: existing.progress || (existing.completed ? 100 : 0),
+      actualMinutes: existing.actualMinutes || 0,
+    }
+  })
 }
 
 exports.getRoadmaps = async (req, res) => {
@@ -138,15 +268,16 @@ exports.createRoadmap = async (req, res) => {
   if (!goal) return fail(res, 404, 'Goal not found.', 'NOT_FOUND')
 
   try {
-    const userContext = { age, education, skills, interests }
+    const existingRoadmap = await Roadmap.findOne({ goalId: goal._id, userId: req.user._id })
+    const userContext = await loadUserContext(req.user._id, goal, { age, education, skills, interests })
     const rawData = await generateRoadmap(goal.title, goal.category, userContext)
     const validated = validateRoadmapPayload(rawData)
-    const roadmapData = validated.valid ? { ...rawData, ...validated.data } : FALLBACK_ROADMAP
-    const learningStages = validated.data?.learningStages?.length
-      ? validated.data.learningStages
-      : (roadmapData.learningStages || []).length
-        ? roadmapData.learningStages
-        : (roadmapData.nextSteps || []).map((step, index) => ({
+    const fallbackData = attachTransparency(buildFallbackRoadmap(goal, userContext), userContext, true)
+    const mergedData = validated.valid ? attachTransparency({ ...rawData, ...validated.data }, userContext, false) : fallbackData
+    const roadmapData = preserveGeneratedProgress(existingRoadmap, mergedData)
+    const learningStages = (roadmapData.learningStages || []).length
+      ? roadmapData.learningStages
+      : (roadmapData.nextSteps || []).map((step, index) => ({
           title: step.title || `Step ${index + 1}`,
           description: step.description || '',
           order: index + 1,
@@ -173,7 +304,12 @@ exports.createRoadmap = async (req, res) => {
     try {
       const generated = await generateDailyTasks(goal.title, goal.category, roadmapData)
       const days = Array.isArray(generated?.days) ? generated.days : []
-      const tasksToCreate = days.flatMap((dayInfo) => (
+      const existingTasks = await Task.find({
+        roadmapId: roadmap._id,
+        userId: req.user._id,
+        $or: [{ source: { $in: ['ai', 'roadmap'] } }, { source: { $exists: false } }],
+      }).lean()
+      const tasksToCreate = preserveGeneratedTasks(existingTasks, days.flatMap((dayInfo) => (
         Array.isArray(dayInfo.tasks) ? dayInfo.tasks.map((task) => ({
           userId: req.user._id,
           goalId: goal._id,
@@ -186,8 +322,9 @@ exports.createRoadmap = async (req, res) => {
           estimatedTime: task.estimatedTime,
           category: goal.category,
           completed: false,
+          status: 'todo',
         })) : []
-      )).filter((task) => task.title)
+      )).filter((task) => task.title))
 
       await Task.deleteMany({
         roadmapId: roadmap._id,
@@ -195,7 +332,7 @@ exports.createRoadmap = async (req, res) => {
         $or: [{ source: { $in: ['ai', 'roadmap'] } }, { source: { $exists: false } }],
       })
       if (tasksToCreate.length) await Task.insertMany(tasksToCreate)
-      if (resetProgress === true) {
+      if (resetProgress === true && !existingRoadmap) {
         await Goal.updateOne({ _id: goal._id, userId: req.user._id }, { $set: { progress: 0, completed: false } })
       }
     } catch (taskErr) {
@@ -208,11 +345,13 @@ exports.createRoadmap = async (req, res) => {
     console.error('[roadmapController.createRoadmap]', error.message)
     const isQuota = error?.status === 429 || error?.code === 'insufficient_quota'
     if (isQuota) {
+      const userContext = await loadUserContext(req.user._id, goal, { age, education, skills, interests })
+      const fallbackRoadmap = attachTransparency(buildFallbackRoadmap(goal, userContext), userContext, true)
       const roadmap = await Roadmap.findOneAndUpdate(
         { goalId: goal._id, userId: req.user._id },
         {
           $set: {
-            data: FALLBACK_ROADMAP,
+            data: fallbackRoadmap,
             status: 'active',
             'architecture.schemaVersion': 'learning-roadmap-v1',
             'architecture.source': 'fallback',

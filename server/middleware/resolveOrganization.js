@@ -3,13 +3,24 @@ const Company = require('../models/Company')
 const InstitutionMember = require('../models/InstitutionMember')
 
 async function ensureInstitutionProfile(user) {
-  let institution = await Institution.findOne({ ownerUserId: user._id })
+  let institution = await Institution.findOne({
+    $or: [{ ownerUserId: user._id }, { ownerId: user._id }],
+  })
   if (!institution) {
     institution = await Institution.create({
+      ownerId: user._id,
       ownerUserId: user._id,
       name: user.organizationName?.trim() || user.name || 'Institution',
       email: user.email,
+      contact: { email: user.email },
+      status: 'pending',
+      verified: false,
     })
+  } else {
+    let dirty = false
+    if (!institution.ownerId) { institution.ownerId = user._id; dirty = true }
+    if (!institution.ownerUserId) { institution.ownerUserId = user._id; dirty = true }
+    if (dirty) await institution.save()
   }
   return institution
 }
@@ -27,13 +38,16 @@ async function ensureCompanyProfile(user) {
 }
 
 async function resolveInstitutionForUser(user) {
-  const owned = await Institution.findOne({ ownerUserId: user._id })
+  const owned = await Institution.findOne({
+    $or: [{ ownerUserId: user._id }, { ownerId: user._id }],
+  })
   if (owned) return owned
 
+  // Prefer OWNER/ADMIN memberships when a user belongs to multiple institutions.
   const membership = await InstitutionMember.findOne({
     userId: user._id,
     active: { $ne: false },
-  })
+  }).sort({ role: 1, updatedAt: -1 })
   if (membership) {
     const institution = await Institution.findById(membership.institutionId)
     if (institution) return institution

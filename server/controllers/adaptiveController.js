@@ -107,14 +107,29 @@ exports.achievements = asyncHandler(async (req, res) => {
 });
 
 exports.animations = asyncHandler(async (req, res) => {
-  const items = await adaptive.recommendAnimations(req.user, {
-    topic: req.query.topic,
-    skill: req.query.skill,
-    bookId: req.query.bookId,
-    courseId: req.query.courseId,
-    limit: Math.min(30, parseInt(req.query.limit, 10) || 10),
+  const limit = Math.min(30, parseInt(req.query.limit, 10) || 10);
+  const query = {
+    type: 'animation',
+    status: 'published',
+    $or: [
+      { scope: 'public' },
+      { uploadedBy: req.user._id },
+    ],
+  };
+  if (req.query.topic) query.topics = req.query.topic;
+  if (req.query.skill) query.skills = req.query.skill;
+  if (req.query.bookId) query.book = req.query.bookId;
+  if (req.query.courseId) query.course = req.query.courseId;
+  const items = await MediaItem.find(query).sort({ views: -1, createdAt: -1 }).limit(limit).lean();
+  res.json({
+    success: true,
+    data: {
+      capability: 'recommended_media',
+      status: 'AVAILABLE',
+      message: 'These results are recommended or mapped learning animations/media. This endpoint does not generate new animations from a provider.',
+      animations: items,
+    },
   });
-  res.json({ success: true, data: { animations: items } });
 });
 
 exports.mapAnimation = asyncHandler(async (req, res) => {
@@ -123,15 +138,22 @@ exports.mapAnimation = asyncHandler(async (req, res) => {
   const isOwner = String(item.uploadedBy) === String(req.user._id);
   const isAdmin = req.user.role === 'admin';
   if (!isOwner && !isAdmin) throw new AppError('Forbidden', 403);
-  const updated = await adaptive.mapAnimation(req.user, item._id, {
-    topics: req.body.topics,
-    skills: req.body.skills,
-    bookId: req.body.bookId,
-    courseId: req.body.courseId,
-    difficulty: req.body.difficulty,
-    learningObjectives: req.body.learningObjectives,
+  if (Array.isArray(req.body.topics)) item.topics = req.body.topics.map((value) => String(value || '').trim()).filter(Boolean).slice(0, 12);
+  if (Array.isArray(req.body.skills)) item.skills = req.body.skills.map((value) => String(value || '').trim()).filter(Boolean).slice(0, 12);
+  if (req.body.bookId !== undefined) item.book = req.body.bookId || null;
+  if (req.body.courseId !== undefined) item.course = req.body.courseId || null;
+  if (req.body.difficulty !== undefined) item.difficulty = req.body.difficulty || '';
+  if (Array.isArray(req.body.learningObjectives)) item.learningObjectives = req.body.learningObjectives.map((value) => String(value || '').trim()).filter(Boolean).slice(0, 12);
+  item.rebuildSearchIndex?.();
+  await item.save();
+  res.json({
+    success: true,
+    data: {
+      capability: 'mapped_media',
+      message: 'The media item was mapped to learning metadata. No provider-backed animation generation was performed.',
+      media: item,
+    },
   });
-  res.json({ success: true, data: { media: updated } });
 });
 
 exports.animationProgress = asyncHandler(async (req, res) => {
@@ -155,6 +177,7 @@ exports.animationProgress = asyncHandler(async (req, res) => {
   res.json({
     success: true,
     data: {
+      capability: 'playback_progress',
       mediaProgress: progress,
       mappings: {
         topics: media.topics,
